@@ -741,31 +741,40 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         suggestions.add("\"" + word + "\"");
 
         final boolean autoCorrectionEnabled = mSettings.getCurrent().mAutoCorrectionEnabled;
-        final CharSequence bestCorrection = mPrefixDictionary.getBestCorrection(word);
+        final java.util.List<CharSequence> matches = mPrefixDictionary.getSuggestions(word, 3);
+        final CharSequence bestCorrection;
+        if (autoCorrectionEnabled) {
+            final CharSequence exactNorm = mPrefixDictionary.getExactNormalizedCorrection(word);
+            if (exactNorm != null) {
+                bestCorrection = exactNorm;
+            } else if (matches.isEmpty()) {
+                bestCorrection = mPrefixDictionary.getBestCorrection(word);
+            } else {
+                bestCorrection = null;
+            }
+        } else {
+            bestCorrection = null;
+        }
 
-        if (bestCorrection != null && autoCorrectionEnabled) {
+        if (bestCorrection != null) {
             // Typo or missing accent with auto-correction enabled:
             // 2. Slot 1: Target autocorrection in BOLD
             suggestions.add(bestCorrection);
             boldIndex = 1;
             // 3. Slot 2: Alternative prefix suggestion if any
-            final java.util.List<CharSequence> more = mPrefixDictionary.getSuggestions(word, 3);
-            for (CharSequence s : more) {
+            for (CharSequence s : matches) {
                 if (!s.toString().equalsIgnoreCase(bestCorrection.toString()) && suggestions.size() < 3) {
                     suggestions.add(s);
                 }
             }
-        } else {
+        } else if (!matches.isEmpty()) {
             // Normal typing / valid prefix / auto-correction disabled:
-            final java.util.List<CharSequence> matches = mPrefixDictionary.getSuggestions(word, 3);
-            if (!matches.isEmpty()) {
-                // 2. Slot 1: Top suggested completion in BOLD
-                suggestions.add(matches.get(0));
-                boldIndex = 1;
-                // 3. Slot 2: Secondary suggestion if available
-                if (matches.size() > 1) {
-                    suggestions.add(matches.get(1));
-                }
+            // 2. Slot 1: Top suggested completion in BOLD
+            suggestions.add(matches.get(0));
+            boldIndex = 1;
+            // 3. Slot 2: Secondary suggestion if available
+            if (matches.size() > 1) {
+                suggestions.add(matches.get(1));
             }
         }
 

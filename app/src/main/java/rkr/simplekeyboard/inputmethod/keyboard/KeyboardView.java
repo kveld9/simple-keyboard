@@ -85,9 +85,9 @@ public class KeyboardView extends View {
     private final float mKeyShiftedLetterHintPadding;
     private final float mKeyTextShadowRadius;
     private final float mVerticalCorrection;
-    private final Drawable mKeyBackground;
-    private final Drawable mFunctionalKeyBackground;
-    private final Drawable mSpacebarBackground;
+    private Drawable mKeyBackground;
+    private Drawable mFunctionalKeyBackground;
+    private Drawable mSpacebarBackground;
     private final Rect mKeyBackgroundPadding = new Rect();
     private static final float KET_TEXT_SHADOW_RADIUS_DISABLED = -1.0f;
     protected int mCustomColor = 0;
@@ -173,8 +173,30 @@ public class KeyboardView extends View {
         final SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(getContext());
         mCustomColor = Settings.readKeyboardColor(prefs, getContext());
         mTheme = Settings.getKeyboardTheme(getContext());
+        updateKeyBackgrounds(prefs);
         invalidateAllKeys();
         requestLayout();
+    }
+
+    private void updateKeyBackgrounds(final SharedPreferences prefs) {
+        final String shape = Settings.readKeyShape(prefs);
+        final Context context = getContext();
+        if (Settings.KEY_SHAPE_ROUNDED.equals(shape)) {
+            mKeyBackground = context.getDrawable(R.drawable.btn_keyboard_key_rounded);
+            mFunctionalKeyBackground = mKeyBackground;
+            mSpacebarBackground = context.getDrawable(R.drawable.btn_keyboard_spacebar_rounded);
+        } else if (Settings.KEY_SHAPE_RECTANGULAR.equals(shape)) {
+            mKeyBackground = context.getDrawable(R.drawable.btn_keyboard_key_border);
+            mFunctionalKeyBackground = mKeyBackground;
+            mSpacebarBackground = context.getDrawable(R.drawable.btn_keyboard_spacebar);
+        } else if (Settings.KEY_SHAPE_BORDERLESS.equals(shape)) {
+            mKeyBackground = context.getDrawable(R.drawable.btn_keyboard_key);
+            mFunctionalKeyBackground = mKeyBackground;
+            mSpacebarBackground = context.getDrawable(R.drawable.btn_keyboard_spacebar);
+        }
+        if (mKeyBackground != null) {
+            mKeyBackground.getPadding(mKeyBackgroundPadding);
+        }
     }
 
     /**

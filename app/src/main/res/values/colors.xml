@@ -52,4 +52,5 @@
     <color name="key_background_pressed_lxx_dark">#4AAAAAAA</color>
     <!-- Dimensions for all themes. -->
     <dimen name="button_corner_radius_lxx">6dp</dimen>
+    <dimen name="button_corner_radius_rounded">20dp</dimen>
  </resources>

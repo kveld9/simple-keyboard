@@ -153,7 +153,7 @@
     </string-array>
     <string name="key_shape">Key shape</string>
     <string-array name="key_shape_entries">
-        <item>Rounded (Gboard style)</item>
+        <item>Rounded</item>
         <item>Rectangular</item>
         <item>Borderless</item>
     </string-array>

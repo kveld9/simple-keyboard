@@ -641,6 +641,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         mLoadedLocale = locale;
+        mPrefixDictionary.clear();
         final String lang = locale.getLanguage();
         final String assetName = "es".equals(lang) ? "dict_es.txt" : "dict_en.txt";
         boolean loaded = false;
@@ -666,24 +667,75 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         if (!mSettings.getCurrent().mShowSuggestions) {
-            mTopBarView.setSuggestions(null);
+            mTopBarView.setSuggestions(null, -1);
             return;
         }
         final EditorInfo editorInfo = getCurrentInputEditorInfo();
         if (editorInfo != null) {
             final InputAttributes attr = new InputAttributes(editorInfo, isFullscreenMode());
             if (attr.mIsPasswordField) {
-                mTopBarView.setSuggestions(null);
+                mTopBarView.setSuggestions(null, -1);
                 return;
             }
         }
         final String word = mInputLogic.mConnection.getWordBeforeCursor();
-        if (word.isEmpty()) {
-            mTopBarView.setSuggestions(null);
+        if (word == null || word.trim().isEmpty()) {
+            mTopBarView.setSuggestions(null, -1);
             return;
         }
-        final java.util.List<CharSequence> suggestions = mPrefixDictionary.getSuggestions(word, 6);
-        mTopBarView.setSuggestions(suggestions);
+
+        final java.util.List<CharSequence> suggestions = new java.util.ArrayList<>();
+        int boldIndex = -1;
+
+        final boolean autoCorrectionEnabled = mSettings.getCurrent().mAutoCorrectionEnabled;
+        final CharSequence bestCorrection = mPrefixDictionary.getBestCorrection(word);
+
+        if (bestCorrection != null && autoCorrectionEnabled) {
+            // Typo detected with auto-correction enabled:
+            // 1. Literal typed word in slot 0 (so user can tap to keep their original spelling)
+            suggestions.add("\"" + word + "\"");
+            // 2. Target autocorrection word in center slot (BOLD)
+            suggestions.add(bestCorrection);
+            boldIndex = 1;
+            // 3. Alternative prefix suggestions if any in slot 2
+            final java.util.List<CharSequence> more = mPrefixDictionary.getSuggestions(word, 3);
+            for (CharSequence s : more) {
+                if (!s.toString().equalsIgnoreCase(bestCorrection.toString()) && suggestions.size() < 3) {
+                    suggestions.add(s);
+                }
+            }
+        } else {
+            // Normal typing / valid prefix / auto-correction disabled:
+            final java.util.List<CharSequence> matches = mPrefixDictionary.getSuggestions(word, 4);
+            if (matches.isEmpty()) {
+                // Word not in dictionary: at least show typed word in the bar
+                suggestions.add(word);
+                boldIndex = 0;
+            } else {
+                final boolean exactMatch = mPrefixDictionary.containsWord(word);
+                if (exactMatch) {
+                    // Exact match: 1st candidate is the word itself (in bold)
+                    suggestions.add(matches.get(0));
+                    boldIndex = 0;
+                    for (int i = 1; i < matches.size() && suggestions.size() < 3; i++) {
+                        suggestions.add(matches.get(i));
+                    }
+                } else {
+                    // Prefix completion:
+                    // Slot 0 (Left): exact typed prefix
+                    suggestions.add(word);
+                    // Slot 1 (Center): top recommended completion in BOLD
+                    suggestions.add(matches.get(0));
+                    boldIndex = 1;
+                    // Slot 2 (Right): secondary completion
+                    if (matches.size() > 1) {
+                        suggestions.add(matches.get(1));
+                    }
+                }
+            }
+        }
+
+        mTopBarView.setSuggestions(suggestions, boldIndex);
     }
 
     @Override

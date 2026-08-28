@@ -60,4 +60,20 @@
     <string name="show_language_switch_key">Mostrar tecla de cambio de idioma</string>
     <string name="pref_use_on_screen">Mostrar el teclado en pantalla</string>
     <string name="show_special_chars">Mostrar caracteres especiales</string>
+    <string name="clipboard">Portapapeles</string>
+    <string name="clipboard_empty">Portapapeles vacío</string>
+    <string name="clipboard_empty_description">Los elementos copiados se mostrarán aquí</string>
+    <string name="clipboard_clear_all">Limpiar no fijados</string>
+    <string name="clipboard_delete">Eliminar</string>
+    <string name="clipboard_pin">Fijar</string>
+    <string name="clipboard_unpin">Desfijar</string>
+    <string name="clipboard_history_retention_time">Tiempo de retención del portapapeles</string>
+    <string-array name="clipboard_retention_entries">
+        <item>10 minutos</item>
+        <item>1 hora</item>
+        <item>1 día</item>
+        <item>3 días</item>
+        <item>7 días</item>
+        <item>Nunca</item>
+    </string-array>
 </resources>

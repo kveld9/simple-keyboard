@@ -285,6 +285,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final EditorInfo editorInfo = getCurrentInputEditorInfo();
         final InputAttributes inputAttributes = new InputAttributes(editorInfo, isFullscreenMode());
         mSettings.loadSettings(inputAttributes);
+        rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet.clearKeyboardCache();
         final SettingsValues currentSettingsValues = mSettings.getCurrent();
         AudioAndHapticFeedbackManager.getInstance().onSettingsChanged(currentSettingsValues);
     }
@@ -468,15 +469,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     void onStartInputInternal(final EditorInfo editorInfo, final boolean restarting) {
         super.onStartInput(editorInfo, restarting);
-
-        // If the primary hint language does not match the current subtype language, then try
-        // to switch to the primary hint language.
-        // TODO: Support all the locales in EditorInfo#hintLocales.
-        final Locale primaryHintLocale = EditorInfoCompatUtils.getPrimaryHintLocale(editorInfo);
-        if (primaryHintLocale == null) {
-            return;
-        }
-        mRichImm.setCurrentSubtype(primaryHintLocale);
     }
 
     void onStartInputViewInternal(final EditorInfo editorInfo, final boolean restarting) {
@@ -544,21 +536,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mInputLogic.mConnection.reloadTextCache(editorInfo, restarting);
         }
 
-        if (isDifferentTextField ||
-                !currentSettingsValues.hasSameOrientation(getResources().getConfiguration())) {
-            loadSettings();
-        }
-        if (isDifferentTextField) {
-            mainKeyboardView.closing();
-            currentSettingsValues = mSettings.getCurrent();
+        loadSettings();
+        currentSettingsValues = mSettings.getCurrent();
+        mainKeyboardView.closing();
+        switcher.loadKeyboard(editorInfo, currentSettingsValues, getCurrentAutoCapsState(),
+                getCurrentRecapitalizeState());
 
-            switcher.loadKeyboard(editorInfo, currentSettingsValues, getCurrentAutoCapsState(),
-                    getCurrentRecapitalizeState());
-        } else {
-            // TODO: Come up with a more comprehensive way to reset the keyboard layout when
-            // a keyboard layout set doesn't get reloaded in this method.
-            switcher.resetKeyboardStateToAlphabet(getCurrentAutoCapsState(),
-                    getCurrentRecapitalizeState());
+        if (mTopBarView != null) {
+            mTopBarView.setLanguageButtonVisible(shouldShowLanguageSwitchKey());
         }
 
         if (TRACE) Debug.startMethodTracing("/data/trace/latinime");

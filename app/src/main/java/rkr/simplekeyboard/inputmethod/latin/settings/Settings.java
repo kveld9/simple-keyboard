@@ -107,6 +107,10 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
+        if (PREF_ENABLED_SUBTYPES.equals(key) || key == null) {
+            RichInputMethodManager.getInstance().reloadSubtypes(mContext);
+        }
+        rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet.clearKeyboardCache();
         mSettingsValuesLock.lock();
         try {
             if (mSettingsValues == null) {

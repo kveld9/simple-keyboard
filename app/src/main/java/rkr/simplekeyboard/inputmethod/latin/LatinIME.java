@@ -329,6 +329,28 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mInputView = view;
         updateSoftInputWindowLayoutParameters();
         view.requestApplyInsets();
+
+        if (mInputView != null) {
+            final rkr.simplekeyboard.inputmethod.latin.topbar.TopBarView topBar = mInputView.findViewById(rkr.simplekeyboard.inputmethod.R.id.top_bar_view);
+            if (topBar != null) {
+                topBar.setListener(new rkr.simplekeyboard.inputmethod.latin.topbar.TopBarListener() {
+                    @Override
+                    public void onSettingsClicked() {
+                        launchSettings();
+                    }
+
+                    @Override
+                    public void onLanguageClicked() {
+                        switchToNextSubtype();
+                    }
+
+                    @Override
+                    public void onClipboardTextClicked(CharSequence text) {
+                        mInputLogic.mConnection.commitText(text, 1);
+                    }
+                });
+            }
+        }
     }
 
     @Override
@@ -557,12 +579,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             outInsets.visibleTopInsets = inputHeight;
             return;
         }
-        final int visibleTopY = inputHeight - visibleKeyboardView.getHeight();
+        final View topBar = mInputView.findViewById(rkr.simplekeyboard.inputmethod.R.id.top_bar_view);
+        final int topBarHeight = (topBar != null && topBar.getVisibility() == View.VISIBLE) ? topBar.getHeight() : 0;
+        final int visibleHeight = visibleKeyboardView.getHeight() + topBarHeight;
+        final int visibleTopY = Math.max(0, inputHeight - visibleHeight);
         // Need to set expanded touchable region only if a keyboard view is being shown.
         if (visibleKeyboardView.isShown()) {
             final int touchLeft = 0;
             final int touchTop = mKeyboardSwitcher.isShowingMoreKeysPanel() ? 0 : visibleTopY;
-            final int touchRight = visibleKeyboardView.getWidth();
+            final int touchRight = mInputView.getWidth();
             final int touchBottom = inputHeight
                     // Extend touchable region below the keyboard.
                     + EXTENDED_TOUCHABLE_REGION_HEIGHT;
@@ -612,7 +637,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // {@link SoftInputWindow#updateWidthHeight(WindowManager.LayoutParams)}.
         final Window window = getWindow().getWindow();
         ViewLayoutUtils.updateLayoutHeightOf(window, LayoutParams.MATCH_PARENT);
-        // This method may be called before {@link #setInputView(View)}.
         if (mInputView != null) {
             // In non-fullscreen mode, {@link InputView} and its parent inputArea should expand to
             // the entire screen and be placed at the bottom of {@link SoftInputWindow}.

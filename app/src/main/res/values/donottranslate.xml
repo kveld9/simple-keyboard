@@ -41,26 +41,10 @@
 
     <!-- Predefined keyboard layouts for additional subtype -->
     <string-array name="predefined_layouts">
-        <item>bepo</item>
         <item>qwerty</item>
-        <item>qwertz</item>
-        <item>azerty</item>
-        <item>dvorak</item>
-        <item>colemak</item>
-        <item>workman</item>
-        <item>pcqwerty</item>
-        <item>abc</item>
     </string-array>
     <!-- Predefined keyboard layout display names -->
     <string-array name="predefined_layout_display_names">
-        <item>BEPO</item>
         <item>QWERTY</item>
-        <item>QWERTZ</item>
-        <item>AZERTY</item>
-        <item>Dvorak</item>
-        <item>Colemak</item>
-        <item>Workman</item>
-        <item>PC</item>
-        <item>ABC</item>
     </string-array>
 </resources>

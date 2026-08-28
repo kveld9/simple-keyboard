@@ -423,11 +423,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         final View keyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (keyboardView != null) {
-            final SettingsValues currentSettingsValues = mSettings.getCurrent();
-            final KeyboardSwitcher switcher = mKeyboardSwitcher;
-            final int visibility = switcher.isImeSuppressedByHardwareKeyboard(currentSettingsValues, switcher.getKeyboardSwitchState())
-                    ? View.GONE : View.VISIBLE;
-            keyboardView.setVisibility(visibility);
+            keyboardView.setVisibility(View.VISIBLE);
         }
         if (mInputView != null) {
             mInputView.requestLayout();

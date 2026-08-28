@@ -92,6 +92,7 @@ public class KeyboardView extends View {
     private static final float KET_TEXT_SHADOW_RADIUS_DISABLED = -1.0f;
     protected int mCustomColor = 0;
     protected KeyboardTheme mTheme;
+    private boolean mIsRoundedShape = false;
 
     // The maximum key label width in the proportion to the key width.
     private static final float MAX_LABEL_RATIO = 0.90f;
@@ -180,6 +181,7 @@ public class KeyboardView extends View {
 
     private void updateKeyBackgrounds(final SharedPreferences prefs) {
         final String shape = Settings.readKeyShape(prefs);
+        mIsRoundedShape = Settings.KEY_SHAPE_ROUNDED.equals(shape);
         final Context context = getContext();
         if (Settings.KEY_SHAPE_ROUNDED.equals(shape)) {
             mKeyBackground = context.getDrawable(R.drawable.btn_keyboard_key_rounded);
@@ -449,17 +451,21 @@ public class KeyboardView extends View {
                 paint.setTextAlign(Align.LEFT);
             } else if (key.hasShiftedLetterHint()) {
                 // The hint label is placed at top-right corner of the key. Used mainly on tablet.
-                hintX = keyWidth - mKeyShiftedLetterHintPadding - labelCharWidth / 2.0f;
+                final float roundedInsetX = mIsRoundedShape ? (keyWidth * 0.09f) : 0.0f;
+                final float roundedInsetY = mIsRoundedShape ? (keyHeight * 0.08f) : 0.0f;
+                hintX = keyWidth - mKeyShiftedLetterHintPadding - roundedInsetX - labelCharWidth / 2.0f;
                 paint.getFontMetrics(mFontMetrics);
-                hintBaseline = -mFontMetrics.top;
+                hintBaseline = -mFontMetrics.top + roundedInsetY;
                 paint.setTextAlign(Align.CENTER);
             } else { // key.hasHintLetter()
                 // The hint letter is placed at top-right corner of the key. Used mainly on phone.
                 final float hintDigitWidth = TypefaceUtils.getReferenceDigitWidth(paint);
                 final float hintLabelWidth = TypefaceUtils.getStringWidth(hintLabel, paint);
-                hintX = keyWidth - mKeyHintLetterPadding
+                final float roundedInsetX = mIsRoundedShape ? (keyWidth * 0.09f) : 0.0f;
+                final float roundedInsetY = mIsRoundedShape ? (keyHeight * 0.08f) : 0.0f;
+                hintX = keyWidth - mKeyHintLetterPadding - roundedInsetX
                         - Math.max(hintDigitWidth, hintLabelWidth) / 2.0f;
-                hintBaseline = -paint.ascent();
+                hintBaseline = -paint.ascent() + roundedInsetY;
                 paint.setTextAlign(Align.CENTER);
             }
             final float adjustmentY = params.mHintLabelVerticalAdjustment * labelCharHeight;

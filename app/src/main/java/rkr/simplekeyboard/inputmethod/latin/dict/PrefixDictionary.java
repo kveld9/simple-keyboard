@@ -1,19 +1,3 @@
-/*
- * Copyright (C) 2026 Simple Keyboard Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package rkr.simplekeyboard.inputmethod.latin.dict;
 
 import java.io.BufferedReader;
@@ -24,18 +8,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * Lightweight in-memory Trie dictionary for prefix-based autocompletion and word suggestions.
+ * Lightweight in-memory Trie dictionary with Accent-Folding and Diacritic Invariance.
  */
 public final class PrefixDictionary {
 
     private static final class TrieNode {
         final Map<Character, TrieNode> children = new HashMap<>();
-        boolean isEndOfWord;
-        int frequency;
+        final List<ScoredWord> words = new ArrayList<>();
     }
 
     private static final class ScoredWord implements Comparable<ScoredWord> {
@@ -60,11 +45,33 @@ public final class PrefixDictionary {
     public PrefixDictionary() {
     }
 
+    public static String stripAccents(final String s) {
+        if (s == null) return "";
+        final StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            final char c = s.charAt(i);
+            switch (c) {
+                case 'á': case 'à': case 'ä': case 'â': case 'ã': sb.append('a'); break;
+                case 'é': case 'è': case 'ë': case 'ê': sb.append('e'); break;
+                case 'í': case 'ì': case 'ï': case 'î': sb.append('i'); break;
+                case 'ó': case 'ò': case 'ö': case 'ô': case 'õ': sb.append('o'); break;
+                case 'ú': case 'ù': case 'ü': case 'û': sb.append('u'); break;
+                case 'Á': case 'À': case 'Ä': case 'Â': case 'Ã': sb.append('A'); break;
+                case 'É': case 'È': case 'Ë': case 'Ê': sb.append('E'); break;
+                case 'Í': case 'Ì': case 'Ï': case 'Î': sb.append('I'); break;
+                case 'Ó': case 'Ò': case 'Ö': case 'Ô': case 'Õ': sb.append('O'); break;
+                case 'Ú': case 'Ù': case 'Ü': case 'Û': sb.append('U'); break;
+                default: sb.append(c); break;
+            }
+        }
+        return sb.toString();
+    }
+
     public synchronized void insert(final String word, final int frequency) {
         if (word == null || word.isEmpty()) {
             return;
         }
-        final String normalized = word.toLowerCase();
+        final String normalized = stripAccents(word.toLowerCase());
         TrieNode current = mRoot;
         for (int i = 0; i < normalized.length(); i++) {
             final char ch = normalized.charAt(i);
@@ -75,11 +82,22 @@ public final class PrefixDictionary {
             }
             current = child;
         }
-        if (!current.isEndOfWord) {
-            current.isEndOfWord = true;
+
+        boolean found = false;
+        for (int i = 0; i < current.words.size(); i++) {
+            if (current.words.get(i).word.equalsIgnoreCase(word)) {
+                if (frequency > current.words.get(i).frequency) {
+                    current.words.set(i, new ScoredWord(word, frequency));
+                }
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            current.words.add(new ScoredWord(word, frequency));
+            Collections.sort(current.words);
             mWordCount++;
         }
-        current.frequency = Math.max(current.frequency, frequency);
     }
 
     public synchronized void loadFromStream(final InputStream inputStream) throws IOException {
@@ -112,11 +130,11 @@ public final class PrefixDictionary {
         }
 
         final String trimmed = prefix.trim();
-        final String lowerPrefix = trimmed.toLowerCase();
+        final String normPrefix = stripAccents(trimmed.toLowerCase());
         TrieNode current = mRoot;
 
-        for (int i = 0; i < lowerPrefix.length(); i++) {
-            final char ch = lowerPrefix.charAt(i);
+        for (int i = 0; i < normPrefix.length(); i++) {
+            final char ch = normPrefix.charAt(i);
             current = current.children.get(ch);
             if (current == null) {
                 return Collections.emptyList();
@@ -124,35 +142,37 @@ public final class PrefixDictionary {
         }
 
         final List<ScoredWord> scoredWords = new ArrayList<>();
-        collectWords(current, new StringBuilder(lowerPrefix), scoredWords);
+        collectWords(current, scoredWords);
         Collections.sort(scoredWords);
 
         final boolean isAllUpper = isAllUpperCase(trimmed);
         final boolean isFirstUpper = Character.isUpperCase(trimmed.charAt(0));
 
         final List<CharSequence> results = new ArrayList<>();
-        for (int i = 0; i < Math.min(maxCount, scoredWords.size()); i++) {
+        final Set<String> added = new HashSet<>();
+        for (int i = 0; i < scoredWords.size() && results.size() < maxCount; i++) {
             final String word = scoredWords.get(i).word;
+            String formatted;
             if (isAllUpper && word.length() > 1) {
-                results.add(word.toUpperCase());
+                formatted = word.toUpperCase();
             } else if (isFirstUpper && word.length() > 0) {
-                results.add(Character.toUpperCase(word.charAt(0)) + word.substring(1));
+                formatted = Character.toUpperCase(word.charAt(0)) + word.substring(1);
             } else {
-                results.add(word);
+                formatted = word;
+            }
+            if (added.add(formatted.toLowerCase())) {
+                results.add(formatted);
             }
         }
         return results;
     }
 
-    private void collectWords(final TrieNode node, final StringBuilder prefixBuilder,
-                              final List<ScoredWord> accumulator) {
-        if (node.isEndOfWord) {
-            accumulator.add(new ScoredWord(prefixBuilder.toString(), node.frequency));
+    private void collectWords(final TrieNode node, final List<ScoredWord> accumulator) {
+        if (!node.words.isEmpty()) {
+            accumulator.addAll(node.words);
         }
-        for (Map.Entry<Character, TrieNode> entry : node.children.entrySet()) {
-            prefixBuilder.append(entry.getKey());
-            collectWords(entry.getValue(), prefixBuilder, accumulator);
-            prefixBuilder.setLength(prefixBuilder.length() - 1);
+        for (TrieNode child : node.children.values()) {
+            collectWords(child, accumulator);
         }
     }
 
@@ -173,47 +193,77 @@ public final class PrefixDictionary {
             return false;
         }
         final String lower = word.toLowerCase();
+        final String norm = stripAccents(lower);
         TrieNode current = mRoot;
-        for (int i = 0; i < lower.length(); i++) {
-            current = current.children.get(lower.charAt(i));
+        for (int i = 0; i < norm.length(); i++) {
+            current = current.children.get(norm.charAt(i));
             if (current == null) {
                 return false;
             }
         }
-        return current.isEndOfWord;
+        for (ScoredWord sw : current.words) {
+            if (sw.word.equalsIgnoreCase(word)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public synchronized CharSequence getBestCorrection(final String word) {
-        if (word == null || word.length() <= 2) {
-            return null;
-        }
-        if (containsWord(word)) {
+        if (word == null || word.length() <= 1) {
             return null;
         }
 
         final String lower = word.toLowerCase();
+        final String norm = stripAccents(lower);
+
+        // 1. Check exact normalized match (e.g. "autocorreccion" -> "autocorrección")
+        TrieNode current = mRoot;
+        boolean foundNorm = true;
+        for (int i = 0; i < norm.length(); i++) {
+            current = current.children.get(norm.charAt(i));
+            if (current == null) {
+                foundNorm = false;
+                break;
+            }
+        }
+        if (foundNorm && !current.words.isEmpty()) {
+            final String best = current.words.get(0).word;
+            if (best.equalsIgnoreCase(word)) {
+                return null;
+            }
+            return formatCasing(best, word);
+        }
+
+        // 2. Fuzzy search for typo corrections (d=1)
+        if (word.length() <= 2) {
+            return null;
+        }
         final List<ScoredWord> candidates = new ArrayList<>();
-        searchFuzzy(mRoot, new StringBuilder(), lower, 0, 1, candidates);
+        searchFuzzy(mRoot, new StringBuilder(), norm, 0, 1, candidates);
 
         if (candidates.isEmpty()) {
             return null;
         }
         Collections.sort(candidates);
         final String best = candidates.get(0).word;
+        return formatCasing(best, word);
+    }
 
-        if (isAllUpperCase(word)) {
-            return best.toUpperCase();
-        } else if (Character.isUpperCase(word.charAt(0))) {
-            return Character.toUpperCase(best.charAt(0)) + best.substring(1);
+    private static CharSequence formatCasing(final String target, final String original) {
+        if (isAllUpperCase(original) && target.length() > 1) {
+            return target.toUpperCase();
+        } else if (Character.isUpperCase(original.charAt(0)) && target.length() > 0) {
+            return Character.toUpperCase(target.charAt(0)) + target.substring(1);
         }
-        return best;
+        return target;
     }
 
     private void searchFuzzy(final TrieNode node, final StringBuilder currentPath,
                              final String target, final int targetIdx, final int remainingDistance,
                              final List<ScoredWord> candidates) {
-        if (node.isEndOfWord && targetIdx == target.length()) {
-            candidates.add(new ScoredWord(currentPath.toString(), node.frequency));
+        if (targetIdx == target.length() && !node.words.isEmpty()) {
+            candidates.addAll(node.words);
         }
 
         if (remainingDistance < 0) {
@@ -236,10 +286,10 @@ public final class PrefixDictionary {
                     // Exact character match
                     searchFuzzy(child, currentPath, target, targetIdx + 1, remainingDistance, candidates);
                 } else if (remainingDistance > 0) {
-                    // Substitution (wrong character typed by user)
+                    // Substitution
                     searchFuzzy(child, currentPath, target, targetIdx + 1, remainingDistance - 1, candidates);
 
-                    // Transposition (two adjacent characters swapped)
+                    // Transposition
                     if (targetIdx + 1 < target.length() && target.charAt(targetIdx + 1) == ch) {
                         final char nextTargetChar = target.charAt(targetIdx);
                         final TrieNode transChild = child.children.get(nextTargetChar);
@@ -252,7 +302,7 @@ public final class PrefixDictionary {
                 }
             }
 
-            // Insertion (missing character skipped by user)
+            // Insertion
             if (remainingDistance > 0) {
                 searchFuzzy(child, currentPath, target, targetIdx, remainingDistance - 1, candidates);
             }
@@ -267,8 +317,7 @@ public final class PrefixDictionary {
 
     public synchronized void clear() {
         mRoot.children.clear();
-        mRoot.isEndOfWord = false;
-        mRoot.frequency = 0;
+        mRoot.words.clear();
         mWordCount = 0;
     }
 }

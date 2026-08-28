@@ -114,6 +114,15 @@ public class PrefixDictionaryTest {
         assertEquals("Hello", mDict.getBestCorrection("Helol"));
         assertEquals("HELLO", mDict.getBestCorrection("HELOL"));
 
+        // Accent-folding autocorrection (unaccented input -> accented dictionary word)
+        mDict.insert("autocorrección", 100);
+        mDict.insert("también", 100);
+        assertEquals("autocorrección", mDict.getBestCorrection("autocorreccion"));
+        assertEquals("Autocorrección", mDict.getBestCorrection("Autocorreccion"));
+        assertEquals("AUTOCORRECCIÓN", mDict.getBestCorrection("AUTOCORRECCION"));
+        assertEquals("también", mDict.getBestCorrection("tambien"));
+        assertEquals("También", mDict.getBestCorrection("Tambien"));
+
         // Too short or non-correctable
         assertEquals(null, mDict.getBestCorrection("hi"));
         assertEquals(null, mDict.getBestCorrection("xyzabc"));

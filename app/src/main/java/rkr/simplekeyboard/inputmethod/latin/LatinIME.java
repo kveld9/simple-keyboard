@@ -64,6 +64,7 @@ import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryManager;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryView;
 import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
+import rkr.simplekeyboard.inputmethod.latin.dict.UserDictionaryDatabase;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -104,6 +105,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private ClipboardHistoryView mClipboardHistoryView;
     private ClipboardHistoryManager mClipboardHistoryManager;
     private final PrefixDictionary mPrefixDictionary = new PrefixDictionary();
+    private UserDictionaryDatabase mUserDictionaryDb;
     private Locale mLoadedLocale;
 
     private RichInputMethodManager mRichImm;
@@ -276,6 +278,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
         mClipboardHistoryManager.start();
+        mUserDictionaryDb = new UserDictionaryDatabase(this);
 
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
@@ -303,6 +306,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mClipboardHistoryManager != null) {
             mClipboardHistoryManager.close();
             mClipboardHistoryManager = null;
+        }
+        if (mUserDictionaryDb != null) {
+            mUserDictionaryDb.close();
+            mUserDictionaryDb = null;
         }
         mSettings.onDestroy();
         unregisterReceiver(mRingerModeChangeReceiver);
@@ -376,6 +383,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
                     @Override
                     public void onSuggestionClicked(CharSequence text) {
+                        if (text != null && text.length() > 0) {
+                            String cleanWord = text.toString().trim();
+                            if (cleanWord.startsWith("\"") && cleanWord.endsWith("\"") && cleanWord.length() >= 2) {
+                                cleanWord = cleanWord.substring(1, cleanWord.length() - 1).trim();
+                            }
+                            if (cleanWord.length() > 0) {
+                                mPrefixDictionary.insert(cleanWord, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+                                if (mUserDictionaryDb != null) {
+                                    final String wordToLearn = cleanWord;
+                                    new Thread(() -> mUserDictionaryDb.learnWord(wordToLearn)).start();
+                                }
+                            }
+                        }
                         mInputLogic.mConnection.commitSuggestion(text);
                         updateSuggestions();
                     }
@@ -670,6 +690,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         // 2. Load primary active language with 100% frequency
         loadSingleLanguageDictionary(currentLang, 1.0f);
+
+        // 3. Load user-learned words from database with top priority
+        if (mUserDictionaryDb != null) {
+            final java.util.Map<String, Integer> userWords = mUserDictionaryDb.getAllLearnedWords();
+            for (java.util.Map.Entry<String, Integer> entry : userWords.entrySet()) {
+                mPrefixDictionary.insert(entry.getKey(), entry.getValue());
+            }
+        }
 
         mLoadedLocale = currentLocale;
     }

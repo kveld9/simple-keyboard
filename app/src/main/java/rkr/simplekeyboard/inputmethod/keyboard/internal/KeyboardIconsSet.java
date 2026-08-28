@@ -22,8 +22,6 @@ import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.util.SparseIntArray;
 
-import java.util.HashMap;
-
 import rkr.simplekeyboard.inputmethod.R;
 
 public final class KeyboardIconsSet {
@@ -55,8 +53,6 @@ public final class KeyboardIconsSet {
 
     private static final SparseIntArray ATTR_ID_TO_ICON_ID = new SparseIntArray();
 
-    // Icon name to icon id map.
-    private static final HashMap<String, Integer> sNameToIdsMap = new HashMap<>();
 
     private static final Object[] NAMES_AND_ATTR_IDS = {
         NAME_UNDEFINED,                   ATTR_UNDEFINED,
@@ -92,7 +88,7 @@ public final class KeyboardIconsSet {
             if (attrId != ATTR_UNDEFINED) {
                 ATTR_ID_TO_ICON_ID.put(attrId, iconId);
             }
-            sNameToIdsMap.put(name, iconId);
+
             ICON_NAMES[iconId] = name;
             iconId++;
         }
@@ -124,9 +120,10 @@ public final class KeyboardIconsSet {
     }
 
     public static int getIconId(final String name) {
-        Integer iconId = sNameToIdsMap.get(name);
-        if (iconId != null) {
-            return iconId;
+        for (int i = 0; i < ICON_NAMES.length; i++) {
+            if (ICON_NAMES[i] != null && ICON_NAMES[i].equals(name)) {
+                return i;
+            }
         }
         throw new RuntimeException("unknown icon name: " + name);
     }

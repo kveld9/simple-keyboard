@@ -361,6 +361,8 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
             mKeyboardView.cancelAllOngoingEvents();
             mKeyboardView.deallocateMemory();
         }
+        KeyboardLayoutSet.clearKeyboardCache();
+        rkr.simplekeyboard.inputmethod.keyboard.internal.KeyPreviewView.clearTextCache();
     }
 
     public View onCreateInputView() {

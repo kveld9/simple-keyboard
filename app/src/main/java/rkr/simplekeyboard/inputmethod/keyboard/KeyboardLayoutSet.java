@@ -115,7 +115,10 @@ public final class KeyboardLayoutSet {
         clearKeyboardCache();
     }
 
-    private static void clearKeyboardCache() {
+    public static void clearKeyboardCache() {
+        for (SoftReference<Keyboard> ref : sKeyboardCache.values()) {
+            if (ref != null) ref.clear();
+        }
         sKeyboardCache.clear();
         sUniqueKeysCache.clear();
         Arrays.fill(sForcibleKeyboardCache, null);

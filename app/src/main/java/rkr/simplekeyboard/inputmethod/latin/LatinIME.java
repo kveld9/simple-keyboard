@@ -491,6 +491,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         super.onFinishInputView(finishingInput);
     }
 
+    @Override
+    public void onTrimMemory(final int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            mHandler.cancelDeallocateMemory();
+            deallocateMemory();
+        }
+    }
+
     protected void deallocateMemory() {
         mKeyboardSwitcher.deallocateMemory();
     }

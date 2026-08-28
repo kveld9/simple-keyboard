@@ -507,6 +507,15 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         mMoreKeysKeyboardCache.clear();
     }
 
+    @Override
+    public void deallocateMemory() {
+        super.deallocateMemory();
+        mMoreKeysKeyboardCache.clear();
+        if (mDrawingPreviewPlacerView != null) {
+            mDrawingPreviewPlacerView.removeAllViews();
+        }
+    }
+
     public void onHideWindow() {
         onDismissMoreKeysPanel();
     }

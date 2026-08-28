@@ -20,7 +20,7 @@ package rkr.simplekeyboard.inputmethod.latin.utils;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
-import android.util.SparseArray;
+import android.util.SparseIntArray;
 
 public final class TypefaceUtils {
     private static final char[] KEY_LABEL_REFERENCE_CHAR = { 'M' };
@@ -31,41 +31,41 @@ public final class TypefaceUtils {
     }
 
     // This sparse array caches key label text height in pixel indexed by key label text size.
-    private static final SparseArray<Float> sTextHeightCache = new SparseArray<>();
+    private static final SparseIntArray sTextHeightCache = new SparseIntArray();
     // Working variable for the following method.
     private static final Rect sTextHeightBounds = new Rect();
 
     private static float getCharHeight(final char[] referenceChar, final Paint paint) {
         final int key = getCharGeometryCacheKey(referenceChar[0], paint);
         synchronized (sTextHeightCache) {
-            final Float cachedValue = sTextHeightCache.get(key);
-            if (cachedValue != null) {
-                return cachedValue;
+            final int index = sTextHeightCache.indexOfKey(key);
+            if (index >= 0) {
+                return Float.intBitsToFloat(sTextHeightCache.valueAt(index));
             }
 
             paint.getTextBounds(referenceChar, 0, 1, sTextHeightBounds);
             final float height = sTextHeightBounds.height();
-            sTextHeightCache.put(key, height);
+            sTextHeightCache.put(key, Float.floatToRawIntBits(height));
             return height;
         }
     }
 
     // This sparse array caches key label text width in pixel indexed by key label text size.
-    private static final SparseArray<Float> sTextWidthCache = new SparseArray<>();
+    private static final SparseIntArray sTextWidthCache = new SparseIntArray();
     // Working variable for the following method.
     private static final Rect sTextWidthBounds = new Rect();
 
     private static float getCharWidth(final char[] referenceChar, final Paint paint) {
         final int key = getCharGeometryCacheKey(referenceChar[0], paint);
         synchronized (sTextWidthCache) {
-            final Float cachedValue = sTextWidthCache.get(key);
-            if (cachedValue != null) {
-                return cachedValue;
+            final int index = sTextWidthCache.indexOfKey(key);
+            if (index >= 0) {
+                return Float.intBitsToFloat(sTextWidthCache.valueAt(index));
             }
 
             paint.getTextBounds(referenceChar, 0, 1, sTextWidthBounds);
             final float width = sTextWidthBounds.width();
-            sTextWidthCache.put(key, width);
+            sTextWidthCache.put(key, Float.floatToRawIntBits(width));
             return width;
         }
     }
@@ -97,13 +97,7 @@ public final class TypefaceUtils {
         return getCharWidth(KEY_NUMERIC_HINT_LABEL_REFERENCE_CHAR, paint);
     }
 
-    // Working variable for the following method.
-    private static final Rect sStringWidthBounds = new Rect();
-
     public static float getStringWidth(final String string, final Paint paint) {
-        synchronized (sStringWidthBounds) {
-            paint.getTextBounds(string, 0, string.length(), sStringWidthBounds);
-            return sStringWidthBounds.width();
-        }
+        return paint.measureText(string);
     }
 }

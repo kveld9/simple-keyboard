@@ -28,27 +28,29 @@ import java.util.HashMap;
 import java.util.Locale;
 
 public final class KeyboardTextsTable {
-    // Name to index map.
-    private static final HashMap<String, Integer> sNameToIndexesMap = new HashMap<>();
+    // Sorted names for binary search
+    private static final String[] sSortedNames;
+    private static final int[] sSortedIndexes;
+
     // Locale to texts table map.
     private static final HashMap<String, String[]> sLocaleToTextsTableMap = new HashMap<>();
 
     public static String getText(final String name, final String[] textsTable) {
-        final Integer indexObj = sNameToIndexesMap.get(name);
-        if (indexObj == null) {
-            throw new RuntimeException("Unknown text name=" + name);
+        int left = 0;
+        int right = sSortedNames.length - 1;
+        while (left <= right) {
+            int mid = (left + right) >>> 1;
+            int cmp = sSortedNames[mid].compareTo(name);
+            if (cmp < 0) left = mid + 1;
+            else if (cmp > 0) right = mid - 1;
+            else {
+                int index = sSortedIndexes[mid];
+                final String text = (index < textsTable.length) ? textsTable[index] : null;
+                if (text != null) return text;
+                return TEXTS_DEFAULT[index];
+            }
         }
-        final int index = indexObj;
-        final String text = (index < textsTable.length) ? textsTable[index] : null;
-        if (text != null) {
-            return text;
-        }
-        // Sanity check.
-        if (index >= 0 && index < TEXTS_DEFAULT.length) {
-            return TEXTS_DEFAULT[index];
-        }
-        // Throw exception for debugging purpose.
-        throw new RuntimeException("Illegal index=" + index + " for name=" + name);
+        throw new RuntimeException("Unknown text name=" + name);
     }
 
     public static String[] getTextsTable(final Locale locale) {
@@ -4552,8 +4554,23 @@ public final class KeyboardTextsTable {
     };
 
     static {
-        for (int index = 0; index < NAMES.length; index++) {
-            sNameToIndexesMap.put(NAMES[index], index);
+        sSortedNames = new String[NAMES.length];
+        sSortedIndexes = new int[NAMES.length];
+        for (int i = 0; i < NAMES.length; i++) {
+            sSortedNames[i] = NAMES[i];
+            sSortedIndexes[i] = i;
+        }
+        for (int i = 0; i < NAMES.length - 1; i++) {
+            for (int j = i + 1; j < NAMES.length; j++) {
+                if (sSortedNames[i].compareTo(sSortedNames[j]) > 0) {
+                    String tempName = sSortedNames[i];
+                    sSortedNames[i] = sSortedNames[j];
+                    sSortedNames[j] = tempName;
+                    int tempIndex = sSortedIndexes[i];
+                    sSortedIndexes[i] = sSortedIndexes[j];
+                    sSortedIndexes[j] = tempIndex;
+                }
+            }
         }
 
         for (int i = 0; i < LOCALES_AND_TEXTS.length; i += 2) {

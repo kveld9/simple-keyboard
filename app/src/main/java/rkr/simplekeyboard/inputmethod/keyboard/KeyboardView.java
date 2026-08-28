@@ -519,5 +519,6 @@ public class KeyboardView extends View {
 
     public void deallocateMemory() {
         freeOffscreenBuffer();
+        mInvalidatedKeys.clear();
     }
 }

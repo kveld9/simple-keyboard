@@ -19,10 +19,41 @@ package rkr.simplekeyboard.inputmethod.latin;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 public final class InputView extends FrameLayout {
     public InputView(final Context context, final AttributeSet attrs) {
         super(context, attrs, 0);
+    }
+
+    @Override
+    public void addView(View child, int index, ViewGroup.LayoutParams params) {
+        if (params instanceof FrameLayout.LayoutParams) {
+            ((FrameLayout.LayoutParams) params).gravity = Gravity.BOTTOM;
+        } else if (params != null) {
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(params);
+            lp.gravity = Gravity.BOTTOM;
+            params = lp;
+        }
+        super.addView(child, index, params);
+    }
+
+    @Override
+    protected void onFinishInflate() {
+        super.onFinishInflate();
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            ViewGroup.LayoutParams lp = child.getLayoutParams();
+            if (lp instanceof FrameLayout.LayoutParams) {
+                ((FrameLayout.LayoutParams) lp).gravity = Gravity.BOTTOM;
+            } else if (lp != null) {
+                FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(lp);
+                flp.gravity = Gravity.BOTTOM;
+                child.setLayoutParams(flp);
+            }
+        }
     }
 }

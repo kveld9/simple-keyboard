@@ -190,9 +190,9 @@ public class KeyboardView extends View {
             mFunctionalKeyBackground = mKeyBackground;
             mSpacebarBackground = context.getDrawable(R.drawable.btn_keyboard_spacebar);
         } else if (Settings.KEY_SHAPE_BORDERLESS.equals(shape)) {
-            mKeyBackground = context.getDrawable(R.drawable.btn_keyboard_key);
+            mKeyBackground = context.getDrawable(R.drawable.btn_keyboard_key_borderless);
             mFunctionalKeyBackground = mKeyBackground;
-            mSpacebarBackground = context.getDrawable(R.drawable.btn_keyboard_spacebar);
+            mSpacebarBackground = context.getDrawable(R.drawable.btn_keyboard_spacebar_rounded);
         }
         if (mKeyBackground != null) {
             mKeyBackground.getPadding(mKeyBackgroundPadding);

@@ -142,7 +142,7 @@ public final class PrefixDictionary {
         }
 
         final List<ScoredWord> scoredWords = new ArrayList<>();
-        collectWords(current, scoredWords);
+        collectWords(current, scoredWords, 40);
         Collections.sort(scoredWords, (a, b) -> {
             final boolean aExact = stripAccents(a.word.toLowerCase()).equals(normPrefix);
             final boolean bExact = stripAccents(b.word.toLowerCase()).equals(normPrefix);
@@ -174,12 +174,18 @@ public final class PrefixDictionary {
         return results;
     }
 
-    private void collectWords(final TrieNode node, final List<ScoredWord> accumulator) {
+    private void collectWords(final TrieNode node, final List<ScoredWord> accumulator, final int maxLimit) {
         if (!node.words.isEmpty()) {
             accumulator.addAll(node.words);
+            if (accumulator.size() >= maxLimit) {
+                return;
+            }
         }
         for (TrieNode child : node.children.values()) {
-            collectWords(child, accumulator);
+            collectWords(child, accumulator, maxLimit);
+            if (accumulator.size() >= maxLimit) {
+                return;
+            }
         }
     }
 
@@ -216,36 +222,49 @@ public final class PrefixDictionary {
         return false;
     }
 
-    public synchronized CharSequence getBestCorrection(final String word) {
+    public synchronized CharSequence getExactNormalizedCorrection(final String word) {
         if (word == null || word.isEmpty()) {
             return null;
         }
-
         final String lower = word.toLowerCase();
         final String norm = stripAccents(lower);
-
-        // 1. Check exact normalized match (e.g. "autocorreccion" -> "autocorrección")
         TrieNode current = mRoot;
-        boolean foundNorm = true;
         for (int i = 0; i < norm.length(); i++) {
             current = current.children.get(norm.charAt(i));
             if (current == null) {
-                foundNorm = false;
-                break;
+                return null;
             }
         }
-        if (foundNorm && !current.words.isEmpty()) {
+        if (!current.words.isEmpty()) {
             final String best = current.words.get(0).word;
             if (best.equalsIgnoreCase(word)) {
                 return null;
             }
             return formatCasing(best, word);
         }
+        return null;
+    }
 
-        // 2. Fuzzy search for typo corrections (d=1)
+    public synchronized CharSequence getBestCorrection(final String word) {
+        if (word == null || word.isEmpty()) {
+            return null;
+        }
+
+        // 1. Instant O(L) exact normalized match (e.g. "autocorreccion" -> "autocorrección")
+        final CharSequence exactNorm = getExactNormalizedCorrection(word);
+        if (exactNorm != null) {
+            return exactNorm;
+        }
+        if (containsWord(word)) {
+            return null;
+        }
+
+        // 2. Fuzzy search for typo corrections (d=1, minimum length 3)
         if (word.length() <= 2) {
             return null;
         }
+        final String lower = word.toLowerCase();
+        final String norm = stripAccents(lower);
         final List<ScoredWord> candidates = new ArrayList<>();
         searchFuzzy(mRoot, new StringBuilder(), norm, 0, 1, candidates);
 

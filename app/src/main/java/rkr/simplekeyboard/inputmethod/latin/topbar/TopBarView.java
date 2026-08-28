@@ -138,13 +138,24 @@ public class TopBarView extends FrameLayout {
     }
 
     public void setSuggestions(List<CharSequence> suggestions) {
+        setSuggestions(suggestions, -1);
+    }
+
+    public void setSuggestions(List<CharSequence> suggestions, int boldIndex) {
         mSuggestionsContainer.removeAllViews();
         if (suggestions == null || suggestions.isEmpty()) return;
-        for (CharSequence suggestion : suggestions) {
+        for (int i = 0; i < suggestions.size(); i++) {
+            final CharSequence suggestion = suggestions.get(i);
             TextView tv = new TextView(getContext());
             tv.setText(suggestion);
             tv.setTextColor(mTextColor);
-            tv.setTextSize(16);
+            if (i == boldIndex) {
+                tv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                tv.setTextSize(16);
+            } else {
+                tv.setTypeface(android.graphics.Typeface.DEFAULT);
+                tv.setTextSize(15);
+            }
             tv.setGravity(Gravity.CENTER);
             int paddingH = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16, getContext().getResources().getDisplayMetrics());
             int paddingV = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6, getContext().getResources().getDisplayMetrics());
@@ -157,7 +168,11 @@ public class TopBarView extends FrameLayout {
             }
             tv.setOnClickListener(v -> {
                 if (mListener != null) {
-                    mListener.onSuggestionClicked(suggestion);
+                    String clean = suggestion.toString();
+                    if (clean.startsWith("\"") && clean.endsWith("\"") && clean.length() > 2) {
+                        clean = clean.substring(1, clean.length() - 1);
+                    }
+                    mListener.onSuggestionClicked(clean);
                 }
             });
             mSuggestionsContainer.addView(tv);

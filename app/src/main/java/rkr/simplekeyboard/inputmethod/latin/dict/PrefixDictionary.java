@@ -143,7 +143,14 @@ public final class PrefixDictionary {
 
         final List<ScoredWord> scoredWords = new ArrayList<>();
         collectWords(current, scoredWords);
-        Collections.sort(scoredWords);
+        Collections.sort(scoredWords, (a, b) -> {
+            final boolean aExact = stripAccents(a.word.toLowerCase()).equals(normPrefix);
+            final boolean bExact = stripAccents(b.word.toLowerCase()).equals(normPrefix);
+            if (aExact != bExact) {
+                return aExact ? -1 : 1;
+            }
+            return Integer.compare(b.frequency, a.frequency);
+        });
 
         final boolean isAllUpper = isAllUpperCase(trimmed);
         final boolean isFirstUpper = Character.isUpperCase(trimmed.charAt(0));

@@ -48,9 +48,9 @@ public class PrefixDictionaryTest {
 
         List<CharSequence> results = mDict.getSuggestions("key", 5);
         assertEquals(3, results.size());
-        assertEquals("keyboard", results.get(0)); // highest frequency
-        assertEquals("keypad", results.get(1));
-        assertEquals("key", results.get(2));
+        assertEquals("key", results.get(0)); // exact match prioritized
+        assertEquals("keyboard", results.get(1)); // then by frequency
+        assertEquals("keypad", results.get(2));
     }
 
     @Test

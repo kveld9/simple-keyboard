@@ -210,7 +210,7 @@ public final class PrefixDictionary {
     }
 
     public synchronized CharSequence getBestCorrection(final String word) {
-        if (word == null || word.length() <= 1) {
+        if (word == null || word.isEmpty()) {
             return null;
         }
 

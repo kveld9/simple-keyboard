@@ -970,7 +970,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 final InputAttributes attr = editorInfo != null ? new InputAttributes(editorInfo, isFullscreenMode()) : null;
                 if (attr == null || !attr.mIsPasswordField) {
                     final String word = mInputLogic.mConnection.getWordBeforeCursor();
-                    if (word != null && word.length() > 2) {
+                    if (word != null && word.length() > 0) {
                         final CharSequence correction = mPrefixDictionary.getBestCorrection(word);
                         if (correction != null) {
                             mInputLogic.mConnection.deleteTextBeforeCursor(word.length());

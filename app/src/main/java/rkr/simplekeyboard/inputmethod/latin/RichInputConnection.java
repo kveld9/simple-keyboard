@@ -262,20 +262,22 @@ public final class RichInputConnection {
     }
 
     public String getWordBeforeCursor() {
-        String text = mTextBeforeCursor;
-        if ((text == null || text.isEmpty()) && isConnected()) {
-            final CharSequence icText = mIC.getTextBeforeCursor(30, 0);
-            if (icText != null) {
-                text = icText.toString();
+        CharSequence icText = null;
+        if (isConnected()) {
+            try {
+                icText = mIC.getTextBeforeCursor(40, 0);
+            } catch (Exception e) {
+                // Ignore fallback
             }
         }
+        String text = (icText != null && icText.length() > 0) ? icText.toString() : mTextBeforeCursor;
         if (text == null || text.isEmpty()) {
             return "";
         }
         int i = text.length() - 1;
         while (i >= 0) {
             char c = text.charAt(i);
-            if (Character.isWhitespace(c) || !Character.isLetterOrDigit(c)) {
+            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
                 break;
             }
             i--;

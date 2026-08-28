@@ -263,7 +263,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     }
 
     public static boolean readAutoCorrectionEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_AUTO_CORRECTION, false);
+        return prefs.getBoolean(PREF_AUTO_CORRECTION, true);
     }
 
     public static String readPrefSubtypes(final SharedPreferences prefs) {

@@ -64,7 +64,10 @@ import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryManager;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryView;
 import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
+import java.io.BufferedReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
@@ -476,6 +479,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void onCurrentSubtypeChanged() {
         mInputLogic.onSubtypeChanged();
         loadKeyboard();
+        loadDictionaryForLocale(mLocale);
     }
 
     void onStartInputInternal(final EditorInfo editorInfo, final boolean restarting) {
@@ -635,18 +639,64 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
-    private void loadDictionaryForLocale(final Locale locale) {
-        if (locale == null) return;
-        if (mLoadedLocale != null && mLoadedLocale.getLanguage().equals(locale.getLanguage())) {
-            return;
+    private void loadDictionaryForLocale(final Locale currentLocale) {
+        final String currentLang = (currentLocale != null) ? currentLocale.getLanguage() : "es";
+
+        final java.util.Set<String> enabledLangs = new java.util.LinkedHashSet<>();
+        if (mRichImm != null) {
+            final java.util.Set<rkr.simplekeyboard.inputmethod.latin.Subtype> subtypes =
+                    mRichImm.getEnabledSubtypes(false);
+            if (subtypes != null) {
+                for (rkr.simplekeyboard.inputmethod.latin.Subtype st : subtypes) {
+                    final String l = st.getLocale();
+                    if (l != null && l.length() >= 2) {
+                        enabledLangs.add(l.substring(0, 2).toLowerCase());
+                    }
+                }
+            }
         }
-        mLoadedLocale = locale;
+        if (enabledLangs.isEmpty()) {
+            enabledLangs.add(currentLang);
+        }
+
         mPrefixDictionary.clear();
-        final String lang = locale.getLanguage();
+
+        // 1. Load secondary enabled languages first (with 85% relative frequency)
+        for (String lang : enabledLangs) {
+            if (!lang.equals(currentLang)) {
+                loadSingleLanguageDictionary(lang, 0.85f);
+            }
+        }
+
+        // 2. Load primary active language with 100% frequency
+        loadSingleLanguageDictionary(currentLang, 1.0f);
+
+        mLoadedLocale = currentLocale;
+    }
+
+    private void loadSingleLanguageDictionary(final String lang, final float weightFactor) {
         final String assetName = "es".equals(lang) ? "dict_es.txt" : "dict_en.txt";
         boolean loaded = false;
-        try (InputStream is = getAssets().open(assetName)) {
-            mPrefixDictionary.loadFromStream(is);
+        try (InputStream is = getAssets().open(assetName);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                final int sep = line.indexOf(' ');
+                if (sep > 0) {
+                    final String word = line.substring(0, sep);
+                    try {
+                        int freq = Integer.parseInt(line.substring(sep + 1));
+                        int adjustedFreq = (int) (freq * weightFactor);
+                        mPrefixDictionary.insert(word, Math.max(1, adjustedFreq));
+                    } catch (NumberFormatException e) {
+                        mPrefixDictionary.insert(word, 1);
+                    }
+                } else {
+                    mPrefixDictionary.insert(line, 1);
+                }
+            }
             loaded = true;
         } catch (Exception e) {
             Log.w(TAG, "Could not load dictionary asset: " + assetName, e);
@@ -657,7 +707,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 : new String[]{"the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not", "on", "with", "he", "as", "you", "do", "at", "this", "but", "his", "by", "from", "they", "we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would", "there", "their", "what", "so", "up", "out", "if", "about", "who", "get", "which", "go", "me", "when", "make", "can", "like", "time", "no", "just", "him", "know", "take", "people", "into", "year", "your", "good", "some", "could", "them", "see", "other", "than", "then", "now", "look", "only", "come", "its", "over", "think", "also", "back", "after", "use", "two", "how", "our", "work", "first", "well", "way", "even", "new", "want", "because", "any", "these", "give", "day", "most", "us", "keyboard", "simple", "great", "need", "feel", "high", "place", "thing", "things", "case", "call", "hand", "right", "world"};
             int freq = defaultWords.length * 10;
             for (String w : defaultWords) {
-                mPrefixDictionary.insert(w, freq--);
+                mPrefixDictionary.insert(w, (int) (freq-- * weightFactor));
             }
         }
     }

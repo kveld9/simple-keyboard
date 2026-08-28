@@ -61,12 +61,16 @@ import rkr.simplekeyboard.inputmethod.keyboard.KeyboardActionListener;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardId;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardSwitcher;
 import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
+import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryManager;
+import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryView;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsActivity;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
+import rkr.simplekeyboard.inputmethod.latin.topbar.TopBarListener;
+import rkr.simplekeyboard.inputmethod.latin.topbar.TopBarView;
 import rkr.simplekeyboard.inputmethod.latin.utils.ApplicationUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.LeakGuardHandlerWrapper;
 import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
@@ -91,6 +95,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     // TODO: Move these {@link View}s to {@link KeyboardSwitcher}.
     private View mInputView;
+    private TopBarView mTopBarView;
+    private ClipboardHistoryView mClipboardHistoryView;
+    private ClipboardHistoryManager mClipboardHistoryManager;
 
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
@@ -260,6 +267,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         AudioAndHapticFeedbackManager.init(this);
         super.onCreate();
 
+        mClipboardHistoryManager = new ClipboardHistoryManager(this);
+        mClipboardHistoryManager.start();
+
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
         loadSettings();
@@ -281,6 +291,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onDestroy() {
+        if (mClipboardHistoryManager != null) {
+            mClipboardHistoryManager.close();
+            mClipboardHistoryManager = null;
+        }
         mSettings.onDestroy();
         unregisterReceiver(mRingerModeChangeReceiver);
         super.onDestroy();
@@ -331,9 +345,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         view.requestApplyInsets();
 
         if (mInputView != null) {
-            final rkr.simplekeyboard.inputmethod.latin.topbar.TopBarView topBar = mInputView.findViewById(rkr.simplekeyboard.inputmethod.R.id.top_bar_view);
-            if (topBar != null) {
-                topBar.setListener(new rkr.simplekeyboard.inputmethod.latin.topbar.TopBarListener() {
+            mTopBarView = mInputView.findViewById(rkr.simplekeyboard.inputmethod.R.id.top_bar_view);
+            mClipboardHistoryView = mInputView.findViewById(rkr.simplekeyboard.inputmethod.R.id.clipboard_history_view);
+
+            if (mTopBarView != null) {
+                mTopBarView.setListener(new TopBarListener() {
                     @Override
                     public void onSettingsClicked() {
                         launchSettings();
@@ -345,11 +361,75 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     }
 
                     @Override
-                    public void onClipboardTextClicked(CharSequence text) {
-                        mInputLogic.mConnection.commitText(text, 1);
+                    public void onClipboardClicked() {
+                        showClipboardHistory();
                     }
                 });
             }
+
+            if (mClipboardHistoryView != null) {
+                mClipboardHistoryView.setListener(new ClipboardHistoryView.ClipboardHistoryListener() {
+                    @Override
+                    public void onPasteText(CharSequence text) {
+                        mInputLogic.mConnection.commitText(text, 1);
+                        hideClipboardHistory();
+                    }
+
+                    @Override
+                    public void onCloseClipboard() {
+                        hideClipboardHistory();
+                    }
+                });
+            }
+        }
+    }
+
+    public void showClipboardHistory() {
+        if (mClipboardHistoryView == null || mInputView == null) {
+            return;
+        }
+        if (mClipboardHistoryManager != null) {
+            mClipboardHistoryManager.updateCurrentClip();
+            mClipboardHistoryView.setDatabase(mClipboardHistoryManager.getDatabase());
+        }
+        final int topBarHeight = (mTopBarView != null && mTopBarView.getVisibility() == View.VISIBLE) ? mTopBarView.getHeight() : 0;
+        final View visibleKeyboardView = mKeyboardSwitcher.getVisibleKeyboardView();
+        final int keyboardHeight = (visibleKeyboardView != null && visibleKeyboardView.getVisibility() == View.VISIBLE) ? visibleKeyboardView.getHeight() : 0;
+        final int totalHeight = topBarHeight + keyboardHeight;
+        if (totalHeight > 0) {
+            mClipboardHistoryView.setTargetHeight(totalHeight);
+        }
+
+        if (mTopBarView != null) {
+            mTopBarView.setVisibility(View.GONE);
+        }
+        if (visibleKeyboardView != null) {
+            visibleKeyboardView.setVisibility(View.GONE);
+        }
+
+        mClipboardHistoryView.reloadClips();
+        mClipboardHistoryView.setVisibility(View.VISIBLE);
+        mInputView.requestLayout();
+    }
+
+    public void hideClipboardHistory() {
+        if (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE) {
+            mClipboardHistoryView.setVisibility(View.GONE);
+        }
+        if (mTopBarView != null) {
+            mTopBarView.setVisibility(View.VISIBLE);
+            mTopBarView.setMode(TopBarView.MODE_NORMAL);
+        }
+        final View keyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (keyboardView != null) {
+            final SettingsValues currentSettingsValues = mSettings.getCurrent();
+            final KeyboardSwitcher switcher = mKeyboardSwitcher;
+            final int visibility = switcher.isImeSuppressedByHardwareKeyboard(currentSettingsValues, switcher.getKeyboardSwitchState())
+                    ? View.GONE : View.VISIBLE;
+            keyboardView.setVisibility(visibility);
+        }
+        if (mInputView != null) {
+            mInputView.requestLayout();
         }
     }
 
@@ -482,6 +562,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
 
         if (TRACE) Debug.startMethodTracing("/data/trace/latinime");
+
+        if (mClipboardHistoryManager != null) {
+            mClipboardHistoryManager.updateCurrentClip();
+        }
+        hideClipboardHistory();
     }
 
     @Override
@@ -494,6 +579,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onWindowHidden() {
         super.onWindowHidden();
+        hideClipboardHistory();
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (mainKeyboardView != null) {
             mainKeyboardView.closing();
@@ -510,6 +596,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     void onFinishInputViewInternal(final boolean finishingInput) {
+        hideClipboardHistory();
         super.onFinishInputView(finishingInput);
     }
 
@@ -523,6 +610,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     protected void deallocateMemory() {
+        if (mClipboardHistoryView != null) {
+            mClipboardHistoryView.deallocateMemory();
+        }
         mKeyboardSwitcher.deallocateMemory();
     }
 
@@ -563,7 +653,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onComputeInsets(final InputMethodService.Insets outInsets) {
         super.onComputeInsets(outInsets);
-        // This method may be called before {@link #setInputView(View)}.
         if (mInputView == null) {
             return;
         }
@@ -572,28 +661,33 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         final int inputHeight = mInputView.getHeight();
-        if (isImeSuppressedByHardwareKeyboard() && !visibleKeyboardView.isShown()) {
-            // If there is a hardware keyboard and a visible software keyboard view has been hidden,
-            // no visual element will be shown on the screen.
+
+        final boolean isClipboardVisible = (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE);
+        final boolean isKeyboardShown = visibleKeyboardView.isShown();
+
+        if (!isClipboardVisible && isImeSuppressedByHardwareKeyboard() && !isKeyboardShown) {
             outInsets.contentTopInsets = inputHeight;
             outInsets.visibleTopInsets = inputHeight;
             return;
         }
-        final View topBar = mInputView.findViewById(rkr.simplekeyboard.inputmethod.R.id.top_bar_view);
-        final int topBarHeight = (topBar != null && topBar.getVisibility() == View.VISIBLE) ? topBar.getHeight() : 0;
-        final int visibleHeight = visibleKeyboardView.getHeight() + topBarHeight;
-        final int visibleTopY = Math.max(0, inputHeight - visibleHeight);
-        // Need to set expanded touchable region only if a keyboard view is being shown.
-        if (visibleKeyboardView.isShown()) {
-            final int touchLeft = 0;
-            final int touchTop = mKeyboardSwitcher.isShowingMoreKeysPanel() ? 0 : visibleTopY;
-            final int touchRight = mInputView.getWidth();
-            final int touchBottom = inputHeight
-                    // Extend touchable region below the keyboard.
-                    + EXTENDED_TOUCHABLE_REGION_HEIGHT;
-            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
-            outInsets.touchableRegion.set(touchLeft, touchTop, touchRight, touchBottom);
+
+        final int visibleHeight;
+        if (isClipboardVisible) {
+            visibleHeight = mClipboardHistoryView.getHeight();
+        } else {
+            final View topBar = mInputView.findViewById(rkr.simplekeyboard.inputmethod.R.id.top_bar_view);
+            final int topBarHeight = (topBar != null && topBar.getVisibility() == View.VISIBLE) ? topBar.getHeight() : 0;
+            visibleHeight = visibleKeyboardView.getHeight() + topBarHeight;
         }
+
+        final int visibleTopY = Math.max(0, inputHeight - visibleHeight);
+
+        if (isClipboardVisible || isKeyboardShown) {
+            final int touchTop = (!isClipboardVisible && mKeyboardSwitcher.isShowingMoreKeysPanel()) ? 0 : visibleTopY;
+            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
+            outInsets.touchableRegion.set(0, touchTop, mInputView.getWidth(), inputHeight + EXTENDED_TOUCHABLE_REGION_HEIGHT);
+        }
+
         outInsets.contentTopInsets = visibleTopY;
         outInsets.visibleTopInsets = visibleTopY;
     }
@@ -914,6 +1008,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
+    }
+
+    @Override
+    public boolean onKeyDown(final int keyCode, final KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_DOWN) {
+            if (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE) {
+                hideClipboardHistory();
+                return true;
+            }
+        }
+        return super.onKeyDown(keyCode, event);
     }
 
     @Override

@@ -36,6 +36,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryView
+            android:id="@+id/clipboard_history_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
         <rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView
             android:id="@+id/keyboard_view"
             android:layoutDirection="ltr"

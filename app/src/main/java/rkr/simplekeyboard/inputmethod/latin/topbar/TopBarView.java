@@ -155,6 +155,12 @@ public class TopBarView extends FrameLayout {
         }
     }
     
+    public void setLanguageButtonVisible(boolean visible) {
+        if (mLanguageButton != null) {
+            mLanguageButton.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 38, getContext().getResources().getDisplayMetrics());

@@ -41,10 +41,12 @@
 
     <!-- Predefined keyboard layouts for additional subtype -->
     <string-array name="predefined_layouts">
+        <item>spanish</item>
         <item>qwerty</item>
     </string-array>
     <!-- Predefined keyboard layout display names -->
     <string-array name="predefined_layout_display_names">
+        <item>Español</item>
         <item>QWERTY</item>
     </string-array>
 </resources>

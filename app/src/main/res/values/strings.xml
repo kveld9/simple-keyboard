@@ -151,4 +151,15 @@
         <item>10080</item>
         <item>-1</item>
     </string-array>
+    <string name="key_shape">Key shape</string>
+    <string-array name="key_shape_entries">
+        <item>Rounded (Gboard style)</item>
+        <item>Rectangular</item>
+        <item>Borderless</item>
+    </string-array>
+    <string-array name="key_shape_values" translatable="false">
+        <item>rounded</item>
+        <item>rectangular</item>
+        <item>borderless</item>
+    </string-array>
 </resources>

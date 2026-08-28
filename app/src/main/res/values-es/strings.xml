@@ -76,4 +76,10 @@
         <item>7 días</item>
         <item>Nunca</item>
     </string-array>
+    <string name="key_shape">Forma de teclas</string>
+    <string-array name="key_shape_entries">
+        <item>Redondeadas (Estilo Gboard)</item>
+        <item>Rectangulares</item>
+        <item>Sin bordes</item>
+    </string-array>
 </resources>

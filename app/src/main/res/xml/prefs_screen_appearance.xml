@@ -23,6 +23,12 @@
         android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.ThemeSettingsFragment"
         android:key="screen_theme"
         android:title="@string/settings_screen_theme" />
+    <ListPreference
+        android:key="pref_key_shape"
+        android:title="@string/key_shape"
+        android:entries="@array/key_shape_entries"
+        android:entryValues="@array/key_shape_values"
+        android:defaultValue="rounded" />
     <rkr.simplekeyboard.inputmethod.latin.settings.ColorDialogPreference
         android:key="pref_keyboard_color"
         android:title="@string/keyboard_color" />

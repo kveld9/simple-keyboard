@@ -320,6 +320,9 @@ public class TopBarView extends FrameLayout {
             mSuggestionsContainer.removeAllViews();
             mSuggestionsContainer.addView(view, new LinearLayout.LayoutParams(
                     0, LayoutParams.MATCH_PARENT, 1.0f));
+            if (mSuggestionsContainer.getWidth() == 0) {
+                mSuggestionsContainer.post(mSuggestionsContainer::requestLayout);
+            }
         }
     }
 

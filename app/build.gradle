@@ -1,13 +1,16 @@
 apply plugin: 'com.android.application'
 
+def appVersionName = project.findProperty("versionName") ?: "7.0.0"
+def appVersionCode = project.findProperty("versionCode") ? project.property("versionCode").toInteger() : 150
+
 android {
     defaultConfig {
         applicationId "rkr.simplekeyboard.inputmethod"
         compileSdk 37
         minSdkVersion 24
         targetSdkVersion 37
-        versionCode 148
-        versionName "6.7"
+        versionCode appVersionCode
+        versionName appVersionName
     }
     buildTypes {
         release {
@@ -15,6 +18,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.debug
         }
+    }
+    buildFeatures {
+        buildConfig = true
     }
     namespace 'rkr.simplekeyboard.inputmethod'
 }

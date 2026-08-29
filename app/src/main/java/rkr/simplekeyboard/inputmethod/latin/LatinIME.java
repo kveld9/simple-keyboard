@@ -130,8 +130,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private String mOriginalTypedWordBeforeAutocorrect = null;
     private String mAutocorrectedWord = null;
-    private String mPrevPrevWord = null;
-    private String mPreviousWord = null;
     private rkr.simplekeyboard.inputmethod.latin.dict.ContactsDictionary mContactsDictionary;
     private boolean mCanRevertAutocorrect = false;
     private int mLastInlineFieldId = 0;
@@ -608,6 +606,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         // Switch to the null consumer to handle cases leading to early exit below, for which we
         // also wouldn't be consuming gesture data.
+        mCanRevertAutocorrect = false;
+        mOriginalTypedWordBeforeAutocorrect = null;
+        mAutocorrectedWord = null;
         if (mTopBarView != null) {
             mTopBarView.closeToolTray();
             if (mTopBarView.isExternalViewActive()) {
@@ -735,6 +736,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     void onFinishInputViewInternal(final boolean finishingInput) {
+        mCanRevertAutocorrect = false;
+        mOriginalTypedWordBeforeAutocorrect = null;
+        mAutocorrectedWord = null;
         hideClipboardHistory();
         if (mTopBarView != null && mTopBarView.isExternalViewActive()) {
             mTopBarView.setExternalView(null);
@@ -1547,8 +1551,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         final String cleanCommitted = committedWord.trim();
         learnNgramAsync(w1, w2, cleanCommitted);
-        mPrevPrevWord = w2;
-        mPreviousWord = cleanCommitted;
     }
 
     private void handleSpaceAutoCorrect(final Event event) {
@@ -1564,15 +1566,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private String[] getEffectivePreviousWords() {
-        if (mPreviousWord != null && !mPreviousWord.isEmpty()) {
-            return new String[]{ mPrevPrevWord != null ? mPrevPrevWord : "", mPreviousWord };
-        }
         return mInputLogic.mConnection.getTwoPreviousWordsBeforeCursor();
     }
 
     private String getEffectivePreviousWord() {
-        return (mPreviousWord != null && !mPreviousWord.isEmpty())
-                ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
+        return mInputLogic.mConnection.getPreviousWordBeforeCursor();
     }
 
     private static boolean isWordEmpty(final String word) {

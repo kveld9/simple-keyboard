@@ -792,8 +792,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // 2. Slot 1: Target autocorrection in BOLD
             suggestions.add(bestCorrection);
             boldIndex = 1;
-            // 3. Slot 2: Alternative prefix suggestion if any
-            for (CharSequence s : matches) {
+            // 3. Slot 2: Alternative suggestion (from matches or fuzzy candidates)
+            final java.util.List<CharSequence> candidates = matches.isEmpty() ? mPrefixDictionary.getFuzzySuggestions(word, 3) : matches;
+            for (CharSequence s : candidates) {
                 if (!s.toString().equalsIgnoreCase(bestCorrection.toString()) && suggestions.size() < 3) {
                     suggestions.add(s);
                 }

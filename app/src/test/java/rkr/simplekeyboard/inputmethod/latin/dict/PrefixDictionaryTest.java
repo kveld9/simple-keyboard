@@ -123,8 +123,14 @@ public class PrefixDictionaryTest {
         assertEquals("también", mDict.getBestCorrection("tambien"));
         assertEquals("También", mDict.getBestCorrection("Tambien"));
 
+        // 2-letter typo correction (e.g. "qe" -> "que")
+        mDict.insert("que", 250);
+        assertEquals("que", mDict.getBestCorrection("qe"));
+        List<CharSequence> fuzzyQe = mDict.getFuzzySuggestions("qe", 2);
+        assertTrue(fuzzyQe.contains("que"));
+
         // Too short or non-correctable
-        assertEquals(null, mDict.getBestCorrection("hi"));
+        assertEquals(null, mDict.getBestCorrection("a"));
         assertEquals(null, mDict.getBestCorrection("xyzabc"));
     }
 }

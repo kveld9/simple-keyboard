@@ -91,5 +91,5 @@
         <item>Agresiva</item>
         <item>Muy agresiva</item>
     </string-array>
-    <string name="settings_category_autocorrect">Corrección de texto</string>
+    <string name="settings_screen_autocorrect">Corrección de texto</string>
 </resources>

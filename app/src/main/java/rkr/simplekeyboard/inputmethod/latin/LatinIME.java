@@ -123,6 +123,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private String mAutocorrectedWord = null;
     private String mPreviousWord = null;
     private boolean mCanRevertAutocorrect = false;
+    private int mLastInlineFieldId = 0;
 
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
@@ -565,7 +566,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // also wouldn't be consuming gesture data.
         if (mTopBarView != null) {
             mTopBarView.closeToolTray();
-            if (!restarting) {
+            if (mTopBarView.isExternalViewActive()) {
                 mTopBarView.setExternalView(null);
             }
         }
@@ -595,8 +596,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     + ((editorInfo.inputType & InputType.TYPE_TEXT_FLAG_CAP_WORDS) != 0));
         }
         Log.i(TAG, "Starting input. Cursor position = "
-                + editorInfo.initialSelStart + "," + editorInfo.initialSelEnd +
-                " Restarting = " + restarting);
+                + editorInfo.initialSelStart + "," + editorInfo.initialSelEnd
+                + " Restarting = " + restarting
+                + " fieldId = " + editorInfo.fieldId
+                + " lastInlineFieldId = " + mLastInlineFieldId
+                + " externalActive = " + (mTopBarView != null && mTopBarView.isExternalViewActive()));
 
         // In landscape mode, this method gets called without the input view being created.
         if (mainKeyboardView == null) {
@@ -688,6 +692,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     void onFinishInputViewInternal(final boolean finishingInput) {
         hideClipboardHistory();
+        if (mTopBarView != null && mTopBarView.isExternalViewActive()) {
+            mTopBarView.setExternalView(null);
+        }
         super.onFinishInputView(finishingInput);
     }
 
@@ -706,9 +713,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final java.util.List<InlineSuggestion> inlineSuggestions = response.getInlineSuggestions();
         if (inlineSuggestions == null || inlineSuggestions.isEmpty()) {
             Log.i(TAG, "onInlineSuggestionsResponse: empty suggestions (returning false)");
+            // Match LeanType: just return false when empty. The framework handles this
+            // appropriately without falling into the infinite focus loop because we
+            // didn't modify the keyboard layout/view hierarchy here.
             return false;
         }
         Log.i(TAG, "onInlineSuggestionsResponse: received " + inlineSuggestions.size() + " suggestions");
+        final EditorInfo editorInfo = getCurrentInputEditorInfo();
+        if (editorInfo != null) {
+            mLastInlineFieldId = editorInfo.fieldId;
+        }
         final View inlineView = rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createView(
                 inlineSuggestions, mDisplayContext != null ? mDisplayContext : this);
         if (mTopBarView != null) {

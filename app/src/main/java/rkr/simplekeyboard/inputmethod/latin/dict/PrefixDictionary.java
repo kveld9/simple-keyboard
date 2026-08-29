@@ -20,6 +20,7 @@ import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
  * Long Word correction bonuses, and Bigram context support.
  */
 public final class PrefixDictionary {
+    public static final int BASE_LEARNED_FREQUENCY = 250;
 
     private static final char[] EMPTY_CHARS = new char[0];
     private static final TrieNode[] EMPTY_CHILDREN = new TrieNode[0];
@@ -64,8 +65,9 @@ public final class PrefixDictionary {
 
         boolean addWord(final String word, final int freq) {
             final short sFreq = (short) Math.min(Short.MAX_VALUE, Math.max(1, freq));
-            for (int i = 0; i < words.length; i++) {
-                if (words[i].equalsIgnoreCase(word)) {
+            final String[] w = words;
+            for (int i = 0; i < w.length; i++) {
+                if (w[i].equalsIgnoreCase(word)) {
                     if (sFreq > freqs[i]) {
                         freqs[i] = sFreq;
                         sortWords();
@@ -73,10 +75,10 @@ public final class PrefixDictionary {
                     return false;
                 }
             }
-            final int len = words.length;
+            final int len = w.length;
             final String[] newW = new String[len + 1];
             final short[] newF = new short[len + 1];
-            System.arraycopy(words, 0, newW, 0, len);
+            System.arraycopy(w, 0, newW, 0, len);
             System.arraycopy(freqs, 0, newF, 0, len);
             newW[len] = word;
             newF[len] = sFreq;
@@ -84,24 +86,6 @@ public final class PrefixDictionary {
             this.freqs = newF;
             sortWords();
             return true;
-        }
-
-        boolean removeWord(final String word) {
-            for (int i = 0; i < words.length; i++) {
-                if (words[i].equalsIgnoreCase(word)) {
-                    final int len = words.length;
-                    final String[] newW = new String[len - 1];
-                    final short[] newF = new short[len - 1];
-                    System.arraycopy(words, 0, newW, 0, i);
-                    System.arraycopy(words, i + 1, newW, i, len - i - 1);
-                    System.arraycopy(freqs, 0, newF, 0, i);
-                    System.arraycopy(freqs, i + 1, newF, i, len - i - 1);
-                    this.words = newW;
-                    this.freqs = newF;
-                    return true;
-                }
-            }
-            return false;
         }
 
         private void sortWords() {
@@ -290,52 +274,6 @@ public final class PrefixDictionary {
         }
     }
 
-    public synchronized void syncUserWords(final Map<String, Integer> userWords) {
-        if (userWords == null || userWords.isEmpty()) {
-            return;
-        }
-        for (Map.Entry<String, Integer> entry : userWords.entrySet()) {
-            insert(entry.getKey(), entry.getValue());
-        }
-    }
-
-    public synchronized void syncUserBigrams(final Map<String, Map<String, Integer>> userBigrams) {
-        if (userBigrams == null || userBigrams.isEmpty()) {
-            return;
-        }
-        for (Map.Entry<String, Map<String, Integer>> entry : userBigrams.entrySet()) {
-            final String prev = entry.getKey();
-            for (Map.Entry<String, Integer> subEntry : entry.getValue().entrySet()) {
-                setBigram(prev, subEntry.getKey(), subEntry.getValue());
-            }
-        }
-    }
-
-    public synchronized boolean removeWord(final String word) {
-        if (word == null || word.isEmpty()) {
-            return false;
-        }
-        final String normalized = stripAccents(word.toLowerCase());
-        TrieNode current = mRoot;
-        for (int i = 0; i < normalized.length(); i++) {
-            current = current.getChild(normalized.charAt(i));
-            if (current == null) {
-                return false;
-            }
-        }
-        boolean removed = current.removeWord(word);
-        if (removed) {
-            mWordCount--;
-            for (int i = 0; i < mTopWords.size(); i++) {
-                if (mTopWords.get(i).word.equalsIgnoreCase(word)) {
-                    mTopWords.remove(i);
-                    break;
-                }
-            }
-        }
-        return removed;
-    }
-
     public synchronized void setBigram(final String prevWord, final String word, final int freq) {
         if (prevWord == null || word == null || prevWord.isEmpty() || word.isEmpty()) {
             return;
@@ -364,21 +302,6 @@ public final class PrefixDictionary {
         return freq != null ? (freq & 0xFFFF) : 0;
     }
 
-    public synchronized Map<String, Integer> getBigramPredictions(final String prevWord) {
-        final Map<String, Integer> results = new HashMap<>();
-        if (prevWord == null || prevWord.isEmpty()) {
-            return results;
-        }
-        final String normPrev = stripAccents(prevWord.toLowerCase());
-        final Map<String, Short> nextMap = mBigrams.get(normPrev);
-        if (nextMap != null) {
-            for (Map.Entry<String, Short> entry : nextMap.entrySet()) {
-                results.put(entry.getKey(), entry.getValue() & 0xFFFF);
-            }
-        }
-        return results;
-    }
-
     public synchronized int getWordFrequency(final String word) {
         if (word == null || word.isEmpty()) return 0;
         final String norm = stripAccents(word.toLowerCase());
@@ -393,39 +316,6 @@ public final class PrefixDictionary {
             }
         }
         return 0;
-    }
-
-    public synchronized void loadFromStream(final InputStream inputStream) throws IOException {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) {
-                    continue;
-                }
-                final String[] parts = line.split("[\\s,]+");
-                if (parts.length >= 3) {
-                    try {
-                        final String prev = parts[0];
-                        final String word = parts[1];
-                        final int freq = Integer.parseInt(parts[2]);
-                        setBigram(prev, word, freq);
-                    } catch (NumberFormatException e) {
-                        insert(parts[0], 1);
-                    }
-                } else if (parts.length == 2) {
-                    try {
-                        final String word = parts[0];
-                        final int freq = Integer.parseInt(parts[1]);
-                        insert(word, freq);
-                    } catch (NumberFormatException e) {
-                        insert(parts[0], 1);
-                    }
-                } else if (parts.length == 1) {
-                    insert(parts[0], 1);
-                }
-            }
-        }
     }
 
     public synchronized List<CharSequence> getSuggestions(final String prefix, final int maxCount) {

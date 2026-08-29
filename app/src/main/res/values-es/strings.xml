@@ -36,8 +36,6 @@
     <string name="locale_name_es_US">"Español (EE.UU.)"</string>
     <string name="locale_name_hi_ZZ">"Hinglish"</string>
     <string name="locale_name_sr_ZZ">"Serbio (latino)"</string>
-    <string name="subtype_traditional">"tradicional"</string>
-    <string name="subtype_compact">"compacto"</string>
     <string name="add">"Añadir"</string>
     <string name="keyboard_theme_black">Negro AMOLED</string>
     <string name="remove">"Quitar"</string>
@@ -85,8 +83,6 @@
         <item>Sin bordes</item>
     </string-array>
     <string name="show_suggestions">Mostrar sugerencias de texto</string>
-    <string name="auto_correction">Autocorrección</string>
-    <string name="auto_correction_summary">La barra espaciadora corrige palabras mal escritas</string>
     <string name="auto_correction_threshold">Sensibilidad de autocorrección</string>
     <string name="auto_correction_threshold_summary">La barra espaciadora corrige palabras según la agresividad seleccionada</string>
     <string-array name="auto_correction_threshold_entries">

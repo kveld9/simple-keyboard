@@ -68,29 +68,10 @@
     <string name="locale_name_sr_ZZ">Serbian (Latin)</string>
     <!-- Description for a keyboard layout listing the language and layout name. -->
     <string name="subtype_generic_layout"><xliff:g id="LANGUAGE_NAME" example="English (US)">%1$s</xliff:g> (<xliff:g id="LAYOUT" example="QWERTY">%2$s</xliff:g>)</string>
-    <!-- Description for a traditional keyboard layout, such as Nepali (Traditional). -->
-    <string name="subtype_traditional">Traditional</string>
-    <!-- Description for a compact keyboard layout, such as Hindi (Compact). -->
-    <string name="subtype_compact">Compact</string>
-    <!-- Description for Bulgarian (BDS) keyboard layout. -->
-    <string name="subtype_bds">BDS</string>
-    <!-- Description for Turkish (Q) keyboard layout. -->
-    <string name="subtype_q">Q</string>
-    <!-- Description for Turkish (F) keyboard layout. -->
-    <string name="subtype_f">F</string>
-    <!-- Description for Bengali (Akkhor) keyboard layout. -->
-    <string name="subtype_akkhor">Akkhor</string>
-    <!-- Description for Ergo-L keyboard layout. -->
-    <string name="subtype_ergol">Ergo-L</string>
-    <!-- Description for Hcesar keyboard layout. -->
-    <string name="subtype_hcesar">HCESAR</string>
 
-    <string name="keyboard_theme_dark_border" translatable="false">Material Dark Border</string>
-    <string name="keyboard_theme_light_border" translatable="false">Material Light Border</string>
     <string name="keyboard_theme_dark" translatable="false">Material Dark</string>
     <string name="keyboard_theme_light" translatable="false">Material Light</string>
     <string name="keyboard_theme_system" translatable="false">System Default</string>
-    <string name="keyboard_theme_system_border" translatable="false">System Default Border</string>
     <string name="keyboard_theme_black" translatable="false">AMOLED Black</string>
 
     <!-- Title of the button to add a language in the settings dialog [CHAR LIMIT=15] -->
@@ -165,8 +146,6 @@
         <item>borderless</item>
     </string-array>
     <string name="show_suggestions">Show text suggestions</string>
-    <string name="auto_correction">Auto-correction</string>
-    <string name="auto_correction_summary">Spacebar corrects mistyped words</string>
     <string name="auto_correction_threshold">Auto-correction sensitivity</string>
     <string name="auto_correction_threshold_summary">Spacebar corrects mistyped words based on selected aggressiveness</string>
     <string-array name="auto_correction_threshold_entries">

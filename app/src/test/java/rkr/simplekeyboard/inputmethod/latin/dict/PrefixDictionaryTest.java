@@ -72,9 +72,11 @@ public class PrefixDictionaryTest {
     }
 
     @Test
-    public void testStreamLoading() throws IOException {
-        String data = "android 200\napple 150\napartment 100\napplication 180\n# comment line\n";
-        mDict.loadFromStream(new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
+    public void testPrefixSuggestionsSorting() {
+        mDict.insert("android", 200);
+        mDict.insert("apple", 150);
+        mDict.insert("apartment", 100);
+        mDict.insert("application", 180);
 
         assertEquals(4, mDict.getWordCount());
         List<CharSequence> results = mDict.getSuggestions("ap", 3);
@@ -352,41 +354,7 @@ public class PrefixDictionaryTest {
         assertEquals("fácil", mDict.getBestCorrection("facil"));
     }
 
-    @Test
-    public void testSyncUserWordsAndBigrams() {
-        java.util.Map<String, Integer> userWords = new java.util.HashMap<>();
-        userWords.put("customword", 250);
-        userWords.put("secondword", 255);
 
-        mDict.syncUserWords(userWords);
-
-        assertEquals(2, mDict.getWordCount());
-        assertEquals(250, mDict.getWordFrequency("customword"));
-        assertEquals(255, mDict.getWordFrequency("secondword"));
-
-        java.util.Map<String, java.util.Map<String, Integer>> userBigrams = new java.util.HashMap<>();
-        java.util.Map<String, Integer> nexts = new java.util.HashMap<>();
-        nexts.put("secondword", 240);
-        userBigrams.put("customword", nexts);
-
-        mDict.syncUserBigrams(userBigrams);
-
-        assertEquals(240, mDict.getBigramFrequency("customword", "secondword"));
-    }
-
-    @Test
-    public void testRemoveWord() {
-        mDict.insert("testing", 100);
-        mDict.insert("tester", 90);
-        assertEquals(2, mDict.getWordCount());
-        assertEquals(100, mDict.getWordFrequency("testing"));
-
-        boolean removed = mDict.removeWord("testing");
-        assertTrue(removed);
-        assertEquals(1, mDict.getWordCount());
-        assertEquals(0, mDict.getWordFrequency("testing"));
-        assertEquals(90, mDict.getWordFrequency("tester"));
-    }
 
     @Test
     public void testGetNextWordPredictionsWithBigrams() {

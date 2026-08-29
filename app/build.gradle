@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
 def appVersionName = project.findProperty("versionName") ?: "7.0.0"
-def appVersionCode = project.findProperty("versionCode") ? project.property("versionCode").toInteger() : 150
+def appVersionCode = project.findProperty("versionCode") ? project.property("versionCode").toInteger() : 70000
 
 android {
     defaultConfig {

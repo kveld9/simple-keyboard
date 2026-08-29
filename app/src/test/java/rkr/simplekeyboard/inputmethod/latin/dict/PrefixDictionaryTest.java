@@ -145,8 +145,8 @@ public class PrefixDictionaryTest {
         // Non-adjacent substitution (cost 1.0): 'a' not adjacent to 'p'
         assertEquals(1.0f, PrefixDictionary.computeWeightedDistance("a", "p"), 0.001f);
 
-        // Transposition (cost 0.8)
-        assertEquals(0.8f, PrefixDictionary.computeWeightedDistance("ab", "ba"), 0.001f);
+        // Transposition (cost 0.5)
+        assertEquals(0.5f, PrefixDictionary.computeWeightedDistance("ab", "ba"), 0.001f);
 
         // Insertion / Deletion (cost 1.0)
         assertEquals(1.0f, PrefixDictionary.computeWeightedDistance("abc", "ab"), 0.001f);
@@ -250,5 +250,141 @@ public class PrefixDictionaryTest {
         PrefixDictionary target = new PrefixDictionary();
         target.copyFrom(mDict);
         assertEquals(3.0f, target.getAutoCorrectionThreshold(), 0.001f);
+    }
+
+    @Test
+    public void testSpecialWordProtection() {
+        mDict.insert("tiempo", 100);
+        mDict.insert("problema", 100);
+        mDict.insert("árbol", 100);
+        mDict.insert("google", 100);
+
+        // 1. Numbers / Digits (mp3, h2o, v2, 100km)
+        assertTrue(PrefixDictionary.hasDigits("mp3"));
+        assertTrue(PrefixDictionary.hasDigits("h2o"));
+        assertTrue(PrefixDictionary.hasDigits("v2"));
+        assertTrue(PrefixDictionary.hasDigits("100km"));
+        assertEquals(null, mDict.getBestCorrection("mp3"));
+        assertEquals(null, mDict.getBestCorrection("h2o"));
+        assertEquals(null, mDict.getBestCorrection("v2"));
+        assertEquals(null, mDict.getBestCorrection("100km"));
+        assertEquals(null, mDict.getExactNormalizedCorrection("mp3"));
+
+        // 2. URLs / Emails (@, .)
+        assertTrue(PrefixDictionary.hasUrlOrEmailSymbol("correo@gmail.com"));
+        assertTrue(PrefixDictionary.hasUrlOrEmailSymbol("google.com"));
+        assertTrue(PrefixDictionary.hasUrlOrEmailSymbol("app.kt"));
+        assertEquals(null, mDict.getBestCorrection("correo@gmail.com"));
+        assertEquals(null, mDict.getBestCorrection("google.com"));
+        assertEquals(null, mDict.getBestCorrection("app.kt"));
+        assertEquals(null, mDict.getExactNormalizedCorrection("google.com"));
+
+        // 3. Intermediate uppercase / CamelCase / Acronyms
+        assertTrue(PrefixDictionary.hasIntermediateUpperCase("WiFi"));
+        assertTrue(PrefixDictionary.hasIntermediateUpperCase("ChatGPT"));
+        assertTrue(PrefixDictionary.hasIntermediateUpperCase("iPhone"));
+        assertTrue(PrefixDictionary.hasIntermediateUpperCase("PlayStation"));
+        assertTrue(PrefixDictionary.hasIntermediateUpperCase("McDonalds"));
+        assertEquals(null, mDict.getBestCorrection("WiFi"));
+        assertEquals(null, mDict.getBestCorrection("ChatGPT"));
+        assertEquals(null, mDict.getBestCorrection("iPhone"));
+        assertEquals(null, mDict.getBestCorrection("PlayStation"));
+        assertEquals(null, mDict.getBestCorrection("McDonalds"));
+
+        // Standard casing should NOT be blocked
+        assertEquals("árbol", mDict.getBestCorrection("arbol"));
+        assertEquals("Árbol", mDict.getBestCorrection("Arbol"));
+        assertEquals("ÁRBOL", mDict.getBestCorrection("ARBOL"));
+    }
+
+    @Test
+    public void testTranspositionDetection() {
+        mDict.insert("tiempo", 100);
+        mDict.insert("problema", 100);
+        mDict.insert("gracias", 100);
+
+        // Fast typing adjacent swaps
+        assertEquals("tiempo", mDict.getBestCorrection("tiemop"));
+        assertEquals("problema", mDict.getBestCorrection("porblema"));
+        assertEquals("gracias", mDict.getBestCorrection("gracais"));
+
+        // Transposition cost check
+        assertEquals(0.5f, PrefixDictionary.computeWeightedDistance("tiemop", "tiempo"), 0.001f);
+        assertEquals(0.5f, PrefixDictionary.computeWeightedDistance("porblema", "problema"), 0.001f);
+        assertEquals(0.5f, PrefixDictionary.computeWeightedDistance("gracais", "gracias"), 0.001f);
+    }
+
+    @Test
+    public void testApplyCasingAndInheritance() {
+        assertEquals("ÁRBOL", PrefixDictionary.applyCasing("ARBOL", "árbol"));
+        assertEquals("Canción", PrefixDictionary.applyCasing("Cancion", "canción"));
+        assertEquals("canción", PrefixDictionary.applyCasing("cancion", "canción"));
+        assertEquals("HELLO", PrefixDictionary.applyCasing("HEL", "hello"));
+        assertEquals("Hello", PrefixDictionary.applyCasing("He", "hello"));
+        assertEquals("hello", PrefixDictionary.applyCasing("he", "HELLO"));
+
+        mDict.insert("árbol", 100);
+        mDict.insert("canción", 100);
+
+        assertEquals("ÁRBOL", mDict.getBestCorrection("ARBOL"));
+        assertEquals("Árbol", mDict.getBestCorrection("Arbol"));
+        assertEquals("árbol", mDict.getBestCorrection("arbol"));
+        assertEquals("CANCIÓN", mDict.getBestCorrection("CANCION"));
+        assertEquals("Canción", mDict.getBestCorrection("Cancion"));
+        assertEquals("canción", mDict.getBestCorrection("cancion"));
+    }
+
+    @Test
+    public void testAccentRestorationWithoutPenalty() {
+        mDict.insert("árbol", 100);
+        mDict.insert("también", 100);
+        mDict.insert("música", 100);
+        mDict.insert("fácil", 100);
+
+        assertEquals(0.0f, PrefixDictionary.computeWeightedDistance("arbol", "árbol"), 0.001f);
+        assertEquals(0.0f, PrefixDictionary.computeWeightedDistance("tambien", "también"), 0.001f);
+        assertEquals(0.0f, PrefixDictionary.computeWeightedDistance("musica", "música"), 0.001f);
+        assertEquals(0.0f, PrefixDictionary.computeWeightedDistance("facil", "fácil"), 0.001f);
+
+        assertEquals("árbol", mDict.getBestCorrection("arbol"));
+        assertEquals("también", mDict.getBestCorrection("tambien"));
+        assertEquals("música", mDict.getBestCorrection("musica"));
+        assertEquals("fácil", mDict.getBestCorrection("facil"));
+    }
+
+    @Test
+    public void testSyncUserWordsAndBigrams() {
+        java.util.Map<String, Integer> userWords = new java.util.HashMap<>();
+        userWords.put("customword", 250);
+        userWords.put("secondword", 255);
+
+        mDict.syncUserWords(userWords);
+
+        assertEquals(2, mDict.getWordCount());
+        assertEquals(250, mDict.getWordFrequency("customword"));
+        assertEquals(255, mDict.getWordFrequency("secondword"));
+
+        java.util.Map<String, java.util.Map<String, Integer>> userBigrams = new java.util.HashMap<>();
+        java.util.Map<String, Integer> nexts = new java.util.HashMap<>();
+        nexts.put("secondword", 240);
+        userBigrams.put("customword", nexts);
+
+        mDict.syncUserBigrams(userBigrams);
+
+        assertEquals(240, mDict.getBigramFrequency("customword", "secondword"));
+    }
+
+    @Test
+    public void testRemoveWord() {
+        mDict.insert("testing", 100);
+        mDict.insert("tester", 90);
+        assertEquals(2, mDict.getWordCount());
+        assertEquals(100, mDict.getWordFrequency("testing"));
+
+        boolean removed = mDict.removeWord("testing");
+        assertTrue(removed);
+        assertEquals(1, mDict.getWordCount());
+        assertEquals(0, mDict.getWordFrequency("testing"));
+        assertEquals(90, mDict.getWordFrequency("tester"));
     }
 }

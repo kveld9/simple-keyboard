@@ -286,6 +286,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
         mClipboardHistoryManager.start();
         mUserDictionaryDb = new UserDictionaryDatabase(this);
+        mUserDictionaryDb.decayAndCleanupAsync();
 
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
@@ -298,6 +299,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void loadSettings() {
+        if (mUserDictionaryDb != null) {
+            mUserDictionaryDb.decayAndCleanupAsync();
+        }
         mLocale = mRichImm.getCurrentSubtype().getLocaleObject();
         final EditorInfo editorInfo = getCurrentInputEditorInfo();
         final InputAttributes inputAttributes = new InputAttributes(editorInfo, isFullscreenMode());
@@ -722,17 +726,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
             // 3. Load user-learned words and bigrams from database with top priority
             if (mUserDictionaryDb != null) {
-                final java.util.Map<String, Integer> userWords = mUserDictionaryDb.getAllLearnedWords();
-                for (java.util.Map.Entry<String, Integer> entry : userWords.entrySet()) {
-                    newDict.insert(entry.getKey(), entry.getValue());
-                }
-                final java.util.Map<String, java.util.Map<String, Integer>> userBigrams = mUserDictionaryDb.getAllBigrams();
-                for (java.util.Map.Entry<String, java.util.Map<String, Integer>> entry : userBigrams.entrySet()) {
-                    final String prev = entry.getKey();
-                    for (java.util.Map.Entry<String, Integer> subEntry : entry.getValue().entrySet()) {
-                        newDict.setBigram(prev, subEntry.getKey(), subEntry.getValue());
-                    }
-                }
+                final java.util.Map<String, Integer> userWords = mUserDictionaryDb.loadUserWords();
+                newDict.syncUserWords(userWords);
+
+                final java.util.Map<String, java.util.Map<String, Integer>> userBigrams = mUserDictionaryDb.loadUserBigrams();
+                newDict.syncUserBigrams(userBigrams);
             }
 
             mHandler.post(() -> {
@@ -1157,6 +1155,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         updateStateAfterInputTransaction(completeInputTransaction);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
         updateSuggestions();
+    }
+
+    public static String applyCasing(final String typed, final String suggestion) {
+        return PrefixDictionary.applyCasing(typed, suggestion);
     }
 
     // A helper method to split the code point and the key code. Ultimately, they should not be

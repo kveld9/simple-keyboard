@@ -91,22 +91,31 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
             return null;
         }
         final String currentText = text.toString();
-        storeClipTextIfChanged(currentText);
+        long clipTimestamp = System.currentTimeMillis();
+        try {
+            if (clip.getDescription() != null && clip.getDescription().getTimestamp() > 0) {
+                clipTimestamp = clip.getDescription().getTimestamp();
+            }
+        } catch (Throwable ignored) {}
+
+        storeClipTextIfChanged(currentText, clipTimestamp);
         return currentText;
     }
 
-    private void storeClipTextIfChanged(final String currentText) {
+    private void storeClipTextIfChanged(final String currentText, final long clipTimestamp) {
         if (!currentText.equals(mLastText)) {
             mLastText = currentText;
-            mLastTextTime = System.currentTimeMillis();
+            mLastTextTime = clipTimestamp;
             mLastTextUsed = false;
             final long retentionMinutes = getRetentionMinutes();
             mExecutor.execute(() -> {
                 mDatabase.deleteExpiredClips(retentionMinutes);
-                mDatabase.insertClip(currentText);
+                if (retentionMinutes <= 0 || (System.currentTimeMillis() - clipTimestamp <= retentionMinutes * 60 * 1000L)) {
+                    mDatabase.insertClip(currentText, false, clipTimestamp);
+                }
             });
         } else if (mLastTextTime <= 0) {
-            mLastTextTime = System.currentTimeMillis();
+            mLastTextTime = clipTimestamp;
         }
     }
 
@@ -119,7 +128,12 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
             return null;
         }
         final long now = System.currentTimeMillis();
-        if (mLastTextTime <= 0 || (now - mLastTextTime > CLIPBOARD_SUGGESTION_TIMEOUT_MS)) {
+        long maxTimeout = CLIPBOARD_SUGGESTION_TIMEOUT_MS;
+        final long retentionMinutes = getRetentionMinutes();
+        if (retentionMinutes > 0) {
+            maxTimeout = Math.min(maxTimeout, retentionMinutes * 60 * 1000L);
+        }
+        if (mLastTextTime <= 0 || (now - mLastTextTime > maxTimeout)) {
             return null;
         }
         return clip;

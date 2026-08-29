@@ -27,6 +27,7 @@ public class TopBarView extends FrameLayout {
     private LinearLayout mNormalModeContainer;
     private ImageView mExpandButton;
     private LinearLayout mSuggestionsContainer;
+    private FrameLayout mExternalViewContainer;
     private TextView mLeftSlot;
     private View mDivider1;
     private TextView mCenterSlot;
@@ -88,8 +89,12 @@ public class TopBarView extends FrameLayout {
         mSuggestionsContainer.addView(mCenterSlot);
         mSuggestionsContainer.addView(mDivider2);
         mSuggestionsContainer.addView(mRightSlot);
-
         mNormalModeContainer.addView(mSuggestionsContainer);
+
+        mExternalViewContainer = new FrameLayout(context);
+        mExternalViewContainer.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
+        mExternalViewContainer.setVisibility(View.GONE);
+        mNormalModeContainer.addView(mExternalViewContainer);
 
         View rightSpacer = new View(context);
         int spacerWidth = ViewUtils.dpToPx(context, 18);
@@ -181,6 +186,9 @@ public class TopBarView extends FrameLayout {
     }
 
     public void setSuggestions(List<CharSequence> suggestions, int boldIndex) {
+        if (isExternalViewActive()) {
+            setExternalView(null);
+        }
         if (suggestions == null || suggestions.isEmpty()) {
             clearSuggestions();
             return;
@@ -232,6 +240,9 @@ public class TopBarView extends FrameLayout {
     }
 
     public void setClipboardSuggestion(final String fullClipText) {
+        if (isExternalViewActive()) {
+            setExternalView(null);
+        }
         if (fullClipText == null || fullClipText.trim().isEmpty()) {
             setSuggestions(null, -1);
             return;
@@ -296,6 +307,23 @@ public class TopBarView extends FrameLayout {
         slot.setOnClickListener(v -> handleSuggestionClick(text));
     }
     
+    public void setExternalView(View view) {
+        if (view == null) {
+            mExternalViewContainer.removeAllViews();
+            mExternalViewContainer.setVisibility(View.GONE);
+            mSuggestionsContainer.setVisibility(View.VISIBLE);
+        } else {
+            mSuggestionsContainer.setVisibility(View.GONE);
+            mExternalViewContainer.removeAllViews();
+            mExternalViewContainer.addView(view);
+            mExternalViewContainer.setVisibility(View.VISIBLE);
+        }
+    }
+
+    public boolean isExternalViewActive() {
+        return mExternalViewContainer != null && mExternalViewContainer.getVisibility() == View.VISIBLE;
+    }
+
     public void setLanguageButtonVisible(boolean visible) {
         if (mLanguageButton != null) {
             mLanguageButton.setVisibility(visible ? View.VISIBLE : View.GONE);

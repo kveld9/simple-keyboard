@@ -323,6 +323,6 @@ public final class CapsModeUtils {
         if ((capsFlags & android.text.TextUtils.CAP_MODE_SENTENCES) != 0) {
             builder.add("sentences");
         }
-        return builder.isEmpty() ? "none" : TextUtils.join("|", builder);
+        return builder.isEmpty() ? "none" : String.join("|", builder);
     }
 }

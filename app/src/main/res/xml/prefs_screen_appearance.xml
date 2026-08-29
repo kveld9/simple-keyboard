@@ -29,9 +29,6 @@
         android:entries="@array/key_shape_entries"
         android:entryValues="@array/key_shape_values"
         android:defaultValue="rounded" />
-    <rkr.simplekeyboard.inputmethod.latin.settings.ColorDialogPreference
-        android:key="pref_keyboard_color"
-        android:title="@string/keyboard_color" />
     <rkr.simplekeyboard.inputmethod.latin.settings.SeekBarDialogPreference
         android:key="pref_keyboard_height"
         android:title="@string/prefs_keyboard_height_settings"

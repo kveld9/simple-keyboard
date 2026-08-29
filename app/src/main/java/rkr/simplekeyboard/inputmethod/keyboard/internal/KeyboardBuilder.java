@@ -575,54 +575,88 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
         final TypedArray caseAttr = mResources.obtainAttributes(attr, R.styleable.Keyboard_Case);
         if (DEBUG) startTag("<%s>", TAG_CASE);
         try {
-            final boolean keyboardLayoutSetMatched = matchString(caseAttr,
-                    R.styleable.Keyboard_Case_keyboardLayoutSet,
-                    id.mSubtype.getKeyboardLayoutSet());
-            final boolean keyboardLayoutSetElementMatched = matchTypedValue(caseAttr,
-                    R.styleable.Keyboard_Case_keyboardLayoutSetElement, id.mElementId,
-                    KeyboardId.elementIdToName(id.mElementId));
-            final boolean keyboardThemeMatched = matchTypedValue(caseAttr,
-                    R.styleable.Keyboard_Case_keyboardTheme, id.mThemeId,
-                    KeyboardTheme.getKeyboardThemeName(id.mThemeId));
-            final boolean modeMatched = matchTypedValue(caseAttr,
-                    R.styleable.Keyboard_Case_mode, id.mMode, KeyboardId.modeName(id.mMode));
-            final boolean navigateNextMatched = matchBoolean(caseAttr,
-                    R.styleable.Keyboard_Case_navigateNext, id.navigateNext());
-            final boolean navigatePreviousMatched = matchBoolean(caseAttr,
-                    R.styleable.Keyboard_Case_navigatePrevious, id.navigatePrevious());
-            final boolean passwordInputMatched = matchBoolean(caseAttr,
-                    R.styleable.Keyboard_Case_passwordInput, id.passwordInput());
-            final boolean clobberSettingsKeyMatched = matchBoolean(caseAttr,
-                    R.styleable.Keyboard_Case_clobberSettingsKey, id.mClobberSettingsKey);
-            final boolean languageSwitchKeyEnabledMatched = matchBoolean(caseAttr,
-                    R.styleable.Keyboard_Case_languageSwitchKeyEnabled,
-                    id.mLanguageSwitchKeyEnabled);
-            final boolean isMultiLineMatched = matchBoolean(caseAttr,
-                    R.styleable.Keyboard_Case_isMultiLine, id.isMultiLine());
-            final boolean imeActionMatched = matchInteger(caseAttr,
-                    R.styleable.Keyboard_Case_imeAction, id.imeAction());
-            final boolean isIconDefinedMatched = isIconDefined(caseAttr,
-                    R.styleable.Keyboard_Case_isIconDefined, mParams.mIconsSet);
-            final Locale locale = id.getLocale();
-            final boolean localeCodeMatched = matchLocaleCodes(caseAttr, locale);
-            final boolean languageCodeMatched = matchLanguageCodes(caseAttr, locale);
-            final boolean countryCodeMatched = matchCountryCodes(caseAttr, locale);
-            final boolean showMoreKeysMatched = matchBoolean(caseAttr,
-                    R.styleable.Keyboard_Case_showExtraChars, id.mShowMoreKeys);
-            final boolean showNumberRowMatched = matchBoolean(caseAttr,
-                    R.styleable.Keyboard_Case_showNumberRow, id.mShowNumberRow);
-            final boolean selected = keyboardLayoutSetMatched && keyboardLayoutSetElementMatched
-                    && keyboardThemeMatched && modeMatched && navigateNextMatched
-                    && navigatePreviousMatched && passwordInputMatched
-                    && languageSwitchKeyEnabledMatched && clobberSettingsKeyMatched
-                    && isMultiLineMatched && imeActionMatched && isIconDefinedMatched
-                    && localeCodeMatched && languageCodeMatched && countryCodeMatched
-                    && showMoreKeysMatched && showNumberRowMatched;
-
-            return selected;
+            return matchCondition(caseAttr, id);
         } finally {
             caseAttr.recycle();
         }
+    }
+
+    private boolean matchCondition(final TypedArray caseAttr, final KeyboardId id) {
+        if (!matchLayoutAndTheme(caseAttr, id)) {
+            return false;
+        }
+        if (!matchNavigationAndInput(caseAttr, id)) {
+            return false;
+        }
+        if (!matchUiAndFlags(caseAttr, id, mParams.mIconsSet)) {
+            return false;
+        }
+        if (!matchKeyVisibility(caseAttr, id)) {
+            return false;
+        }
+        return matchLocale(caseAttr, id.getLocale());
+    }
+
+    private static boolean matchLayoutAndTheme(final TypedArray caseAttr, final KeyboardId id) {
+        if (!matchString(caseAttr, R.styleable.Keyboard_Case_keyboardLayoutSet,
+                id.mSubtype.getKeyboardLayoutSet())) {
+            return false;
+        }
+        if (!matchTypedValue(caseAttr, R.styleable.Keyboard_Case_keyboardLayoutSetElement,
+                id.mElementId, KeyboardId.elementIdToName(id.mElementId))) {
+            return false;
+        }
+        if (!matchTypedValue(caseAttr, R.styleable.Keyboard_Case_keyboardTheme,
+                id.mThemeId, KeyboardTheme.getKeyboardThemeName(id.mThemeId))) {
+            return false;
+        }
+        return matchTypedValue(caseAttr, R.styleable.Keyboard_Case_mode,
+                id.mMode, KeyboardId.modeName(id.mMode));
+    }
+
+    private static boolean matchNavigationAndInput(final TypedArray caseAttr, final KeyboardId id) {
+        if (!matchBoolean(caseAttr, R.styleable.Keyboard_Case_navigateNext, id.navigateNext())) {
+            return false;
+        }
+        if (!matchBoolean(caseAttr, R.styleable.Keyboard_Case_navigatePrevious, id.navigatePrevious())) {
+            return false;
+        }
+        if (!matchBoolean(caseAttr, R.styleable.Keyboard_Case_passwordInput, id.passwordInput())) {
+            return false;
+        }
+        return matchBoolean(caseAttr, R.styleable.Keyboard_Case_isMultiLine, id.isMultiLine());
+    }
+
+    private static boolean matchUiAndFlags(final TypedArray caseAttr, final KeyboardId id,
+            final KeyboardIconsSet iconsSet) {
+        if (!matchBoolean(caseAttr, R.styleable.Keyboard_Case_clobberSettingsKey, id.mClobberSettingsKey)) {
+            return false;
+        }
+        if (!matchBoolean(caseAttr, R.styleable.Keyboard_Case_languageSwitchKeyEnabled,
+                id.mLanguageSwitchKeyEnabled)) {
+            return false;
+        }
+        if (!matchInteger(caseAttr, R.styleable.Keyboard_Case_imeAction, id.imeAction())) {
+            return false;
+        }
+        return isIconDefined(caseAttr, R.styleable.Keyboard_Case_isIconDefined, iconsSet);
+    }
+
+    private static boolean matchKeyVisibility(final TypedArray caseAttr, final KeyboardId id) {
+        if (!matchBoolean(caseAttr, R.styleable.Keyboard_Case_showExtraChars, id.mShowMoreKeys)) {
+            return false;
+        }
+        return matchBoolean(caseAttr, R.styleable.Keyboard_Case_showNumberRow, id.mShowNumberRow);
+    }
+
+    private static boolean matchLocale(final TypedArray caseAttr, final Locale locale) {
+        if (!matchLocaleCodes(caseAttr, locale)) {
+            return false;
+        }
+        if (!matchLanguageCodes(caseAttr, locale)) {
+            return false;
+        }
+        return matchCountryCodes(caseAttr, locale);
     }
 
     private static boolean matchLocaleCodes(TypedArray caseAttr, final Locale locale) {

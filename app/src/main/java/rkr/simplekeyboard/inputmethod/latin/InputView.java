@@ -29,29 +29,35 @@ public final class InputView extends FrameLayout {
         super(context, attrs, 0);
     }
 
-    @Override
-    public void addView(View child, int index, ViewGroup.LayoutParams params) {
+    private static FrameLayout.LayoutParams ensureBottomGravity(final ViewGroup.LayoutParams params) {
         if (params instanceof FrameLayout.LayoutParams) {
-            ((FrameLayout.LayoutParams) params).gravity = Gravity.BOTTOM;
-        } else if (params != null) {
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(params);
-            lp.gravity = Gravity.BOTTOM;
-            params = lp;
+            final FrameLayout.LayoutParams flp = (FrameLayout.LayoutParams) params;
+            flp.gravity = Gravity.BOTTOM;
+            return flp;
         }
-        super.addView(child, index, params);
+        if (params != null) {
+            final FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(params);
+            flp.gravity = Gravity.BOTTOM;
+            return flp;
+        }
+        return null;
+    }
+
+    @Override
+    public void addView(final View child, final int index, final ViewGroup.LayoutParams params) {
+        final FrameLayout.LayoutParams flp = ensureBottomGravity(params);
+        super.addView(child, index, flp != null ? flp : params);
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        for (int i = 0; i < getChildCount(); i++) {
-            View child = getChildAt(i);
-            ViewGroup.LayoutParams lp = child.getLayoutParams();
-            if (lp instanceof FrameLayout.LayoutParams) {
-                ((FrameLayout.LayoutParams) lp).gravity = Gravity.BOTTOM;
-            } else if (lp != null) {
-                FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(lp);
-                flp.gravity = Gravity.BOTTOM;
+        final int count = getChildCount();
+        for (int i = 0; i < count; i++) {
+            final View child = getChildAt(i);
+            final ViewGroup.LayoutParams lp = child.getLayoutParams();
+            final FrameLayout.LayoutParams flp = ensureBottomGravity(lp);
+            if (flp != null && flp != lp) {
                 child.setLayoutParams(flp);
             }
         }

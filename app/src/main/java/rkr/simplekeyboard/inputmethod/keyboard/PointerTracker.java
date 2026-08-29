@@ -224,25 +224,33 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     // primaryCode is different from {@link Key#mKeyCode}.
     private void callListenerOnCodeInput(final Key key, final int primaryCode, final int x,
             final int y, final boolean isKeyRepeat) {
-        final boolean ignoreModifierKey = mIsInDraggingFinger && key.isModifier();
-        final boolean altersCode = key.altCodeWhileTyping() && sTimerProxy.isTypingState();
-        final int code = altersCode ? key.getAltCode() : primaryCode;
-        if (DEBUG_LISTENER) {
-            final String output = code == Constants.CODE_OUTPUT_TEXT
-                    ? key.getOutputText() : Constants.printableCode(code);
-            Log.d(TAG, String.format("[%d] onCodeInput: %4d %4d %s%s%s", mPointerId, x, y,
-                    output, ignoreModifierKey ? " ignoreModifier" : "",
-                    altersCode ? " altersCode" : ""));
-        }
-        if (ignoreModifierKey) {
+        if (mIsInDraggingFinger && key.isModifier()) {
             return;
         }
+        final int code = resolveEffectiveCode(key, primaryCode);
+        if (DEBUG_LISTENER) {
+            final boolean altersCode = code != primaryCode;
+            final String output = code == Constants.CODE_OUTPUT_TEXT
+                    ? key.getOutputText() : Constants.printableCode(code);
+            Log.d(TAG, String.format("[%d] onCodeInput: %4d %4d %s%s", mPointerId, x, y,
+                    output, altersCode ? " altersCode" : ""));
+        }
+        dispatchCodeInput(key, code, x, y, isKeyRepeat);
+    }
 
+    private int resolveEffectiveCode(final Key key, final int primaryCode) {
+        if (key.altCodeWhileTyping() && sTimerProxy.isTypingState()) {
+            return key.getAltCode();
+        }
+        return primaryCode;
+    }
+
+    private void dispatchCodeInput(final Key key, final int code, final int x, final int y,
+            final boolean isKeyRepeat) {
         if (code == Constants.CODE_OUTPUT_TEXT) {
             sListener.onTextInput(key.getOutputText());
         } else if (code != Constants.CODE_UNSPECIFIED) {
-            sListener.onCodeInput(code,
-                x, y, isKeyRepeat);
+            sListener.onCodeInput(code, x, y, isKeyRepeat);
         }
     }
 
@@ -416,38 +424,47 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         final int action = me.getActionMasked();
         final long eventTime = me.getEventTime();
         if (action == MotionEvent.ACTION_MOVE) {
-            // When this pointer is the only active pointer and is showing a more keys panel,
-            // we should ignore other pointers' motion event.
-            final boolean shouldIgnoreOtherPointers =
-                    isShowingMoreKeysPanel() && getActivePointerTrackerCount() == 1;
-            final int pointerCount = me.getPointerCount();
-            for (int index = 0; index < pointerCount; index++) {
-                final int id = me.getPointerId(index);
-                if (shouldIgnoreOtherPointers && id != mPointerId) {
-                    continue;
-                }
-                final int x = (int)me.getX(index);
-                final int y = (int)me.getY(index);
-                final PointerTracker tracker = getPointerTracker(id);
-                tracker.onMoveEvent(x, y, eventTime);
-            }
+            processMoveMotionEvent(me, eventTime);
             return;
         }
         final int index = me.getActionIndex();
-        final int x = (int)me.getX(index);
-        final int y = (int)me.getY(index);
-        switch (action) {
-        case MotionEvent.ACTION_DOWN:
-        case MotionEvent.ACTION_POINTER_DOWN:
+        dispatchNonMoveMotionEvent(action, (int) me.getX(index), (int) me.getY(index), eventTime,
+                keyDetector);
+    }
+
+    private void processMoveMotionEvent(final MotionEvent me, final long eventTime) {
+        // When this pointer is the only active pointer and is showing a more keys panel,
+        // we should ignore other pointers' motion event.
+        final boolean shouldIgnoreOtherPointers =
+                isShowingMoreKeysPanel() && getActivePointerTrackerCount() == 1;
+        final int pointerCount = me.getPointerCount();
+        for (int index = 0; index < pointerCount; index++) {
+            final int id = me.getPointerId(index);
+            if (shouldIgnoreOtherPointers && id != mPointerId) {
+                continue;
+            }
+            final int x = (int) me.getX(index);
+            final int y = (int) me.getY(index);
+            final PointerTracker tracker = getPointerTracker(id);
+            tracker.onMoveEvent(x, y, eventTime);
+        }
+    }
+
+    private void dispatchNonMoveMotionEvent(final int action, final int x, final int y,
+            final long eventTime, final KeyDetector keyDetector) {
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             onDownEvent(x, y, eventTime, keyDetector);
-            break;
-        case MotionEvent.ACTION_UP:
-        case MotionEvent.ACTION_POINTER_UP:
+            return;
+        }
+        dispatchUpOrCancelEvent(action, x, y, eventTime);
+    }
+
+    private void dispatchUpOrCancelEvent(final int action, final int x, final int y,
+            final long eventTime) {
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP) {
             onUpEvent(x, y, eventTime);
-            break;
-        case MotionEvent.ACTION_CANCEL:
+        } else if (action == MotionEvent.ACTION_CANCEL) {
             onCancelEvent(x, y, eventTime);
-            break;
         }
     }
 
@@ -617,44 +634,59 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
 
     private void onMoveEventInternal(final int x, final int y, final long eventTime) {
         final Key oldKey = mCurrentKey;
-
-        if (oldKey != null && oldKey.getCode() == Constants.CODE_SPACE && Settings.getInstance().getCurrent().mSpaceSwipeEnabled) {
-            //Pointer slider
-            int steps = (x - mStartX) / sPointerStep;
-            final int swipeIgnoreTime = Settings.getInstance().getCurrent().mKeyLongpressTimeout / MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;
-            if (steps != 0 && mStartTime + swipeIgnoreTime < System.currentTimeMillis()) {
-                mCursorMoved = true;
-                mStartX += steps * sPointerStep;
-                sListener.onMoveCursorPointer(steps);
-            }
+        if (handleSpaceSwipe(x, oldKey) || handleDeleteSwipe(x, oldKey)) {
             return;
         }
-
-        if (oldKey != null && oldKey.getCode() == Constants.CODE_DELETE && Settings.getInstance().getCurrent().mDeleteSwipeEnabled) {
-            //Delete slider
-            int steps = (x - mStartX) / sPointerStep;
-            if (steps != 0) {
-                sTimerProxy.cancelKeyTimersOf(this);
-                mCursorMoved = true;
-                mStartX += steps * sPointerStep;
-                sListener.onMoveDeletePointer(steps);
-            }
-            return;
-        }
-
         final Key newKey = onMoveKey(x, y);
+        transitionToNewKey(newKey, oldKey, x, y, eventTime);
+    }
+
+    private boolean handleSpaceSwipe(final int x, final Key oldKey) {
+        if (oldKey == null || oldKey.getCode() != Constants.CODE_SPACE
+                || !Settings.getInstance().getCurrent().mSpaceSwipeEnabled) {
+            return false;
+        }
+        final int steps = (x - mStartX) / sPointerStep;
+        final int swipeIgnoreTime = Settings.getInstance().getCurrent().mKeyLongpressTimeout
+                / MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;
+        if (steps != 0 && mStartTime + swipeIgnoreTime < System.currentTimeMillis()) {
+            mCursorMoved = true;
+            mStartX += steps * sPointerStep;
+            sListener.onMoveCursorPointer(steps);
+        }
+        return true;
+    }
+
+    private boolean handleDeleteSwipe(final int x, final Key oldKey) {
+        if (oldKey == null || oldKey.getCode() != Constants.CODE_DELETE
+                || !Settings.getInstance().getCurrent().mDeleteSwipeEnabled) {
+            return false;
+        }
+        final int steps = (x - mStartX) / sPointerStep;
+        if (steps != 0) {
+            sTimerProxy.cancelKeyTimersOf(this);
+            mCursorMoved = true;
+            mStartX += steps * sPointerStep;
+            sListener.onMoveDeletePointer(steps);
+        }
+        return true;
+    }
+
+    private void transitionToNewKey(final Key newKey, final Key oldKey, final int x, final int y,
+            final long eventTime) {
         if (newKey != null) {
-            if (oldKey != null && isMajorEnoughMoveToBeOnNewKey(x, y, newKey)) {
-                dragFingerFromOldKeyToNewKey(newKey, x, y, eventTime, oldKey);
-            } else if (oldKey == null) {
-                // The pointer has been slid in to the new key, but the finger was not on any keys.
-                // In this case, we must call onPress() to notify that the new key is being pressed.
-                processDraggingFingerInToNewKey(newKey, x, y);
-            }
-        } else { // newKey == null
-            if (oldKey != null && isMajorEnoughMoveToBeOnNewKey(x, y, newKey)) {
-                dragFingerOutFromOldKey(oldKey, x, y);
-            }
+            handleValidNewKeyTransition(newKey, oldKey, x, y, eventTime);
+        } else if (oldKey != null && isMajorEnoughMoveToBeOnNewKey(x, y, null)) {
+            dragFingerOutFromOldKey(oldKey, x, y);
+        }
+    }
+
+    private void handleValidNewKeyTransition(final Key newKey, final Key oldKey, final int x,
+            final int y, final long eventTime) {
+        if (oldKey != null && isMajorEnoughMoveToBeOnNewKey(x, y, newKey)) {
+            dragFingerFromOldKeyToNewKey(newKey, x, y, eventTime, oldKey);
+        } else if (oldKey == null) {
+            processDraggingFingerInToNewKey(newKey, x, y);
         }
     }
 
@@ -698,38 +730,60 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         // Release the last pressed key.
         setReleasedKeyGraphics(currentKey, true /* withAnimation */);
 
-        if (mCursorMoved && currentKey.getCode() == Constants.CODE_DELETE) {
-            sListener.onUpWithDeletePointerActive();
-        }
-        if (mCursorMoved && currentKey.getCode() == Constants.CODE_SPACE) {
-            sListener.onUpWithSpacePointerActive();
-        }
+        notifyUpWithActivePointer(currentKey);
 
         if (isShowingMoreKeysPanel()) {
-            if (!mIsTrackingForActionDisabled) {
-                final int translatedX = mMoreKeysPanel.translateX(x);
-                final int translatedY = mMoreKeysPanel.translateY(y);
-                mMoreKeysPanel.onUpEvent(translatedX, translatedY, mPointerId);
-            }
-            dismissMoreKeysPanel();
+            handleMoreKeysPanelUp(x, y);
             return;
         }
 
-        if (mCursorMoved) {
-            mCursorMoved = false;
-            return;
-        }
-        if (mIsTrackingForActionDisabled) {
-            return;
-        }
-        if (currentKey != null && currentKey.isRepeatable()
-                && (currentKey.getCode() == currentRepeatingKeyCode) && !isInDraggingFinger) {
+        if (isKeyActionSuppressed(currentKey, currentRepeatingKeyCode, isInDraggingFinger)) {
             return;
         }
         detectAndSendKey(currentKey, mKeyX, mKeyY);
         if (isInSlidingKeyInput) {
             callListenerOnFinishSlidingInput();
         }
+    }
+
+    private void notifyUpWithActivePointer(final Key currentKey) {
+        if (!mCursorMoved || currentKey == null) {
+            return;
+        }
+        if (currentKey.getCode() == Constants.CODE_DELETE) {
+            sListener.onUpWithDeletePointerActive();
+        } else if (currentKey.getCode() == Constants.CODE_SPACE) {
+            sListener.onUpWithSpacePointerActive();
+        }
+    }
+
+    private void handleMoreKeysPanelUp(final int x, final int y) {
+        if (!mIsTrackingForActionDisabled) {
+            final int translatedX = mMoreKeysPanel.translateX(x);
+            final int translatedY = mMoreKeysPanel.translateY(y);
+            mMoreKeysPanel.onUpEvent(translatedX, translatedY, mPointerId);
+        }
+        dismissMoreKeysPanel();
+    }
+
+    private boolean isKeyActionSuppressed(final Key currentKey, final int repeatingCode,
+            final boolean isDragging) {
+        if (mCursorMoved) {
+            mCursorMoved = false;
+            return true;
+        }
+        if (mIsTrackingForActionDisabled) {
+            return true;
+        }
+        return isRepeatKeySuppressed(currentKey, repeatingCode, isDragging);
+    }
+
+    private static boolean isRepeatKeySuppressed(final Key key, final int repeatingCode,
+            final boolean isDragging) {
+        if (isDragging || key == null || !key.isRepeatable()) {
+            return false;
+        }
+        return key.getCode() == repeatingCode;
     }
 
     @Override

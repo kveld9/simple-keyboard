@@ -153,61 +153,67 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         } else {
             final SharedPreferences.Editor prefsEditor = prefs.edit();
             for (final String key : restrictionKeys) {
-                switch (key) {
-                    case PREF_ENABLED_SUBTYPES:
-                    case PREF_AUTO_CORRECTION_THRESHOLD:
-                        Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
-                        prefsEditor.putString(key, appRestrictions.getString(key));
-                        break;
-                    case SCREEN_THEME:
-                        Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
-                        prefsEditor.putString(KeyboardTheme.KEYBOARD_THEME_KEY, appRestrictions.getString(key));
-                        break;
-                    case PREF_AUTO_CAP:
-                    case PREF_SHOW_NUMBER_ROW:
-                    case PREF_SHOW_SPECIAL_CHARS:
-                    case PREF_SHOW_LANGUAGE_SWITCH_KEY:
-                    case PREF_USE_ON_SCREEN:
-                    case PREF_ENABLE_IME_SWITCH:
-                    case PREF_DELETE_SWIPE:
-                    case PREF_SPACE_SWIPE:
-                    case PREF_VIBRATE_ON:
-                    case PREF_SOUND_ON:
-                    case PREF_POPUP_ON:
-                        Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getBoolean(key));
-                        prefsEditor.putBoolean(key, appRestrictions.getBoolean(key));
-                        break;
-                    case PREF_KEYPRESS_SOUND_VOLUME:
-                    case PREF_KEYBOARD_HEIGHT:
-                        Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getInt(key));
-                        prefsEditor.putFloat(key, appRestrictions.getInt(key) / 100f);
-                        break;
-                    case PREF_KEY_LONGPRESS_TIMEOUT:
-                    case PREF_BOTTOM_OFFSET_PORTRAIT:
-                        Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getInt(key));
-                        prefsEditor.putInt(key, appRestrictions.getInt(key));
-                        break;
-                    case PREF_KEYBOARD_COLOR:
-                        Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
-                        String color = appRestrictions.getString(key);
-                        if (color.startsWith("#")) {
-                            try {
-                                color = "FF" + color.substring(1);
-                                prefsEditor.putInt(key, Integer.parseUnsignedInt(color, 16));
-                                break;
-                            } catch (NumberFormatException ignored) { }
-                        }
-                        prefsEditor.remove(key);
-                        break;
-                    default:
-                        Log.e(TAG, "Unhandled restriction: " + key);
-                }
+                applySingleRestriction(key, appRestrictions, prefsEditor);
             }
-
             prefsEditor.putStringSet(ACTIVE_RESTRICTIONS, restrictionKeys);
             prefsEditor.apply();
         }
         return restrictionKeys;
+    }
+
+    private static void applyColorRestriction(final String key, final String color, final SharedPreferences.Editor prefsEditor) {
+        if (color != null && color.startsWith("#")) {
+            try {
+                final String hexColor = "FF" + color.substring(1);
+                prefsEditor.putInt(key, Integer.parseUnsignedInt(hexColor, 16));
+                return;
+            } catch (NumberFormatException ignored) { }
+        }
+        prefsEditor.remove(key);
+    }
+
+    private static void applySingleRestriction(final String key, final Bundle appRestrictions, final SharedPreferences.Editor prefsEditor) {
+        switch (key) {
+            case PREF_ENABLED_SUBTYPES:
+            case PREF_AUTO_CORRECTION_THRESHOLD:
+                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
+                prefsEditor.putString(key, appRestrictions.getString(key));
+                break;
+            case SCREEN_THEME:
+                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
+                prefsEditor.putString(KeyboardTheme.KEYBOARD_THEME_KEY, appRestrictions.getString(key));
+                break;
+            case PREF_AUTO_CAP:
+            case PREF_SHOW_NUMBER_ROW:
+            case PREF_SHOW_SPECIAL_CHARS:
+            case PREF_SHOW_LANGUAGE_SWITCH_KEY:
+            case PREF_USE_ON_SCREEN:
+            case PREF_ENABLE_IME_SWITCH:
+            case PREF_DELETE_SWIPE:
+            case PREF_SPACE_SWIPE:
+            case PREF_VIBRATE_ON:
+            case PREF_SOUND_ON:
+            case PREF_POPUP_ON:
+                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getBoolean(key));
+                prefsEditor.putBoolean(key, appRestrictions.getBoolean(key));
+                break;
+            case PREF_KEYPRESS_SOUND_VOLUME:
+            case PREF_KEYBOARD_HEIGHT:
+                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getInt(key));
+                prefsEditor.putFloat(key, appRestrictions.getInt(key) / 100f);
+                break;
+            case PREF_KEY_LONGPRESS_TIMEOUT:
+            case PREF_BOTTOM_OFFSET_PORTRAIT:
+                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getInt(key));
+                prefsEditor.putInt(key, appRestrictions.getInt(key));
+                break;
+            case PREF_KEYBOARD_COLOR:
+                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
+                applyColorRestriction(key, appRestrictions.getString(key), prefsEditor);
+                break;
+            default:
+                Log.e(TAG, "Unhandled restriction: " + key);
+        }
     }
 
     public void loadSettings(final InputAttributes inputAttributes) {

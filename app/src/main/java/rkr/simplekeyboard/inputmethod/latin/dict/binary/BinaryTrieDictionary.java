@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
+
 public class BinaryTrieDictionary {
     private final ByteBuffer buffer;
     private final int rootOffset;
@@ -65,7 +67,7 @@ public class BinaryTrieDictionary {
             char c = (char) (buffer.getShort(childNode) & 0xFFFF);
             char lowerChildChar = Character.toLowerCase(c);
             
-            if (removeAccents(lowerChildChar) == removeAccents(targetChar)) {
+            if (StringUtils.removeAccents(lowerChildChar) == StringUtils.removeAccents(targetChar)) {
                 int result = dfsUnaccentedMatch(childNode, target, targetIndex + 1);
                 if (result > 0) {
                     int freq = getNodeFrequency(result);
@@ -77,19 +79,6 @@ public class BinaryTrieDictionary {
             }
         }
         return bestNode;
-    }
-    
-    private char removeAccents(char c) {
-        switch (c) {
-            case 'á': case 'à': case 'ä': case 'â': return 'a';
-            case 'é': case 'è': case 'ë': case 'ê': return 'e';
-            case 'í': case 'ì': case 'ï': case 'î': return 'i';
-            case 'ó': case 'ò': case 'ö': case 'ô': return 'o';
-            case 'ú': case 'ù': case 'ü': case 'û': return 'u';
-            case 'ñ': return 'n';
-            case 'ç': return 'c';
-            default: return c;
-        }
     }
 
     public List<CharSequence> getPrefixSuggestions(String prefix, int limit) {

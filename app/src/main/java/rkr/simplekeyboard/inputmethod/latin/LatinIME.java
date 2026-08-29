@@ -407,22 +407,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                                 cleanWord = cleanWord.substring(1, cleanWord.length() - 1).trim();
                             }
                             if (cleanWord.length() > 0) {
-                                mPrefixDictionary.insert(cleanWord, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
-                                final String prevWord = (mPreviousWord != null && !mPreviousWord.isEmpty())
-                                        ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
-                                if (prevWord != null && !prevWord.isEmpty()) {
-                                    mPrefixDictionary.setBigram(prevWord, cleanWord, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
-                                }
-                                if (mUserDictionaryDb != null) {
-                                    final String wordToLearn = cleanWord;
-                                    final String pWord = prevWord;
-                                    new Thread(() -> {
-                                        mUserDictionaryDb.learnWord(wordToLearn);
-                                        if (pWord != null && !pWord.isEmpty()) {
-                                            mUserDictionaryDb.learnBigram(pWord, wordToLearn);
-                                        }
-                                    }).start();
-                                }
+                                learnWordAsync(cleanWord, getEffectivePreviousWord());
                                 mPreviousWord = cleanWord;
                             }
                         }
@@ -644,8 +629,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onWindowShown() {
         super.onWindowShown();
-        if (isInputViewShown())
+        if (isInputViewShown()) {
             setNavigationBarColor();
+            if (mClipboardHistoryManager != null) {
+                mClipboardHistoryManager.updateCurrentClip();
+            }
+            if (mTopBarView != null) {
+                updateSuggestions();
+            }
+        }
     }
 
     @Override
@@ -822,104 +814,149 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     public void updateSuggestions() {
-        if (mTopBarView == null || !isInputViewShown()) {
+        if (isSuggestionsDisabled()) {
             return;
-        }
-        if (!mSettings.getCurrent().mShowSuggestions) {
-            mTopBarView.setSuggestions(null, -1);
-            return;
-        }
-        final EditorInfo editorInfo = getCurrentInputEditorInfo();
-        if (editorInfo != null) {
-            final InputAttributes attr = new InputAttributes(editorInfo, isFullscreenMode());
-            if (attr.mIsPasswordField) {
-                mTopBarView.setSuggestions(null, -1);
-                return;
-            }
         }
         final String word = mInputLogic.mConnection.getWordBeforeCursor();
-        final String prevWord = (mPreviousWord != null && !mPreviousWord.isEmpty())
-                ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
+        final String prevWord = getEffectivePreviousWord();
 
-        if (word == null || word.trim().isEmpty()) {
-            if (mClipboardHistoryManager != null) {
-                final String recentClip = mClipboardHistoryManager.getRecentClipForSuggestion();
-                if (recentClip != null) {
-                    mTopBarView.setClipboardSuggestion(recentClip);
-                    return;
-                }
-            }
-            if (prevWord != null && !prevWord.trim().isEmpty()) {
-                final java.util.List<CharSequence> nextWordPredictions =
-                        mPrefixDictionary.getNextWordPredictions(prevWord.trim(), 3);
-                if (nextWordPredictions != null && !nextWordPredictions.isEmpty()) {
-                    mTopBarView.setSuggestions(nextWordPredictions, 0);
-                    return;
-                }
-            }
-            mTopBarView.setSuggestions(null, -1);
+        if (isWordEmpty(word)) {
+            displayEmptyWordSuggestions(prevWord);
             return;
         }
 
-        final java.util.List<CharSequence> suggestions = new java.util.ArrayList<>();
-        int boldIndex = -1;
+        displayComposingSuggestions(word, prevWord);
+    }
 
-        // 1. Slot 0 is ALWAYS the raw typed word in quotes
+    private boolean isSuggestionsDisabled() {
+        if (mTopBarView == null || !isInputViewShown()) {
+            return true;
+        }
+        if (!mSettings.getCurrent().mShowSuggestions || isPasswordField()) {
+            mTopBarView.setSuggestions(null, -1);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isPasswordField() {
+        final EditorInfo editorInfo = getCurrentInputEditorInfo();
+        if (editorInfo == null) {
+            return false;
+        }
+        return new InputAttributes(editorInfo, isFullscreenMode()).mIsPasswordField;
+    }
+
+    private void displayEmptyWordSuggestions(final String prevWord) {
+        if (displayClipboardChipIfAvailable()) {
+            return;
+        }
+        if (displayNextWordPredictionsIfAvailable(prevWord)) {
+            return;
+        }
+        mTopBarView.setSuggestions(null, -1);
+    }
+
+    private boolean displayClipboardChipIfAvailable() {
+        if (mClipboardHistoryManager == null) {
+            return false;
+        }
+        final String recentClip = mClipboardHistoryManager.getRecentClipForSuggestion();
+        if (recentClip != null) {
+            mTopBarView.setClipboardSuggestion(recentClip);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean displayNextWordPredictionsIfAvailable(final String prevWord) {
+        if (isWordEmpty(prevWord)) {
+            return false;
+        }
+        final java.util.List<CharSequence> nextWordPredictions =
+                mPrefixDictionary.getNextWordPredictions(prevWord.trim(), 3);
+        if (nextWordPredictions != null && !nextWordPredictions.isEmpty()) {
+            mTopBarView.setSuggestions(nextWordPredictions, 0);
+            return true;
+        }
+        return false;
+    }
+
+    private java.util.List<CharSequence> getSuggestionsForWord(final String word, final String prevWord) {
+        if (mBeamSearchDecoder != null) {
+            final java.util.List<CharSequence> matches = mBeamSearchDecoder.getSuggestions(word, 3, prevWord);
+            if (matches != null && !matches.isEmpty()) {
+                return matches;
+            }
+        }
+        final java.util.List<CharSequence> dictMatches = mPrefixDictionary.getSuggestions(word, 3, prevWord);
+        return dictMatches != null ? dictMatches : java.util.Collections.emptyList();
+    }
+
+    private CharSequence getDecoderBestCorrection(final String word, final String prevWord) {
+        if (mBeamSearchDecoder != null) {
+            return mBeamSearchDecoder.getBestCorrection(word, 0.5f, prevWord);
+        }
+        return null;
+    }
+
+    private CharSequence resolveBestCorrection(final String word, final String prevWord, final boolean hasMatches) {
+        if (!mSettings.getCurrent().mAutoCorrectionEnabled) {
+            return null;
+        }
+        final CharSequence decoderCorrection = getDecoderBestCorrection(word, prevWord);
+        if (decoderCorrection != null) {
+            return decoderCorrection;
+        }
+        final CharSequence exactNorm = mPrefixDictionary.getExactNormalizedCorrection(word);
+        if (exactNorm != null) {
+            return exactNorm;
+        }
+        return hasMatches ? null : mPrefixDictionary.getBestCorrection(word, prevWord);
+    }
+
+    private void appendCorrectionAndCandidates(final java.util.List<CharSequence> suggestions,
+            final String word, final String prevWord, final CharSequence bestCorrection,
+            final java.util.List<CharSequence> matches) {
+        suggestions.add(bestCorrection);
+        final java.util.List<CharSequence> candidates = matches.isEmpty()
+                ? mPrefixDictionary.getFuzzySuggestions(word, 3, prevWord) : matches;
+        final String bestStr = bestCorrection.toString();
+        for (CharSequence s : candidates) {
+            if (suggestions.size() >= 3) {
+                break;
+            }
+            if (!s.toString().equalsIgnoreCase(bestStr)) {
+                suggestions.add(s);
+            }
+        }
+    }
+
+    private int appendMatchingSuggestions(final java.util.List<CharSequence> suggestions,
+            final java.util.List<CharSequence> matches) {
+        if (matches.isEmpty()) {
+            return -1;
+        }
+        suggestions.add(matches.get(0));
+        if (matches.size() > 1) {
+            suggestions.add(matches.get(1));
+        }
+        return 1;
+    }
+
+    private void displayComposingSuggestions(final String word, final String prevWord) {
+        final java.util.List<CharSequence> suggestions = new java.util.ArrayList<>();
         suggestions.add("\"" + word + "\"");
 
-        final boolean autoCorrectionEnabled = mSettings.getCurrent().mAutoCorrectionEnabled;
-        java.util.List<CharSequence> matches = null;
-        if (mBeamSearchDecoder != null) {
-            matches = mBeamSearchDecoder.getSuggestions(word, 3, prevWord);
-        }
-        if (matches == null || matches.isEmpty()) {
-            matches = mPrefixDictionary.getSuggestions(word, 3, prevWord);
-        }
+        final java.util.List<CharSequence> matches = getSuggestionsForWord(word, prevWord);
+        final CharSequence bestCorrection = resolveBestCorrection(word, prevWord, !matches.isEmpty());
 
-        final CharSequence bestCorrection;
-        if (autoCorrectionEnabled) {
-            String bsc = null;
-            if (mBeamSearchDecoder != null) {
-                bsc = mBeamSearchDecoder.getBestCorrection(word, 0.5f, prevWord);
-            }
-            if (bsc != null) {
-                bestCorrection = bsc;
-            } else {
-                final CharSequence exactNorm = mPrefixDictionary.getExactNormalizedCorrection(word);
-                if (exactNorm != null) {
-                    bestCorrection = exactNorm;
-                } else if (matches.isEmpty()) {
-                    bestCorrection = mPrefixDictionary.getBestCorrection(word, prevWord);
-                } else {
-                    bestCorrection = null;
-                }
-            }
-        } else {
-            bestCorrection = null;
-        }
-
+        final int boldIndex;
         if (bestCorrection != null) {
-            // Typo or missing accent with auto-correction enabled:
-            // 2. Slot 1: Target autocorrection in BOLD
-            suggestions.add(bestCorrection);
+            appendCorrectionAndCandidates(suggestions, word, prevWord, bestCorrection, matches);
             boldIndex = 1;
-            // 3. Slot 2: Alternative suggestion (from matches or fuzzy candidates)
-            final java.util.List<CharSequence> candidates = matches.isEmpty()
-                    ? mPrefixDictionary.getFuzzySuggestions(word, 3, prevWord) : matches;
-            for (CharSequence s : candidates) {
-                if (!s.toString().equalsIgnoreCase(bestCorrection.toString()) && suggestions.size() < 3) {
-                    suggestions.add(s);
-                }
-            }
-        } else if (!matches.isEmpty()) {
-            // Normal typing / valid prefix / auto-correction disabled:
-            // 2. Slot 1: Top suggested completion in BOLD
-            suggestions.add(matches.get(0));
-            boldIndex = 1;
-            // 3. Slot 2: Secondary suggestion if available
-            if (matches.size() > 1) {
-                suggestions.add(matches.get(1));
-            }
+        } else {
+            boldIndex = appendMatchingSuggestions(suggestions, matches);
         }
 
         mTopBarView.setSuggestions(suggestions, boldIndex);
@@ -1143,109 +1180,195 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onCodeInput(final int codePoint, final int x, final int y,
             final boolean isKeyRepeat) {
-        if (mBeamSearchDecoder != null) {
-            if (Character.isLetter(codePoint)) {
-                mBeamSearchDecoder.onTouch(x, y, (char) codePoint);
-            } else if (codePoint == Constants.CODE_DELETE) {
-                mBeamSearchDecoder.onBackspace();
-            } else if (codePoint == Constants.CODE_SPACE || (!Character.isLetterOrDigit(codePoint) && codePoint > 32)) {
-                mBeamSearchDecoder.reset();
-            }
-        }
+        feedBeamSearchDecoder(codePoint, x, y);
         final Event event = createSoftwareKeypressEvent(getCodePointForKeyboard(codePoint), x, y, isKeyRepeat);
         onEvent(event);
+    }
+
+    private void feedBeamSearchDecoder(final int codePoint, final int x, final int y) {
+        if (mBeamSearchDecoder == null) {
+            return;
+        }
+        if (Character.isLetter(codePoint)) {
+            mBeamSearchDecoder.onTouch(x, y, (char) codePoint);
+        } else if (codePoint == Constants.CODE_DELETE) {
+            mBeamSearchDecoder.onBackspace();
+        } else if (isDecoderResetKey(codePoint)) {
+            mBeamSearchDecoder.reset();
+        }
+    }
+
+    private static boolean isDecoderResetKey(final int codePoint) {
+        return codePoint == Constants.CODE_SPACE || (!Character.isLetterOrDigit(codePoint) && codePoint > 32);
     }
 
     // This method is public for testability of LatinIME, but also in the future it should
     // completely replace #onCodeInput.
     public void onEvent(final Event event) {
-        if (mTopBarView != null && mTopBarView.isToolTrayOpen()) {
-            mTopBarView.closeToolTray();
+        closeToolTrayIfOpen();
+
+        if (handleBackspaceRevert(event)) {
+            return;
         }
+        handleSpaceAutoCorrect(event);
 
-        // Check if backspace should revert previous autocorrect
-        if (event.isFunctionalKeyEvent() && event.mKeyCode == Constants.CODE_DELETE) {
-            if (mCanRevertAutocorrect && mAutocorrectedWord != null && mOriginalTypedWordBeforeAutocorrect != null) {
-                final String textBefore = mInputLogic.mConnection.getTextBeforeCursor(mAutocorrectedWord.length() + 2, 0);
-                if (textBefore != null && textBefore.endsWith(mAutocorrectedWord + " ")) {
-                    mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + 1);
-                    mInputLogic.mConnection.commitText(mOriginalTypedWordBeforeAutocorrect, 1);
-
-                    // Auto-learn reverted word
-                    mPrefixDictionary.insert(mOriginalTypedWordBeforeAutocorrect, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
-                    if (mUserDictionaryDb != null) {
-                        final String raw = mOriginalTypedWordBeforeAutocorrect;
-                        new Thread(() -> mUserDictionaryDb.learnWord(raw)).start();
-                    }
-
-                    mCanRevertAutocorrect = false;
-                    mOriginalTypedWordBeforeAutocorrect = null;
-                    mAutocorrectedWord = null;
-                    mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
-                    updateSuggestions();
-                    return;
-                }
-            }
-            mCanRevertAutocorrect = false;
-        } else if (!event.isFunctionalKeyEvent() && event.mCodePoint != Constants.CODE_SPACE) {
-            mCanRevertAutocorrect = false;
-        }
-
-        if (!event.isFunctionalKeyEvent() && event.mCodePoint == Constants.CODE_SPACE) {
-            final String word = mInputLogic.mConnection.getWordBeforeCursor();
-            final String prevWord = (mPreviousWord != null && !mPreviousWord.isEmpty())
-                    ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
-            String committedWord = word;
-
-            final SettingsValues settingsValues = mSettings.getCurrent();
-            if (settingsValues.mAutoCorrectionEnabled) {
-                final EditorInfo editorInfo = getCurrentInputEditorInfo();
-                final InputAttributes attr = editorInfo != null ? new InputAttributes(editorInfo, isFullscreenMode()) : null;
-                if (attr == null || !attr.mIsPasswordField) {
-                    if (word != null && word.length() > 0) {
-                        CharSequence correction = null;
-                        if (mBeamSearchDecoder != null) {
-                            String bsc = mBeamSearchDecoder.getBestCorrection(word, 0.5f, prevWord);
-                            if (bsc != null) {
-                                correction = bsc;
-                            }
-                        }
-                        if (correction == null) {
-                            correction = mPrefixDictionary.getBestCorrection(word, prevWord);
-                        }
-                        if (correction != null) {
-                            mInputLogic.mConnection.deleteTextBeforeCursor(word.length());
-                            mInputLogic.mConnection.commitText(correction, 1);
-                            mOriginalTypedWordBeforeAutocorrect = word;
-                            mAutocorrectedWord = correction.toString();
-                            committedWord = mAutocorrectedWord;
-                            mCanRevertAutocorrect = true;
-                        } else {
-                            mCanRevertAutocorrect = false;
-                        }
-                    } else {
-                        mCanRevertAutocorrect = false;
-                    }
-                }
-            }
-            if (committedWord != null && !committedWord.trim().isEmpty()) {
-                final String cleanCommitted = committedWord.trim();
-                if (prevWord != null && !prevWord.isEmpty()) {
-                    mPrefixDictionary.setBigram(prevWord, cleanCommitted, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
-                    if (mUserDictionaryDb != null) {
-                        final String p = prevWord;
-                        final String c = cleanCommitted;
-                        new Thread(() -> mUserDictionaryDb.learnBigram(p, c)).start();
-                    }
-                }
-                mPreviousWord = cleanCommitted;
-            }
-        }
         final InputTransaction completeInputTransaction =
                 mInputLogic.onCodeInput(mSettings.getCurrent(), event);
         updateStateAfterInputTransaction(completeInputTransaction);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
         updateSuggestions();
+    }
+
+    private void closeToolTrayIfOpen() {
+        if (mTopBarView != null && mTopBarView.isToolTrayOpen()) {
+            mTopBarView.closeToolTray();
+        }
+    }
+
+    private boolean handleBackspaceRevert(final Event event) {
+        if (!isBackspaceEvent(event)) {
+            if (isNonSpaceNormalKey(event)) {
+                mCanRevertAutocorrect = false;
+            }
+            return false;
+        }
+
+        if (tryExecuteBackspaceRevert(event)) {
+            return true;
+        }
+        mCanRevertAutocorrect = false;
+        return false;
+    }
+
+    private static boolean isBackspaceEvent(final Event event) {
+        return event.isFunctionalKeyEvent() && event.mKeyCode == Constants.CODE_DELETE;
+    }
+
+    private static boolean isNonSpaceNormalKey(final Event event) {
+        return !event.isFunctionalKeyEvent() && event.mCodePoint != Constants.CODE_SPACE;
+    }
+
+    private boolean isAutocorrectRevertible() {
+        return mCanRevertAutocorrect && mAutocorrectedWord != null && mOriginalTypedWordBeforeAutocorrect != null;
+    }
+
+    private boolean tryExecuteBackspaceRevert(final Event event) {
+        if (!isAutocorrectRevertible()) {
+            return false;
+        }
+        final String textBefore = mInputLogic.mConnection.getTextBeforeCursor(mAutocorrectedWord.length() + 2, 0);
+        if (textBefore == null || !textBefore.endsWith(mAutocorrectedWord + " ")) {
+            return false;
+        }
+        executeBackspaceRevert(event);
+        return true;
+    }
+
+    private void executeBackspaceRevert(final Event event) {
+        mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + 1);
+        mInputLogic.mConnection.commitText(mOriginalTypedWordBeforeAutocorrect, 1);
+
+        learnWordAsync(mOriginalTypedWordBeforeAutocorrect, null);
+
+        mCanRevertAutocorrect = false;
+        mOriginalTypedWordBeforeAutocorrect = null;
+        mAutocorrectedWord = null;
+        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+        updateSuggestions();
+    }
+
+    private static boolean isSpaceEvent(final Event event) {
+        return !event.isFunctionalKeyEvent() && event.mCodePoint == Constants.CODE_SPACE;
+    }
+
+    private boolean shouldPerformAutoCorrection(final String word) {
+        if (!mSettings.getCurrent().mAutoCorrectionEnabled || isPasswordField()) {
+            return false;
+        }
+        return !isWordEmpty(word);
+    }
+
+    private CharSequence getBestCorrection(final String word, final String prevWord) {
+        final CharSequence decoderCorrection = getDecoderBestCorrection(word, prevWord);
+        if (decoderCorrection != null) {
+            return decoderCorrection;
+        }
+        return mPrefixDictionary.getBestCorrection(word, prevWord);
+    }
+
+    private String applySpaceAutoCorrection(final String word, final String prevWord) {
+        if (!shouldPerformAutoCorrection(word)) {
+            mCanRevertAutocorrect = false;
+            return word;
+        }
+        final CharSequence correction = getBestCorrection(word, prevWord);
+        if (correction != null) {
+            mInputLogic.mConnection.deleteTextBeforeCursor(word.length());
+            mInputLogic.mConnection.commitText(correction, 1);
+            mOriginalTypedWordBeforeAutocorrect = word;
+            mAutocorrectedWord = correction.toString();
+            mCanRevertAutocorrect = true;
+            return mAutocorrectedWord;
+        }
+        mCanRevertAutocorrect = false;
+        return word;
+    }
+
+    private void recordCommittedWord(final String committedWord, final String prevWord) {
+        if (isWordEmpty(committedWord)) {
+            return;
+        }
+        final String cleanCommitted = committedWord.trim();
+        learnBigramAsync(prevWord, cleanCommitted);
+        mPreviousWord = cleanCommitted;
+    }
+
+    private void handleSpaceAutoCorrect(final Event event) {
+        if (!isSpaceEvent(event)) {
+            return;
+        }
+        final String word = mInputLogic.mConnection.getWordBeforeCursor();
+        final String prevWord = getEffectivePreviousWord();
+        final String committedWord = applySpaceAutoCorrection(word, prevWord);
+        recordCommittedWord(committedWord, prevWord);
+    }
+
+    private String getEffectivePreviousWord() {
+        return (mPreviousWord != null && !mPreviousWord.isEmpty())
+                ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
+    }
+
+    private static boolean isWordEmpty(final String word) {
+        return word == null || word.trim().isEmpty();
+    }
+
+    private void learnBigramAsync(final String prevWord, final String word) {
+        if (isWordEmpty(prevWord) || isWordEmpty(word)) {
+            return;
+        }
+        mPrefixDictionary.setBigram(prevWord, word, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+        if (mUserDictionaryDb != null) {
+            new Thread(() -> {
+                if (mUserDictionaryDb != null) {
+                    mUserDictionaryDb.learnBigram(prevWord, word);
+                }
+            }).start();
+        }
+    }
+
+    private void learnWordAsync(final String word, final String prevWord) {
+        if (isWordEmpty(word)) {
+            return;
+        }
+        mPrefixDictionary.insert(word, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+        learnBigramAsync(prevWord, word);
+        if (mUserDictionaryDb != null) {
+            new Thread(() -> {
+                if (mUserDictionaryDb != null) {
+                    mUserDictionaryDb.learnWord(word);
+                }
+            }).start();
+        }
     }
 
     public static String applyCasing(final String typed, final String suggestion) {

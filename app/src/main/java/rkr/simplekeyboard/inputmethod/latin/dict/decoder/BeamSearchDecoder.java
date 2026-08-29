@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Stack;
 
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 import rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialCandidate;
 import rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel;
@@ -52,63 +53,81 @@ public class BeamSearchDecoder {
     }
 
     public void onTouch(float x, float y, char rawChar) {
-        List<BeamHypothesis> current = states.isEmpty() ? new ArrayList<BeamHypothesis>() : states.peek();
-        List<BeamHypothesis> next = new ArrayList<>();
+        final List<BeamHypothesis> current = getCurrentHypotheses();
+        final List<SpatialCandidate> candidates = getTouchCandidates(x, y, rawChar);
+        List<BeamHypothesis> next = expandHypotheses(current, candidates);
+        if (next.isEmpty()) {
+            next = createFallbackHypotheses(current, rawChar);
+        }
+        pruneAndPushState(next);
+    }
 
+    private List<BeamHypothesis> getCurrentHypotheses() {
+        return states.isEmpty() ? new ArrayList<BeamHypothesis>() : states.peek();
+    }
+
+    private List<SpatialCandidate> getTouchCandidates(float x, float y, char rawChar) {
         List<SpatialCandidate> candidates = spatialModel != null ? spatialModel.getCandidatesForTouch(x, y, rawChar) : new ArrayList<SpatialCandidate>();
         if (candidates.isEmpty()) {
             candidates.add(new SpatialCandidate(rawChar, 1.0f, 0.0f));
         }
+        return candidates;
+    }
 
-        if (dictionary != null) {
-            for (BeamHypothesis hyp : current) {
-                if (hyp.nodeOffset <= 0) continue;
-                
-                char[] childrenChars = new char[256];
-                int[] childrenOffsets = new int[256];
-                int count = dictionary.getChildren(hyp.nodeOffset, childrenChars, childrenOffsets);
-
-                for (int i = 0; i < count; i++) {
-                    char childChar = childrenChars[i];
-                    int childNode = childrenOffsets[i];
-                    char lowerChildChar = Character.toLowerCase(childChar);
-
-                    for (SpatialCandidate cand : candidates) {
-                        if (removeAccents(lowerChildChar) == removeAccents(Character.toLowerCase(cand.codePoint))) {
-                            float freqLog = dictionary.getNodeFrequency(childNode) > 0 ? (float) Math.log(dictionary.getNodeFrequency(childNode)) : 0.0f;
-                            float newSpatialLogScore = hyp.spatialLogScore + cand.logProb;
-                            float newTotalScore = newSpatialLogScore + LAMBDA * freqLog;
-                            next.add(new BeamHypothesis(hyp.word + childChar, childNode, newSpatialLogScore, newTotalScore));
-                        }
-                    }
-                }
+    private List<BeamHypothesis> expandHypotheses(List<BeamHypothesis> current, List<SpatialCandidate> candidates) {
+        List<BeamHypothesis> next = new ArrayList<>();
+        if (dictionary == null) {
+            return next;
+        }
+        for (BeamHypothesis hyp : current) {
+            if (hyp.nodeOffset > 0) {
+                expandSingleHypothesis(hyp, candidates, next);
             }
         }
+        return next;
+    }
 
-        if (next.isEmpty()) {
-            for (BeamHypothesis hyp : current) {
-                next.add(new BeamHypothesis(hyp.word + rawChar, -1, hyp.spatialLogScore, hyp.totalScore));
+    private void expandSingleHypothesis(BeamHypothesis hyp, List<SpatialCandidate> candidates, List<BeamHypothesis> next) {
+        char[] childrenChars = new char[256];
+        int[] childrenOffsets = new int[256];
+        int count = dictionary.getChildren(hyp.nodeOffset, childrenChars, childrenOffsets);
+
+        for (int i = 0; i < count; i++) {
+            matchChildWithCandidates(hyp, childrenChars[i], childrenOffsets[i], candidates, next);
+        }
+    }
+
+    private void matchChildWithCandidates(BeamHypothesis hyp, char childChar, int childNode, List<SpatialCandidate> candidates, List<BeamHypothesis> next) {
+        char lowerChildChar = Character.toLowerCase(childChar);
+        for (SpatialCandidate cand : candidates) {
+            if (StringUtils.removeAccents(lowerChildChar) == StringUtils.removeAccents(Character.toLowerCase(cand.codePoint))) {
+                next.add(createHypothesis(hyp, childChar, childNode, cand));
             }
         }
+    }
 
+    private BeamHypothesis createHypothesis(BeamHypothesis hyp, char childChar, int childNode, SpatialCandidate cand) {
+        int freq = dictionary.getNodeFrequency(childNode);
+        float freqLog = freq > 0 ? (float) Math.log(freq) : 0.0f;
+        float newSpatialLogScore = hyp.spatialLogScore + cand.logProb;
+        float newTotalScore = newSpatialLogScore + LAMBDA * freqLog;
+        return new BeamHypothesis(hyp.word + childChar, childNode, newSpatialLogScore, newTotalScore);
+    }
+
+    private List<BeamHypothesis> createFallbackHypotheses(List<BeamHypothesis> current, char rawChar) {
+        List<BeamHypothesis> fallback = new ArrayList<>(current.size());
+        for (BeamHypothesis hyp : current) {
+            fallback.add(new BeamHypothesis(hyp.word + rawChar, -1, hyp.spatialLogScore, hyp.totalScore));
+        }
+        return fallback;
+    }
+
+    private void pruneAndPushState(List<BeamHypothesis> next) {
         Collections.sort(next);
         if (next.size() > K) {
             next = new ArrayList<>(next.subList(0, K));
         }
         states.push(next);
-    }
-
-    private char removeAccents(char c) {
-        switch (c) {
-            case 'á': case 'à': case 'ä': case 'â': return 'a';
-            case 'é': case 'è': case 'ë': case 'ê': return 'e';
-            case 'í': case 'ì': case 'ï': case 'î': return 'i';
-            case 'ó': case 'ò': case 'ö': case 'ô': return 'o';
-            case 'ú': case 'ù': case 'ü': case 'û': return 'u';
-            case 'ñ': return 'n';
-            case 'ç': return 'c';
-            default: return c;
-        }
     }
 
     public void onBackspace() {
@@ -118,29 +137,45 @@ public class BeamSearchDecoder {
     }
 
     public List<CharSequence> getSuggestions(String typedWord, int limit, String prevWord) {
+        if (states.isEmpty() || dictionary == null) {
+            return Collections.emptyList();
+        }
         List<CharSequence> res = new ArrayList<>();
-        if (states.isEmpty() || dictionary == null) return res;
         List<BeamHypothesis> current = states.peek();
-        
+        collectTerminalSuggestions(current, typedWord, res);
+        collectPrefixSuggestions(current, typedWord, limit, res);
+        return res;
+    }
+
+    private void collectTerminalSuggestions(List<BeamHypothesis> current, String typedWord, List<CharSequence> res) {
         for (BeamHypothesis hyp : current) {
             if (hyp.nodeOffset > 0 && dictionary.isTerminal(hyp.nodeOffset)) {
-                String word = dictionary.getNodeWord(hyp.nodeOffset);
-                if (word != null && !containsIgnoreCase(res, word)) {
-                    res.add(matchCase(word, typedWord));
-                }
+                addSuggestionIfAbsent(res, dictionary.getNodeWord(hyp.nodeOffset), typedWord);
             }
         }
-        
-        if (res.size() < limit && !current.isEmpty() && current.get(0).nodeOffset > 0) {
-            List<CharSequence> prefixes = dictionary.getPrefixSuggestions(current.get(0).word, limit);
-            for (CharSequence p : prefixes) {
-                if (res.size() >= limit) break;
-                if (!containsIgnoreCase(res, p.toString())) {
-                    res.add(matchCase(p.toString(), typedWord));
-                }
-            }
+    }
+
+    private void collectPrefixSuggestions(List<BeamHypothesis> current, String typedWord, int limit, List<CharSequence> res) {
+        if (!shouldQueryPrefixSuggestions(current, limit, res.size())) {
+            return;
         }
-        return res;
+        List<CharSequence> prefixes = dictionary.getPrefixSuggestions(current.get(0).word, limit);
+        for (CharSequence p : prefixes) {
+            if (res.size() >= limit) {
+                break;
+            }
+            addSuggestionIfAbsent(res, p.toString(), typedWord);
+        }
+    }
+
+    private boolean shouldQueryPrefixSuggestions(List<BeamHypothesis> current, int limit, int currentSize) {
+        return currentSize < limit && !current.isEmpty() && current.get(0).nodeOffset > 0;
+    }
+
+    private void addSuggestionIfAbsent(List<CharSequence> res, String word, String typedWord) {
+        if (word != null && !containsIgnoreCase(res, word)) {
+            res.add(StringUtils.applyCasing(typedWord, word));
+        }
     }
     
     private boolean containsIgnoreCase(List<CharSequence> list, String word) {
@@ -148,23 +183,6 @@ public class BeamSearchDecoder {
             if (seq.toString().equalsIgnoreCase(word)) return true;
         }
         return false;
-    }
-    
-    private String matchCase(String word, String typedWord) {
-        if (typedWord.isEmpty() || word.isEmpty()) return word;
-        boolean allUpper = true;
-        boolean firstUpper = Character.isUpperCase(typedWord.charAt(0));
-        for (int i = 0; i < typedWord.length(); i++) {
-            if (Character.isLetter(typedWord.charAt(i)) && !Character.isUpperCase(typedWord.charAt(i))) {
-                allUpper = false;
-                break;
-            }
-        }
-        if (allUpper && typedWord.length() > 1) return word.toUpperCase();
-        if (firstUpper) {
-            return Character.toUpperCase(word.charAt(0)) + word.substring(1).toLowerCase();
-        }
-        return word.toLowerCase();
     }
 
     public String getBestCorrection(String typedWord, float threshold, String prevWord) {
@@ -176,8 +194,7 @@ public class BeamSearchDecoder {
         if (best.nodeOffset > 0 && dictionary.isTerminal(best.nodeOffset)) {
             String word = dictionary.getNodeWord(best.nodeOffset);
             if (word != null && !word.equalsIgnoreCase(typedWord)) {
-                // simple delta check
-                return matchCase(word, typedWord);
+                return StringUtils.applyCasing(typedWord, word);
             }
         }
         return null;

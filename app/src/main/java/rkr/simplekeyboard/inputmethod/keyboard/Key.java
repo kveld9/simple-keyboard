@@ -249,21 +249,43 @@ public class Key implements Comparable<Key> {
                 | row.getDefaultKeyLabelFlags();
         final boolean needsToUpcase = needsToUpcase(mLabelFlags, params.mId.mElementId);
         final Locale localeForUpcasing = params.mId.getLocale();
-        int actionFlags = style.getFlags(keyAttr, R.styleable.Keyboard_Key_keyActionFlags);
-        String[] moreKeys = style.getStringArray(keyAttr, R.styleable.Keyboard_Key_moreKeys);
 
-        // Get maximum column order number and set a relevant mode value.
+        final String[] rawMoreKeys = style.getStringArray(keyAttr, R.styleable.Keyboard_Key_moreKeys);
+        mMoreKeysColumnAndFlags = parseMoreKeysColumnAndFlags(style, keyAttr, params, rawMoreKeys);
+        mMoreKeys = parseMoreKeys(style, keyAttr, mLabelFlags, needsToUpcase, localeForUpcasing);
+
+        final int initialActionFlags = style.getFlags(keyAttr, R.styleable.Keyboard_Key_keyActionFlags);
+        mActionFlags = (mMoreKeys != null)
+                ? (initialActionFlags | ACTION_FLAGS_ENABLE_LONG_PRESS)
+                : initialActionFlags;
+
+        mIconId = KeySpecParser.getIconId(keySpec);
+
+        final int code = KeySpecParser.getCode(keySpec);
+        mLabel = parseLabel(keySpec, mLabelFlags, params, code, needsToUpcase, localeForUpcasing);
+        mHintLabel = parseHintLabel(style, keyAttr, mLabelFlags, needsToUpcase, localeForUpcasing);
+
+        final CodeAndOutput codeAndOutput = parseCodes(keySpec, mLabel, mHintLabel, mLabelFlags,
+                needsToUpcase, localeForUpcasing);
+        mCode = codeAndOutput.code;
+
+        final int altCode = parseAltCode(style, keyAttr, needsToUpcase, localeForUpcasing);
+        mOptionalAttributes = OptionalAttributes.newInstance(codeAndOutput.outputText, altCode);
+        mKeyVisualAttributes = KeyVisualAttributes.newInstance(keyAttr);
+        mHashCode = computeHashCode(this);
+    }
+
+    private static int parseMoreKeysColumnAndFlags(final KeyStyle style, final TypedArray keyAttr,
+            final KeyboardParams params, final String[] moreKeys) {
         int moreKeysColumnAndFlags = MORE_KEYS_MODE_MAX_COLUMN_WITH_AUTO_ORDER
                 | style.getInt(keyAttr, R.styleable.Keyboard_Key_maxMoreKeysColumn,
                         params.mMaxMoreKeysKeyboardColumn);
         int value;
         if ((value = MoreKeySpec.getIntValue(moreKeys, MORE_KEYS_AUTO_COLUMN_ORDER, -1)) > 0) {
-            // Override with fixed column order number and set a relevant mode value.
             moreKeysColumnAndFlags = MORE_KEYS_MODE_FIXED_COLUMN_WITH_AUTO_ORDER
                     | (value & MORE_KEYS_COLUMN_NUMBER_MASK);
         }
         if ((value = MoreKeySpec.getIntValue(moreKeys, MORE_KEYS_FIXED_COLUMN_ORDER, -1)) > 0) {
-            // Override with fixed column order number and set a relevant mode value.
             moreKeysColumnAndFlags = MORE_KEYS_MODE_FIXED_COLUMN_WITH_FIXED_ORDER
                     | (value & MORE_KEYS_COLUMN_NUMBER_MASK);
         }
@@ -273,92 +295,111 @@ public class Key implements Comparable<Key> {
         if (MoreKeySpec.getBooleanValue(moreKeys, MORE_KEYS_NO_PANEL_AUTO_MORE_KEY)) {
             moreKeysColumnAndFlags |= MORE_KEYS_FLAGS_NO_PANEL_AUTO_MORE_KEY;
         }
-        mMoreKeysColumnAndFlags = moreKeysColumnAndFlags;
+        return moreKeysColumnAndFlags;
+    }
 
-        final String[] additionalMoreKeys;
-        if ((mLabelFlags & LABEL_FLAGS_DISABLE_ADDITIONAL_MORE_KEYS) != 0) {
-            additionalMoreKeys = null;
-        } else {
-            additionalMoreKeys = style.getStringArray(keyAttr,
-                    R.styleable.Keyboard_Key_additionalMoreKeys);
+    private static MoreKeySpec[] parseMoreKeys(final KeyStyle style, final TypedArray keyAttr,
+            final int labelFlags, final boolean needsToUpcase, final Locale localeForUpcasing) {
+        final String[] rawMoreKeys = style.getStringArray(keyAttr, R.styleable.Keyboard_Key_moreKeys);
+        final String[] additionalMoreKeys = ((labelFlags & LABEL_FLAGS_DISABLE_ADDITIONAL_MORE_KEYS) != 0)
+                ? null
+                : style.getStringArray(keyAttr, R.styleable.Keyboard_Key_additionalMoreKeys);
+        final String[] moreKeys = MoreKeySpec.insertAdditionalMoreKeys(rawMoreKeys, additionalMoreKeys);
+        if (moreKeys == null) {
+            return null;
         }
-        moreKeys = MoreKeySpec.insertAdditionalMoreKeys(moreKeys, additionalMoreKeys);
-        if (moreKeys != null) {
-            actionFlags |= ACTION_FLAGS_ENABLE_LONG_PRESS;
-            mMoreKeys = new MoreKeySpec[moreKeys.length];
-            for (int i = 0; i < moreKeys.length; i++) {
-                mMoreKeys[i] = new MoreKeySpec(moreKeys[i], needsToUpcase, localeForUpcasing);
-            }
-        } else {
-            mMoreKeys = null;
+        final MoreKeySpec[] result = new MoreKeySpec[moreKeys.length];
+        for (int i = 0; i < moreKeys.length; i++) {
+            result[i] = new MoreKeySpec(moreKeys[i], needsToUpcase, localeForUpcasing);
         }
-        mActionFlags = actionFlags;
+        return result;
+    }
 
-        mIconId = KeySpecParser.getIconId(keySpec);
+    private static String parseLabel(final String keySpec, final int labelFlags,
+            final KeyboardParams params, final int code, final boolean needsToUpcase,
+            final Locale localeForUpcasing) {
+        if ((labelFlags & LABEL_FLAGS_FROM_CUSTOM_ACTION_LABEL) != 0) {
+            return params.mId.mCustomActionLabel;
+        }
+        if (code >= Character.MIN_SUPPLEMENTARY_CODE_POINT) {
+            return new StringBuilder().appendCodePoint(code).toString();
+        }
+        final String label = KeySpecParser.getLabel(keySpec);
+        return needsToUpcase ? StringUtils.toTitleCaseOfKeyLabel(label, localeForUpcasing) : label;
+    }
 
-        final int code = KeySpecParser.getCode(keySpec);
-        if ((mLabelFlags & LABEL_FLAGS_FROM_CUSTOM_ACTION_LABEL) != 0) {
-            mLabel = params.mId.mCustomActionLabel;
-        } else if (code >= Character.MIN_SUPPLEMENTARY_CODE_POINT) {
-            // This is a workaround to have a key that has a supplementary code point in its label.
-            // Because we can put a string in resource neither as a XML entity of a supplementary
-            // code point nor as a surrogate pair.
-            mLabel = new StringBuilder().appendCodePoint(code).toString();
-        } else {
-            final String label = KeySpecParser.getLabel(keySpec);
-            mLabel = needsToUpcase
-                    ? StringUtils.toTitleCaseOfKeyLabel(label, localeForUpcasing)
-                    : label;
+    private static String parseHintLabel(final KeyStyle style, final TypedArray keyAttr,
+            final int labelFlags, final boolean needsToUpcase, final Locale localeForUpcasing) {
+        if ((labelFlags & LABEL_FLAGS_DISABLE_HINT_LABEL) != 0) {
+            return null;
         }
-        if ((mLabelFlags & LABEL_FLAGS_DISABLE_HINT_LABEL) != 0) {
-            mHintLabel = null;
-        } else {
-            final String hintLabel = style.getString(
-                    keyAttr, R.styleable.Keyboard_Key_keyHintLabel);
-            mHintLabel = needsToUpcase
-                    ? StringUtils.toTitleCaseOfKeyLabel(hintLabel, localeForUpcasing)
-                    : hintLabel;
+        final String hintLabel = style.getString(keyAttr, R.styleable.Keyboard_Key_keyHintLabel);
+        return needsToUpcase ? StringUtils.toTitleCaseOfKeyLabel(hintLabel, localeForUpcasing) : hintLabel;
+    }
+
+    private static final class CodeAndOutput {
+        final int code;
+        final String outputText;
+
+        CodeAndOutput(final int code, final String outputText) {
+            this.code = code;
+            this.outputText = outputText;
         }
-        String outputText = KeySpecParser.getOutputText(keySpec);
-        if (needsToUpcase) {
-            outputText = StringUtils.toTitleCaseOfKeyLabel(outputText, localeForUpcasing);
+    }
+
+    private static CodeAndOutput parseCodes(final String keySpec, final String label,
+            final String hintLabel, final int labelFlags, final boolean needsToUpcase,
+            final Locale localeForUpcasing) {
+        final int rawCode = KeySpecParser.getCode(keySpec);
+        final String rawOutput = KeySpecParser.getOutputText(keySpec);
+        final String outputText = (needsToUpcase && rawOutput != null)
+                ? StringUtils.toTitleCaseOfKeyLabel(rawOutput, localeForUpcasing)
+                : rawOutput;
+
+        if (rawCode != CODE_UNSPECIFIED) {
+            final int code = needsToUpcase ? StringUtils.toTitleCaseOfKeyCode(rawCode, localeForUpcasing) : rawCode;
+            return new CodeAndOutput(code, outputText);
         }
-        // Choose the first letter of the label as primary code if not specified.
-        if (code == CODE_UNSPECIFIED && TextUtils.isEmpty(outputText)
-                && !TextUtils.isEmpty(mLabel)) {
-            if (StringUtils.codePointCount(mLabel) == 1) {
-                // Use the first letter of the hint label if shiftedLetterActivated flag is
-                // specified.
-                if (hasShiftedLetterHint() && isShiftedLetterActivated()) {
-                    mCode = mHintLabel.codePointAt(0);
-                } else {
-                    mCode = mLabel.codePointAt(0);
-                }
-            } else {
-                // In some locale and case, the character might be represented by multiple code
-                // points, such as upper case Eszett of German alphabet.
-                outputText = mLabel;
-                mCode = CODE_OUTPUT_TEXT;
-            }
-        } else if (code == CODE_UNSPECIFIED && outputText != null) {
-            if (StringUtils.codePointCount(outputText) == 1) {
-                mCode = outputText.codePointAt(0);
-                outputText = null;
-            } else {
-                mCode = CODE_OUTPUT_TEXT;
-            }
-        } else {
-            mCode = needsToUpcase ? StringUtils.toTitleCaseOfKeyCode(code, localeForUpcasing)
-                    : code;
+        return resolveUnspecifiedCode(label, hintLabel, labelFlags, outputText);
+    }
+
+    private static CodeAndOutput resolveUnspecifiedCode(final String label, final String hintLabel,
+            final int labelFlags, final String outputText) {
+        if (!TextUtils.isEmpty(outputText)) {
+            return resolveCodeFromOutputText(outputText);
         }
+        if (!TextUtils.isEmpty(label)) {
+            return resolveCodeFromLabel(label, hintLabel, labelFlags);
+        }
+        return new CodeAndOutput(CODE_UNSPECIFIED, null);
+    }
+
+    private static CodeAndOutput resolveCodeFromOutputText(final String outputText) {
+        if (StringUtils.codePointCount(outputText) == 1) {
+            return new CodeAndOutput(outputText.codePointAt(0), null);
+        }
+        return new CodeAndOutput(CODE_OUTPUT_TEXT, outputText);
+    }
+
+    private static CodeAndOutput resolveCodeFromLabel(final String label, final String hintLabel,
+            final int labelFlags) {
+        if (StringUtils.codePointCount(label) != 1) {
+            return new CodeAndOutput(CODE_OUTPUT_TEXT, label);
+        }
+        final boolean useShiftedHint = (labelFlags & LABEL_FLAGS_HAS_SHIFTED_LETTER_HINT) != 0
+                && !TextUtils.isEmpty(hintLabel)
+                && (labelFlags & LABEL_FLAGS_SHIFTED_LETTER_ACTIVATED) != 0;
+        final int code = useShiftedHint ? hintLabel.codePointAt(0) : label.codePointAt(0);
+        return new CodeAndOutput(code, null);
+    }
+
+    private static int parseAltCode(final KeyStyle style, final TypedArray keyAttr,
+            final boolean needsToUpcase, final Locale localeForUpcasing) {
         final int altCodeInAttr = KeySpecParser.parseCode(
                 style.getString(keyAttr, R.styleable.Keyboard_Key_altCode), CODE_UNSPECIFIED);
-        final int altCode = needsToUpcase
+        return needsToUpcase
                 ? StringUtils.toTitleCaseOfKeyCode(altCodeInAttr, localeForUpcasing)
                 : altCodeInAttr;
-        mOptionalAttributes = OptionalAttributes.newInstance(outputText, altCode);
-        mKeyVisualAttributes = KeyVisualAttributes.newInstance(keyAttr);
-        mHashCode = computeHashCode(this);
     }
 
     /**

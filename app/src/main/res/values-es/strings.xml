@@ -38,6 +38,7 @@
     <string name="subtype_traditional">"tradicional"</string>
     <string name="subtype_compact">"compacto"</string>
     <string name="add">"Añadir"</string>
+    <string name="keyboard_theme_black">Negro AMOLED</string>
     <string name="remove">"Quitar"</string>
     <string name="prefs_keypress_sound_volume_settings">"Volumen de sonido al pulsar tecla"</string>
     <string name="prefs_key_longpress_timeout_settings">"Retraso al mantener pulsado"</string>

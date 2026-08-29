@@ -481,17 +481,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void hideClipboardHistory() {
         if (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE) {
             mClipboardHistoryView.setVisibility(View.GONE);
-        }
-        if (mTopBarView != null) {
-            mTopBarView.setVisibility(View.VISIBLE);
-            mTopBarView.setMode(TopBarView.MODE_NORMAL);
-        }
-        final View keyboardView = mKeyboardSwitcher.getMainKeyboardView();
-        if (keyboardView != null) {
-            keyboardView.setVisibility(View.VISIBLE);
-        }
-        if (mInputView != null) {
-            mInputView.requestLayout();
+            if (mTopBarView != null) {
+                mTopBarView.setVisibility(View.VISIBLE);
+                mTopBarView.setMode(TopBarView.MODE_NORMAL);
+            }
+            final View keyboardView = mKeyboardSwitcher.getMainKeyboardView();
+            if (keyboardView != null) {
+                keyboardView.setVisibility(View.VISIBLE);
+            }
+            if (mInputView != null) {
+                mInputView.requestLayout();
+            }
         }
     }
 

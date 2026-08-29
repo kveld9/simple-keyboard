@@ -112,16 +112,14 @@ public final class InlineAutofillUtils {
         }
 
         final HorizontalScrollView inlineSuggestionView = new HorizontalScrollView(context);
-        inlineSuggestionView.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         inlineSuggestionView.setHorizontalScrollBarEnabled(false);
         inlineSuggestionView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        inlineSuggestionView.addView(container);
+        inlineSuggestionView.addView(container, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         final InlineContentClipView scrollableSuggestionsClip = new InlineContentClipView(context);
-        scrollableSuggestionsClip.setLayoutParams(new ViewGroup.LayoutParams(
+        scrollableSuggestionsClip.addView(inlineSuggestionView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        scrollableSuggestionsClip.addView(inlineSuggestionView);
         return scrollableSuggestionsClip;
     }
 
@@ -144,7 +142,8 @@ public final class InlineAutofillUtils {
             SurfaceView mBackgroundView = new SurfaceView(context);
             mBackgroundView.setZOrderOnTop(true);
             mBackgroundView.getHolder().setFormat(PixelFormat.TRANSPARENT);
-            addView(mBackgroundView);
+            addView(mBackgroundView, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
 
         @Override

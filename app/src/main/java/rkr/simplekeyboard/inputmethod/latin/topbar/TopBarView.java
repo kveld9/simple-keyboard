@@ -315,7 +315,8 @@ public class TopBarView extends FrameLayout {
         } else {
             mSuggestionsContainer.setVisibility(View.GONE);
             mExternalViewContainer.removeAllViews();
-            mExternalViewContainer.addView(view);
+            mExternalViewContainer.addView(view, new FrameLayout.LayoutParams(
+                    LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
             mExternalViewContainer.setVisibility(View.VISIBLE);
         }
     }

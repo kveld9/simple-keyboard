@@ -1,16 +1,15 @@
 package rkr.simplekeyboard.inputmethod.latin.topbar;
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -25,8 +24,11 @@ public class TopBarView extends FrameLayout {
 
     private LinearLayout mNormalModeContainer;
     private ImageView mExpandButton;
-    private HorizontalScrollView mSuggestionsScroll;
+    private View mRightSpacer;
     private LinearLayout mSuggestionsContainer;
+    private TextView mLeftSlot;
+    private TextView mCenterSlot;
+    private TextView mRightSlot;
 
     private LinearLayout mToolTrayContainer;
     private ImageView mCloseButton;
@@ -69,14 +71,27 @@ public class TopBarView extends FrameLayout {
         mExpandButton.setOnClickListener(v -> setMode(MODE_TOOL_TRAY));
         mNormalModeContainer.addView(mExpandButton);
 
-        mSuggestionsScroll = new HorizontalScrollView(context);
-        mSuggestionsScroll.setHorizontalScrollBarEnabled(false);
-        mSuggestionsScroll.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
+        // 3-slot centered suggestions container
         mSuggestionsContainer = new LinearLayout(context);
         mSuggestionsContainer.setOrientation(LinearLayout.HORIZONTAL);
         mSuggestionsContainer.setGravity(Gravity.CENTER_VERTICAL);
-        mSuggestionsScroll.addView(mSuggestionsContainer);
-        mNormalModeContainer.addView(mSuggestionsScroll);
+        mSuggestionsContainer.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
+
+        mLeftSlot = createSuggestionSlot(context, 14.0f, false);
+        mCenterSlot = createSuggestionSlot(context, 15.5f, true);
+        mRightSlot = createSuggestionSlot(context, 14.0f, false);
+
+        mSuggestionsContainer.addView(mLeftSlot);
+        mSuggestionsContainer.addView(mCenterSlot);
+        mSuggestionsContainer.addView(mRightSlot);
+
+        mNormalModeContainer.addView(mSuggestionsContainer);
+
+        // Right spacer matching expand button width to keep center slot perfectly balanced
+        mRightSpacer = new View(context);
+        int iconWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 44, context.getResources().getDisplayMetrics());
+        mRightSpacer.setLayoutParams(new LinearLayout.LayoutParams(iconWidth, LayoutParams.MATCH_PARENT));
+        mNormalModeContainer.addView(mRightSpacer);
 
         addView(mNormalModeContainer);
 
@@ -115,13 +130,34 @@ public class TopBarView extends FrameLayout {
         setMode(MODE_NORMAL);
     }
 
+    private TextView createSuggestionSlot(Context context, float textSizeSp, boolean isBold) {
+        TextView tv = new TextView(context);
+        tv.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
+        tv.setGravity(Gravity.CENTER);
+        tv.setTextColor(mTextColor);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSizeSp);
+        tv.setTypeface(isBold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        tv.setMaxLines(1);
+        tv.setEllipsize(TextUtils.TruncateAt.END);
+        int paddingH = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 4, context.getResources().getDisplayMetrics());
+        tv.setPadding(paddingH, 0, paddingH, 0);
+        tv.setClickable(true);
+        tv.setFocusable(false);
+        tv.setVisibility(View.INVISIBLE);
+
+        TypedValue outValue = new TypedValue();
+        if (context.getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)) {
+            tv.setBackgroundResource(outValue.resourceId);
+        }
+        return tv;
+    }
+
     private ImageView createIconButton(Context context, int drawableResId) {
         ImageView iv = new ImageView(context);
         iv.setImageResource(drawableResId);
         iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        int paddingH = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 14, context.getResources().getDisplayMetrics());
-        iv.setPadding(paddingH, 0, paddingH, 0);
-        iv.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        int widthPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 44, context.getResources().getDisplayMetrics());
+        iv.setLayoutParams(new LinearLayout.LayoutParams(widthPx, ViewGroup.LayoutParams.MATCH_PARENT));
         iv.setClickable(true);
         iv.setFocusable(false);
         TypedValue outValue = new TypedValue();
@@ -152,41 +188,59 @@ public class TopBarView extends FrameLayout {
     }
 
     public void setSuggestions(List<CharSequence> suggestions, int boldIndex) {
-        mSuggestionsContainer.removeAllViews();
-        if (suggestions == null || suggestions.isEmpty()) return;
-        for (int i = 0; i < suggestions.size(); i++) {
-            final CharSequence suggestion = suggestions.get(i);
-            TextView tv = new TextView(getContext());
-            tv.setText(suggestion);
-            tv.setTextColor(mTextColor);
-            if (i == boldIndex) {
-                tv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-                tv.setTextSize(16);
-            } else {
-                tv.setTypeface(android.graphics.Typeface.DEFAULT);
-                tv.setTextSize(15);
-            }
-            tv.setGravity(Gravity.CENTER);
-            int paddingH = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16, getContext().getResources().getDisplayMetrics());
-            int paddingV = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6, getContext().getResources().getDisplayMetrics());
-            tv.setPadding(paddingH, paddingV, paddingH, paddingV);
-            tv.setClickable(true);
-            tv.setFocusable(false);
-            TypedValue outValue = new TypedValue();
-            if (getContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)) {
-                tv.setBackgroundResource(outValue.resourceId);
-            }
-            tv.setOnClickListener(v -> {
-                if (mListener != null) {
-                    String clean = suggestion.toString();
-                    if (clean.startsWith("\"") && clean.endsWith("\"") && clean.length() > 2) {
-                        clean = clean.substring(1, clean.length() - 1);
-                    }
-                    mListener.onSuggestionClicked(clean);
-                }
-            });
-            mSuggestionsContainer.addView(tv);
+        if (suggestions == null || suggestions.isEmpty()) {
+            mLeftSlot.setText("");
+            mLeftSlot.setVisibility(View.INVISIBLE);
+            mLeftSlot.setOnClickListener(null);
+
+            mCenterSlot.setText("");
+            mCenterSlot.setVisibility(View.INVISIBLE);
+            mCenterSlot.setOnClickListener(null);
+
+            mRightSlot.setText("");
+            mRightSlot.setVisibility(View.INVISIBLE);
+            mRightSlot.setOnClickListener(null);
+            return;
         }
+
+        final int count = suggestions.size();
+        if (count >= 3) {
+            bindSlot(mLeftSlot, suggestions.get(0), false);
+            bindSlot(mCenterSlot, suggestions.get(1), true);
+            bindSlot(mRightSlot, suggestions.get(2), false);
+        } else if (count == 2) {
+            bindSlot(mLeftSlot, suggestions.get(0), false);
+            bindSlot(mCenterSlot, suggestions.get(1), true);
+            bindSlot(mRightSlot, null, false);
+        } else {
+            bindSlot(mLeftSlot, null, false);
+            bindSlot(mCenterSlot, suggestions.get(0), boldIndex == 0);
+            bindSlot(mRightSlot, null, false);
+        }
+    }
+
+    private void bindSlot(TextView slot, final CharSequence text, boolean isHighlighted) {
+        if (text == null || TextUtils.isEmpty(text)) {
+            slot.setText("");
+            slot.setVisibility(View.INVISIBLE);
+            slot.setOnClickListener(null);
+            return;
+        }
+
+        slot.setText(text);
+        slot.setVisibility(View.VISIBLE);
+        slot.setTypeface(isHighlighted ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        slot.setAlpha(isHighlighted ? 1.0f : 0.85f);
+
+        slot.setOnClickListener(v -> {
+            if (mListener != null) {
+                String clean = text.toString();
+                if (clean.startsWith("\"") && clean.endsWith("\"") && clean.length() > 2) {
+                    clean = clean.substring(1, clean.length() - 1);
+                }
+                mListener.onSuggestionClicked(clean);
+            }
+        });
     }
     
     public void setLanguageButtonVisible(boolean visible) {
@@ -202,3 +256,4 @@ public class TopBarView extends FrameLayout {
         super.onMeasure(widthMeasureSpec, spec);
     }
 }
+

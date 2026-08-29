@@ -71,6 +71,12 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String KEY_SHAPE_BORDERLESS = "borderless";
     public static final String PREF_SHOW_SUGGESTIONS = "pref_show_suggestions";
     public static final String PREF_AUTO_CORRECTION = "pref_auto_correction";
+    public static final String PREF_AUTO_CORRECTION_THRESHOLD = "auto_correction_threshold";
+    public static final String AUTO_CORRECTION_THRESHOLD_DEFAULT = "1";
+    public static final float AUTO_CORRECTION_THRESHOLD_OFF = 0.0f;
+    public static final float AUTO_CORRECTION_THRESHOLD_MODEST = 1.0f;
+    public static final float AUTO_CORRECTION_THRESHOLD_AGGRESSIVE = 2.0f;
+    public static final float AUTO_CORRECTION_THRESHOLD_VERY_AGGRESSIVE = 3.0f;
 
     private static final float UNDEFINED_PREFERENCE_VALUE_FLOAT = -1.0f;
     private static final int UNDEFINED_PREFERENCE_VALUE_INT = -1;
@@ -149,6 +155,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
             for (final String key : restrictionKeys) {
                 switch (key) {
                     case PREF_ENABLED_SUBTYPES:
+                    case PREF_AUTO_CORRECTION_THRESHOLD:
                         Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
                         prefsEditor.putString(key, appRestrictions.getString(key));
                         break;
@@ -270,8 +277,21 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         return prefs.getBoolean(PREF_SHOW_SUGGESTIONS, true);
     }
 
+    public static float readAutoCorrectionThreshold(final SharedPreferences prefs) {
+        final String str = prefs.getString(PREF_AUTO_CORRECTION_THRESHOLD, AUTO_CORRECTION_THRESHOLD_DEFAULT);
+        try {
+            return Float.parseFloat(str);
+        } catch (NumberFormatException | NullPointerException e) {
+            return AUTO_CORRECTION_THRESHOLD_MODEST;
+        }
+    }
+
+    public static int readAutoCorrectionThresholdInt(final SharedPreferences prefs) {
+        return Math.round(readAutoCorrectionThreshold(prefs));
+    }
+
     public static boolean readAutoCorrectionEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_AUTO_CORRECTION, false);
+        return readAutoCorrectionThreshold(prefs) > 0.0f;
     }
 
     public static String readPrefSubtypes(final SharedPreferences prefs) {

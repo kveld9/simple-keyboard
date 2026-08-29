@@ -133,4 +133,122 @@ public class PrefixDictionaryTest {
         assertEquals(null, mDict.getBestCorrection("a"));
         assertEquals(null, mDict.getBestCorrection("xyzabc"));
     }
+
+    @Test
+    public void testComputeWeightedDistance() {
+        // Equal strings -> 0
+        assertEquals(0.0f, PrefixDictionary.computeWeightedDistance("test", "test"), 0.001f);
+
+        // Physical adjacency substitution (cost 0.5): 'a' adjacent to 's'
+        assertEquals(0.5f, PrefixDictionary.computeWeightedDistance("a", "s"), 0.001f);
+
+        // Non-adjacent substitution (cost 1.0): 'a' not adjacent to 'p'
+        assertEquals(1.0f, PrefixDictionary.computeWeightedDistance("a", "p"), 0.001f);
+
+        // Transposition (cost 0.8)
+        assertEquals(0.8f, PrefixDictionary.computeWeightedDistance("ab", "ba"), 0.001f);
+
+        // Insertion / Deletion (cost 1.0)
+        assertEquals(1.0f, PrefixDictionary.computeWeightedDistance("abc", "ab"), 0.001f);
+        assertEquals(1.0f, PrefixDictionary.computeWeightedDistance("ab", "abc"), 0.001f);
+    }
+
+    @Test
+    public void testLongWordCorrectionBonus() {
+        // <= 6 chars -> no bonus
+        assertEquals(0.0f, PrefixDictionary.getLongWordCorrectionBonus("simple", "simple"), 0.001f);
+        assertEquals(0.0f, PrefixDictionary.getLongWordCorrectionBonus("cat", "cot"), 0.001f);
+
+        // > 6 chars -> bonus proportional to length
+        float bonus7 = PrefixDictionary.getLongWordCorrectionBonus("teclados", "teclado");
+        assertTrue(bonus7 > 0.0f);
+
+        float bonus14 = PrefixDictionary.getLongWordCorrectionBonus("reconociminto", "reconocimiento");
+        assertTrue(bonus14 > bonus7);
+    }
+
+    @Test
+    public void testCalcNormalizedScore() {
+        // Exact match gets huge priority
+        float exactScore = PrefixDictionary.calcNormalizedScore("hola", "hola", 100);
+        assertTrue(exactScore >= 1100.0f);
+
+        // Adjacent typo scores higher than non-adjacent typo
+        // 'w' adjacent to 'q', 'p' not adjacent to 'q'
+        float adjScore = PrefixDictionary.calcNormalizedScore("w", "q", 100);
+        float nonAdjScore = PrefixDictionary.calcNormalizedScore("p", "q", 100);
+        assertTrue("Adjacent typo score (" + adjScore + ") should be higher than non-adjacent (" + nonAdjScore + ")",
+                adjScore > nonAdjScore);
+    }
+
+    @Test
+    public void testValidWordProtection() {
+        mDict.insert("in", 200);
+        mDict.insert("on", 150);
+
+        // "in" is a valid word. It should not be autocorrected to "on" even though they are close
+        assertEquals(null, mDict.getBestCorrection("in"));
+
+        // Direct accent replacement should still happen for valid/unaccented variants
+        mDict.insert("canción", 250);
+        assertEquals("canción", mDict.getBestCorrection("cancion"));
+    }
+
+    @Test
+    public void testBigramContextSuggestionsAndCorrections() {
+        mDict.insert("buenos", 100);
+        mDict.insert("días", 100);
+        mDict.insert("noches", 90);
+        mDict.insert("tardes", 80);
+
+        // Without bigram, "días" is at top
+        mDict.setBigram("buenos", "noches", 200);
+        assertEquals(200, mDict.getBigramFrequency("buenos", "noches"));
+
+        // When "buenos" is the previous word, "noches" receives the bigram boost
+        List<CharSequence> suggestions = mDict.getSuggestions("n", 3, "buenos");
+        assertEquals("noches", suggestions.get(0));
+
+        // Fuzzy correction with bigram context
+        mDict.insert("amigo", 50);
+        mDict.insert("amiga", 50);
+        mDict.setBigram("mi", "amiga", 250);
+
+        // Typos with previous word "mi": "amgo" -> should prioritize "amiga" if strong bigram
+        CharSequence corr = mDict.getBestCorrection("amga", "mi");
+        assertEquals("amiga", corr);
+    }
+
+    @Test
+    public void testAutoCorrectionThresholdSettings() {
+        mDict.insert("teclado", 100);
+        mDict.insert("reconocer", 100);
+
+        // 1. Modest threshold (default 1.0f)
+        assertEquals(1.0f, mDict.getAutoCorrectionThreshold(), 0.001f);
+        assertEquals("teclado", mDict.getBestCorrection("teclao"));
+
+        // 2. Off threshold (0.0f) -> No corrections performed
+        mDict.setAutoCorrectionThreshold(0.0f);
+        assertEquals(0.0f, mDict.getAutoCorrectionThreshold(), 0.001f);
+        assertEquals(null, mDict.getBestCorrection("teclao"));
+        assertEquals(null, mDict.getBestCorrection("autocorreccion"));
+
+        // 3. Aggressive threshold (2.0f)
+        mDict.setAutoCorrectionThreshold(2.0f);
+        assertEquals(2.0f, mDict.getAutoCorrectionThreshold(), 0.001f);
+        assertEquals("teclado", mDict.getBestCorrection("teclao"));
+
+        // 4. Very Aggressive threshold (3.0f) -> Supports distance 2 on longer words
+        mDict.setAutoCorrectionThreshold(3.0f);
+        assertEquals(3.0f, mDict.getAutoCorrectionThreshold(), 0.001f);
+        assertEquals("teclado", mDict.getBestCorrection("teclao"));
+        // 2-error typo on 9-letter word: "reocnoer" (missing 'c' and transposition) -> "reconocer"
+        assertEquals("reconocer", mDict.getBestCorrection("reocnoer"));
+
+        // 5. copyFrom preserves threshold
+        PrefixDictionary target = new PrefixDictionary();
+        target.copyFrom(mDict);
+        assertEquals(3.0f, target.getAutoCorrectionThreshold(), 0.001f);
+    }
 }

@@ -86,4 +86,12 @@
     <string name="show_suggestions">Mostrar sugerencias de texto</string>
     <string name="auto_correction">Autocorrección</string>
     <string name="auto_correction_summary">La barra espaciadora corrige palabras mal escritas</string>
+    <string name="auto_correction_threshold">Sensibilidad de autocorrección</string>
+    <string name="auto_correction_threshold_summary">La barra espaciadora corrige palabras según la agresividad seleccionada</string>
+    <string-array name="auto_correction_threshold_entries">
+        <item>Desactivada</item>
+        <item>Moderada</item>
+        <item>Agresiva</item>
+        <item>Muy agresiva</item>
+    </string-array>
 </resources>

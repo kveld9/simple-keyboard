@@ -141,8 +141,12 @@ public class ClipboardHistoryView extends LinearLayout {
         mClearButton.setContentDescription(context.getString(R.string.clipboard_clear_all));
         mClearButton.setOnClickListener(v -> {
             if (mDatabase != null) {
-                mDatabase.clearUnpinned();
-                reloadClips();
+                mAsyncExecutor.execute(() -> {
+                    mDatabase.clearUnpinned();
+                    clearSystemClipboardIfMatches(null);
+                    final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips();
+                    post(() -> displayClips(updatedClips));
+                });
             }
         });
         mHeaderLayout.addView(mClearButton);
@@ -338,6 +342,7 @@ public class ClipboardHistoryView extends LinearLayout {
             if (mDatabase != null) {
                 mAsyncExecutor.execute(() -> {
                     mDatabase.deleteClip(entry.id);
+                    clearSystemClipboardIfMatches(entry.text);
                     final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips();
                     post(() -> displayClips(updatedClips));
                 });
@@ -347,6 +352,26 @@ public class ClipboardHistoryView extends LinearLayout {
 
         card.addView(actionsLayout);
         return card;
+    }
+
+    private void clearSystemClipboardIfMatches(final String deletedText) {
+        try {
+            final android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                    getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null && cm.hasPrimaryClip()) {
+                final android.content.ClipData primaryClip = cm.getPrimaryClip();
+                if (primaryClip != null && primaryClip.getItemCount() > 0) {
+                    final CharSequence currentSystemText = primaryClip.getItemAt(0).getText();
+                    if (deletedText == null || (currentSystemText != null && currentSystemText.toString().equals(deletedText))) {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                            cm.clearPrimaryClip();
+                        } else {
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("", ""));
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
     }
 
     private Drawable getOrCreateCardBackground() {

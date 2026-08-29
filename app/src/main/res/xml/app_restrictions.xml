@@ -50,6 +50,13 @@
         android:title="@string/delete_swipe"
         android:restrictionType="bool"
         android:defaultValue="false" />
+    <restriction
+        android:key="auto_correction_threshold"
+        android:title="@string/auto_correction_threshold"
+        android:restrictionType="choice"
+        android:entries="@array/auto_correction_threshold_entries"
+        android:entryValues="@array/auto_correction_threshold_values"
+        android:defaultValue="1" />
     <!-- settings_screen_key_press -->
     <restriction
         android:key="vibrate_on"

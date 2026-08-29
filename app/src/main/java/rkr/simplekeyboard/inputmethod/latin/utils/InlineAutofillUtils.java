@@ -91,31 +91,78 @@ public final class InlineAutofillUtils {
                 .build();
     }
 
-    public static View createView(final List<InlineSuggestion> inlineSuggestions,
-                                  final Context context) {
+    public static InlineContentClipView createView(final List<InlineSuggestion> inlineSuggestions,
+                                                   final Context context) {
         final LinearLayout container = new LinearLayout(context);
-        container.setOrientation(LinearLayout.HORIZONTAL);
-        container.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        container.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
         for (InlineSuggestion inlineSuggestion : inlineSuggestions) {
             inlineSuggestion.inflate(context, new Size(ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT), context.getMainExecutor(), (view) -> {
-                if (view != null) {
+                if (view != null)
                     container.addView(view);
-                }
             });
         }
 
         final HorizontalScrollView inlineSuggestionView = new HorizontalScrollView(context);
-        inlineSuggestionView.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         inlineSuggestionView.setHorizontalScrollBarEnabled(false);
         inlineSuggestionView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        inlineSuggestionView.setFillViewport(true);
         inlineSuggestionView.addView(container);
 
-        return inlineSuggestionView;
+        final InlineContentClipView scrollableSuggestionsClip = new InlineContentClipView(context);
+        scrollableSuggestionsClip.addView(inlineSuggestionView);
+        return scrollableSuggestionsClip;
+    }
+
+    public static class InlineContentClipView extends FrameLayout {
+        @NonNull
+        private final ViewTreeObserver.OnDrawListener mOnDrawListener =
+                this::clipDescendantInlineContentViews;
+        @NonNull
+        private final Rect mParentBounds = new Rect();
+        @NonNull
+        private final Rect mContentBounds = new Rect();
+        public InlineContentClipView(@NonNull Context context) {
+            this(context, null, 0);
+        }
+        public InlineContentClipView(@NonNull Context context, @Nullable AttributeSet attrs,
+                                     @AttrRes int defStyleAttr) {
+            super(context, attrs, defStyleAttr);
+            SurfaceView mBackgroundView = new SurfaceView(context);
+            mBackgroundView.setZOrderOnTop(true);
+            mBackgroundView.getHolder().setFormat(PixelFormat.TRANSPARENT);
+            addView(mBackgroundView);
+        }
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            getViewTreeObserver().addOnDrawListener(mOnDrawListener);
+        }
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            getViewTreeObserver().removeOnDrawListener(mOnDrawListener);
+        }
+        private void clipDescendantInlineContentViews() {
+            mParentBounds.right = getWidth();
+            mParentBounds.bottom = getHeight();
+            clipDescendantInlineContentViews(this);
+        }
+        private void clipDescendantInlineContentViews(@Nullable View root) {
+            if (root == null) return;
+            if (root instanceof InlineContentView) {
+                InlineContentView inlineContentView = (InlineContentView) root;
+                mContentBounds.set(mParentBounds);
+                offsetRectIntoDescendantCoords(inlineContentView, mContentBounds);
+                inlineContentView.setClipBounds(mContentBounds);
+                return;
+            }
+            if (root instanceof ViewGroup) {
+                ViewGroup rootGroup = (ViewGroup) root;
+                final int childCount = rootGroup.getChildCount();
+                for (int i = 0; i < childCount; i++) {
+                    final View child = rootGroup.getChildAt(i);
+                    clipDescendantInlineContentViews(child);
+                }
+            }
+        }
     }
 }

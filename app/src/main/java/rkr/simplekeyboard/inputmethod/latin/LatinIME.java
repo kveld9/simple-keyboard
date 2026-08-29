@@ -105,6 +105,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private ClipboardHistoryView mClipboardHistoryView;
     private ClipboardHistoryManager mClipboardHistoryManager;
     private final PrefixDictionary mPrefixDictionary = new PrefixDictionary();
+    private final java.util.concurrent.ExecutorService mDictExecutor =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
     private UserDictionaryDatabase mUserDictionaryDb;
     private Locale mLoadedLocale;
 
@@ -315,6 +317,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mUserDictionaryDb.close();
             mUserDictionaryDb = null;
         }
+        mDictExecutor.shutdownNow();
         mSettings.onDestroy();
         unregisterReceiver(mRingerModeChangeReceiver);
         super.onDestroy();
@@ -664,6 +667,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void loadDictionaryForLocale(final Locale currentLocale) {
+        if (currentLocale != null && currentLocale.equals(mLoadedLocale) && mPrefixDictionary.getWordCount() > 0) {
+            return;
+        }
+        mLoadedLocale = currentLocale;
         final String currentLang = (currentLocale != null) ? currentLocale.getLanguage() : "es";
 
         final java.util.Set<String> enabledLangs = new java.util.LinkedHashSet<>();
@@ -683,30 +690,34 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             enabledLangs.add(currentLang);
         }
 
-        mPrefixDictionary.clear();
-
-        // 1. Load secondary enabled languages first (with 85% relative frequency)
-        for (String lang : enabledLangs) {
-            if (!lang.equals(currentLang)) {
-                loadSingleLanguageDictionary(lang, 0.85f);
+        mDictExecutor.execute(() -> {
+            final PrefixDictionary newDict = new PrefixDictionary();
+            // 1. Load secondary enabled languages first (with 85% relative frequency)
+            for (String lang : enabledLangs) {
+                if (!lang.equals(currentLang)) {
+                    loadSingleLanguageDictionaryInto(newDict, lang, 0.85f);
+                }
             }
-        }
 
-        // 2. Load primary active language with 100% frequency
-        loadSingleLanguageDictionary(currentLang, 1.0f);
+            // 2. Load primary active language with 100% frequency
+            loadSingleLanguageDictionaryInto(newDict, currentLang, 1.0f);
 
-        // 3. Load user-learned words from database with top priority
-        if (mUserDictionaryDb != null) {
-            final java.util.Map<String, Integer> userWords = mUserDictionaryDb.getAllLearnedWords();
-            for (java.util.Map.Entry<String, Integer> entry : userWords.entrySet()) {
-                mPrefixDictionary.insert(entry.getKey(), entry.getValue());
+            // 3. Load user-learned words from database with top priority
+            if (mUserDictionaryDb != null) {
+                final java.util.Map<String, Integer> userWords = mUserDictionaryDb.getAllLearnedWords();
+                for (java.util.Map.Entry<String, Integer> entry : userWords.entrySet()) {
+                    newDict.insert(entry.getKey(), entry.getValue());
+                }
             }
-        }
 
-        mLoadedLocale = currentLocale;
+            mHandler.post(() -> {
+                mPrefixDictionary.copyFrom(newDict);
+                updateSuggestions();
+            });
+        });
     }
 
-    private void loadSingleLanguageDictionary(final String lang, final float weightFactor) {
+    private void loadSingleLanguageDictionaryInto(final PrefixDictionary targetDict, final String lang, final float weightFactor) {
         final String assetName = "es".equals(lang) ? "dict_es.txt" : "dict_en.txt";
         boolean loaded = false;
         try (InputStream is = getAssets().open(assetName);
@@ -721,12 +732,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     try {
                         int freq = Integer.parseInt(line.substring(sep + 1));
                         int adjustedFreq = (int) (freq * weightFactor);
-                        mPrefixDictionary.insert(word, Math.max(1, adjustedFreq));
+                        targetDict.insert(word, Math.max(1, adjustedFreq));
                     } catch (NumberFormatException e) {
-                        mPrefixDictionary.insert(word, 1);
+                        targetDict.insert(word, 1);
                     }
                 } else {
-                    mPrefixDictionary.insert(line, 1);
+                    targetDict.insert(line, 1);
                 }
             }
             loaded = true;
@@ -739,7 +750,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 : new String[]{"the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not", "on", "with", "he", "as", "you", "do", "at", "this", "but", "his", "by", "from", "they", "we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would", "there", "their", "what", "so", "up", "out", "if", "about", "who", "get", "which", "go", "me", "when", "make", "can", "like", "time", "no", "just", "him", "know", "take", "people", "into", "year", "your", "good", "some", "could", "them", "see", "other", "than", "then", "now", "look", "only", "come", "its", "over", "think", "also", "back", "after", "use", "two", "how", "our", "work", "first", "well", "way", "even", "new", "want", "because", "any", "these", "give", "day", "most", "us", "keyboard", "simple", "great", "need", "feel", "high", "place", "thing", "things", "case", "call", "hand", "right", "world"};
             int freq = defaultWords.length * 10;
             for (String w : defaultWords) {
-                mPrefixDictionary.insert(w, (int) (freq-- * weightFactor));
+                targetDict.insert(w, (int) (freq-- * weightFactor));
             }
         }
     }

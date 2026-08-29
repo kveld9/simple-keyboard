@@ -39,10 +39,19 @@ public final class PrefixDictionary {
         }
     }
 
-    private final TrieNode mRoot = new TrieNode();
+    private TrieNode mRoot = new TrieNode();
     private int mWordCount = 0;
 
     public PrefixDictionary() {
+    }
+
+    public synchronized void copyFrom(final PrefixDictionary other) {
+        if (other != null) {
+            synchronized (other) {
+                this.mRoot = other.mRoot;
+                this.mWordCount = other.mWordCount;
+            }
+        }
     }
 
     public static String stripAccents(final String s) {

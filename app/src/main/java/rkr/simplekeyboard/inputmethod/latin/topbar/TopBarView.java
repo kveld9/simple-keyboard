@@ -314,12 +314,16 @@ public class TopBarView extends FrameLayout {
                 mSuggestionsContainer.addView(mDivider2);
                 mSuggestionsContainer.addView(mRightSlot);
                 clearSuggestions();
+                mSuggestionsContainer.requestLayout();
+                mSuggestionsContainer.invalidate();
             }
         } else {
             mIsExternalActive = true;
             mSuggestionsContainer.removeAllViews();
             mSuggestionsContainer.addView(view, new LinearLayout.LayoutParams(
-                    LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+                    0, LayoutParams.MATCH_PARENT, 1.0f));
+            mSuggestionsContainer.requestLayout();
+            mSuggestionsContainer.invalidate();
         }
     }
 

@@ -9,8 +9,13 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.os.Build;
 import android.util.Log;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Lightweight, direct-boot aware SQLite database for user-learned words and bigrams
@@ -359,6 +364,64 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
 
     public synchronized Map<String, Map<String, Integer>> getAllBigrams() {
         return loadUserBigrams();
+    }
+
+    public synchronized List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
+        final List<CharSequence> results = new ArrayList<>(Math.max(0, limit));
+        if (limit <= 0) return results;
+        final Set<String> added = new HashSet<>();
+
+        if (prevWord != null && !prevWord.trim().isEmpty()) {
+            try {
+                final SQLiteDatabase db = getReadableDatabase();
+                try (Cursor cursor = db.query(TABLE_BIGRAMS, new String[]{COL_BIGRAM_WORD},
+                        COL_PREV_WORD + "=?", new String[]{prevWord.trim()}, null, null,
+                        COL_BIGRAM_FREQ + " DESC, " + COL_BIGRAM_LAST_USED + " DESC", String.valueOf(limit))) {
+                    if (cursor != null && cursor.moveToFirst()) {
+                        do {
+                            final String w = cursor.getString(0);
+                            if (w != null && added.add(w.toLowerCase())) {
+                                results.add(w);
+                            }
+                        } while (cursor.moveToNext() && results.size() < limit);
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to query next word predictions for: " + prevWord, e);
+            }
+        }
+
+        if (results.size() < limit) {
+            try {
+                final SQLiteDatabase db = getReadableDatabase();
+                try (Cursor cursor = db.query(TABLE_NAME, new String[]{COL_WORD},
+                        null, null, null, null,
+                        COL_FREQ + " DESC, " + COL_LAST_USED + " DESC", String.valueOf(limit * 2))) {
+                    if (cursor != null && cursor.moveToFirst()) {
+                        do {
+                            final String w = cursor.getString(0);
+                            if (w != null && added.add(w.toLowerCase())) {
+                                results.add(w);
+                            }
+                        } while (cursor.moveToNext() && results.size() < limit);
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to query fallback user words", e);
+            }
+        }
+
+        if (results.size() < limit) {
+            final String[] defaultFallback = {"the", "to", "and", "a", "in", "is", "it", "you", "that", "he", "que", "de", "no", "la", "el", "es", "en"};
+            for (String w : defaultFallback) {
+                if (added.add(w.toLowerCase())) {
+                    results.add(w);
+                    if (results.size() >= limit) break;
+                }
+            }
+        }
+
+        return results;
     }
 
     /**

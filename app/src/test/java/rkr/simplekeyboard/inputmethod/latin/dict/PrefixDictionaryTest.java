@@ -387,4 +387,87 @@ public class PrefixDictionaryTest {
         assertEquals(0, mDict.getWordFrequency("testing"));
         assertEquals(90, mDict.getWordFrequency("tester"));
     }
+
+    @Test
+    public void testGetNextWordPredictionsWithBigrams() {
+        mDict.insert("how", 100);
+        mDict.insert("are", 90);
+        mDict.insert("is", 80);
+        mDict.insert("do", 70);
+
+        mDict.setBigram("how", "are", 250);
+        mDict.setBigram("how", "is", 200);
+        mDict.setBigram("how", "do", 150);
+
+        List<CharSequence> preds = mDict.getNextWordPredictions("how", 3);
+        assertEquals(3, preds.size());
+        assertEquals("are", preds.get(0).toString());
+        assertEquals("is", preds.get(1).toString());
+        assertEquals("do", preds.get(2).toString());
+    }
+
+    @Test
+    public void testGetNextWordPredictionsFallbackToTopWords() {
+        mDict.insert("the", 250);
+        mDict.insert("to", 240);
+        mDict.insert("and", 230);
+        mDict.insert("world", 100);
+
+        mDict.setBigram("hello", "world", 255);
+
+        // "hello" only has 1 bigram ("world"), so remaining 2 slots fall back to top frequent words ("the", "to")
+        List<CharSequence> preds = mDict.getNextWordPredictions("hello", 3);
+        assertEquals(3, preds.size());
+        assertEquals("world", preds.get(0).toString());
+        assertEquals("the", preds.get(1).toString());
+        assertEquals("to", preds.get(2).toString());
+    }
+
+    @Test
+    public void testGetNextWordPredictionsChainingAndAccents() {
+        mDict.insert("cómo", 200);
+        mDict.insert("estás", 180);
+        mDict.insert("hoy", 160);
+
+        mDict.setBigram("cómo", "estás", 250);
+        mDict.setBigram("estás", "hoy", 240);
+
+        List<CharSequence> step1 = mDict.getNextWordPredictions("cómo", 1);
+        assertEquals(1, step1.size());
+        assertEquals("estás", step1.get(0).toString());
+
+        List<CharSequence> step2 = mDict.getNextWordPredictions("estás", 1);
+        assertEquals(1, step2.size());
+        assertEquals("hoy", step2.get(0).toString());
+    }
+
+    @Test
+    public void testGetNextWordPredictionsEmptyOrInvalid() {
+        mDict.insert("test", 100);
+        assertTrue(mDict.getNextWordPredictions("test", 0).isEmpty());
+        assertTrue(mDict.getNextWordPredictions("test", -1).isEmpty());
+
+        List<CharSequence> predsNull = mDict.getNextWordPredictions(null, 2);
+        assertEquals(2, predsNull.size());
+
+        List<CharSequence> predsEmpty = mDict.getNextWordPredictions("", 2);
+        assertEquals(2, predsEmpty.size());
+    }
+
+    @Test
+    public void testGetNextWordPredictionsCopyAndClear() {
+        mDict.insert("hello", 100);
+        mDict.insert("world", 90);
+        mDict.setBigram("hello", "world", 200);
+
+        PrefixDictionary copied = new PrefixDictionary();
+        copied.copyFrom(mDict);
+
+        List<CharSequence> copiedPreds = copied.getNextWordPredictions("hello", 2);
+        assertEquals(2, copiedPreds.size());
+        assertEquals("world", copiedPreds.get(0).toString());
+
+        mDict.clear();
+        assertEquals(0, mDict.getWordCount());
+    }
 }

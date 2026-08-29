@@ -5,4 +5,5 @@ public interface TopBarListener {
     void onLanguageClicked();
     void onClipboardClicked();
     void onSuggestionClicked(CharSequence text);
+    void onClipboardSuggestionClicked(String fullClipText);
 }

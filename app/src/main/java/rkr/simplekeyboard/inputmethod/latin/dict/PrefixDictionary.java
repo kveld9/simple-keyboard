@@ -139,6 +139,7 @@ public final class PrefixDictionary {
     private int mWordCount = 0;
     private float mAutoCorrectionThreshold = 1.0f;
     private final Map<String, Map<String, Short>> mBigrams = new HashMap<>();
+    private final List<ScoredWord> mTopWords = new ArrayList<>();
 
     public PrefixDictionary() {
     }
@@ -161,6 +162,8 @@ public final class PrefixDictionary {
                 for (Map.Entry<String, Map<String, Short>> entry : other.mBigrams.entrySet()) {
                     this.mBigrams.put(entry.getKey(), new HashMap<>(entry.getValue()));
                 }
+                this.mTopWords.clear();
+                this.mTopWords.addAll(other.mTopWords);
             }
         }
     }
@@ -276,6 +279,31 @@ public final class PrefixDictionary {
         if (current.addWord(word, frequency)) {
             mWordCount++;
         }
+        updateTopWord(word, frequency);
+    }
+
+    private void updateTopWord(final String word, final int freq) {
+        if (word == null || word.isEmpty()) return;
+        for (int i = 0; i < mTopWords.size(); i++) {
+            if (mTopWords.get(i).word.equalsIgnoreCase(word)) {
+                if (freq > mTopWords.get(i).frequency) {
+                    mTopWords.remove(i);
+                    break;
+                } else {
+                    return;
+                }
+            }
+        }
+        if (mTopWords.size() < 50 || freq > mTopWords.get(mTopWords.size() - 1).frequency) {
+            int insertIdx = Collections.binarySearch(mTopWords, new ScoredWord(word, freq, freq));
+            if (insertIdx < 0) {
+                insertIdx = -insertIdx - 1;
+            }
+            mTopWords.add(insertIdx, new ScoredWord(word, freq, freq));
+            if (mTopWords.size() > 50) {
+                mTopWords.remove(mTopWords.size() - 1);
+            }
+        }
     }
 
     public synchronized void syncUserWords(final Map<String, Integer> userWords) {
@@ -314,6 +342,12 @@ public final class PrefixDictionary {
         boolean removed = current.removeWord(word);
         if (removed) {
             mWordCount--;
+            for (int i = 0; i < mTopWords.size(); i++) {
+                if (mTopWords.get(i).word.equalsIgnoreCase(word)) {
+                    mTopWords.remove(i);
+                    break;
+                }
+            }
         }
         return removed;
     }
@@ -779,6 +813,74 @@ public final class PrefixDictionary {
         }
     }
 
+    public synchronized String getCanonicalWord(final String word) {
+        if (word == null || word.isEmpty()) return word;
+        final String norm = stripAccents(word.toLowerCase());
+        TrieNode current = mRoot;
+        for (int i = 0; i < norm.length(); i++) {
+            current = current.getChild(norm.charAt(i));
+            if (current == null) return word;
+        }
+        if (current.words.length > 0) {
+            return current.words[0];
+        }
+        return word;
+    }
+
+    public synchronized List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
+        if (limit <= 0) {
+            return Collections.emptyList();
+        }
+        final List<CharSequence> results = new ArrayList<>(limit);
+        final Set<String> added = new HashSet<>();
+
+        if (prevWord != null && !prevWord.trim().isEmpty()) {
+            final String normPrev = stripAccents(prevWord.trim().toLowerCase());
+            final Map<String, Short> nextMap = mBigrams.get(normPrev);
+            if (nextMap != null && !nextMap.isEmpty()) {
+                final List<Map.Entry<String, Short>> sortedEntries = new ArrayList<>(nextMap.entrySet());
+                Collections.sort(sortedEntries, (a, b) -> Integer.compare(b.getValue() & 0xFFFF, a.getValue() & 0xFFFF));
+                for (Map.Entry<String, Short> entry : sortedEntries) {
+                    final String candidate = getCanonicalWord(entry.getKey());
+                    if (added.add(candidate.toLowerCase())) {
+                        results.add(candidate);
+                        if (results.size() >= limit) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback to top frequent words from dictionary if not enough bigrams
+        if (results.size() < limit) {
+            for (ScoredWord sw : mTopWords) {
+                final String candidate = sw.word;
+                if (added.add(candidate.toLowerCase())) {
+                    results.add(candidate);
+                    if (results.size() >= limit) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Final fallback to common frequent words if dictionary is small/empty
+        if (results.size() < limit) {
+            final String[] defaultFallback = {"the", "to", "and", "a", "in", "is", "it", "you", "that", "he", "que", "de", "no", "la", "el", "es", "en"};
+            for (String w : defaultFallback) {
+                if (added.add(w.toLowerCase())) {
+                    results.add(w);
+                    if (results.size() >= limit) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        return results;
+    }
+
     public synchronized int getWordCount() {
         return mWordCount;
     }
@@ -787,6 +889,7 @@ public final class PrefixDictionary {
         mRoot = new TrieNode();
         mWordCount = 0;
         mBigrams.clear();
+        mTopWords.clear();
     }
 }
 

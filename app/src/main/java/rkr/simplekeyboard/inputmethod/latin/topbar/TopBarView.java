@@ -24,10 +24,11 @@ public class TopBarView extends FrameLayout {
 
     private LinearLayout mNormalModeContainer;
     private ImageView mExpandButton;
-    private View mRightSpacer;
     private LinearLayout mSuggestionsContainer;
     private TextView mLeftSlot;
+    private View mDivider1;
     private TextView mCenterSlot;
+    private View mDivider2;
     private TextView mRightSlot;
 
     private LinearLayout mToolTrayContainer;
@@ -71,27 +72,30 @@ public class TopBarView extends FrameLayout {
         mExpandButton.setOnClickListener(v -> setMode(MODE_TOOL_TRAY));
         mNormalModeContainer.addView(mExpandButton);
 
-        // 3-slot centered suggestions container
+        // 3-slot centered suggestions container with subtle dividers
         mSuggestionsContainer = new LinearLayout(context);
         mSuggestionsContainer.setOrientation(LinearLayout.HORIZONTAL);
         mSuggestionsContainer.setGravity(Gravity.CENTER_VERTICAL);
         mSuggestionsContainer.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
 
         mLeftSlot = createSuggestionSlot(context, 14.0f, false);
+        mDivider1 = createDivider(context);
         mCenterSlot = createSuggestionSlot(context, 15.5f, true);
+        mDivider2 = createDivider(context);
         mRightSlot = createSuggestionSlot(context, 14.0f, false);
 
         mSuggestionsContainer.addView(mLeftSlot);
+        mSuggestionsContainer.addView(mDivider1);
         mSuggestionsContainer.addView(mCenterSlot);
+        mSuggestionsContainer.addView(mDivider2);
         mSuggestionsContainer.addView(mRightSlot);
 
         mNormalModeContainer.addView(mSuggestionsContainer);
 
-        // Right spacer matching expand button width to keep center slot perfectly balanced
-        mRightSpacer = new View(context);
-        int iconWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 44, context.getResources().getDisplayMetrics());
-        mRightSpacer.setLayoutParams(new LinearLayout.LayoutParams(iconWidth, LayoutParams.MATCH_PARENT));
-        mNormalModeContainer.addView(mRightSpacer);
+        View rightSpacer = new View(context);
+        int spacerWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 18, context.getResources().getDisplayMetrics());
+        rightSpacer.setLayoutParams(new LinearLayout.LayoutParams(spacerWidth, LayoutParams.MATCH_PARENT));
+        mNormalModeContainer.addView(rightSpacer);
 
         addView(mNormalModeContainer);
 
@@ -130,6 +134,19 @@ public class TopBarView extends FrameLayout {
         setMode(MODE_NORMAL);
     }
 
+    private View createDivider(Context context) {
+        View divider = new View(context);
+        int dividerWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1, context.getResources().getDisplayMetrics());
+        int dividerHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 18, context.getResources().getDisplayMetrics());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dividerWidth, dividerHeight);
+        lp.gravity = Gravity.CENTER_VERTICAL;
+        divider.setLayoutParams(lp);
+        divider.setBackgroundColor(mTextColor);
+        divider.setAlpha(0.18f);
+        divider.setVisibility(View.INVISIBLE);
+        return divider;
+    }
+
     private TextView createSuggestionSlot(Context context, float textSizeSp, boolean isBold) {
         TextView tv = new TextView(context);
         tv.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
@@ -156,7 +173,7 @@ public class TopBarView extends FrameLayout {
         ImageView iv = new ImageView(context);
         iv.setImageResource(drawableResId);
         iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        int widthPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 44, context.getResources().getDisplayMetrics());
+        int widthPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 34, context.getResources().getDisplayMetrics());
         iv.setLayoutParams(new LinearLayout.LayoutParams(widthPx, ViewGroup.LayoutParams.MATCH_PARENT));
         iv.setClickable(true);
         iv.setFocusable(false);
@@ -193,9 +210,13 @@ public class TopBarView extends FrameLayout {
             mLeftSlot.setVisibility(View.INVISIBLE);
             mLeftSlot.setOnClickListener(null);
 
+            mDivider1.setVisibility(View.INVISIBLE);
+
             mCenterSlot.setText("");
             mCenterSlot.setVisibility(View.INVISIBLE);
             mCenterSlot.setOnClickListener(null);
+
+            mDivider2.setVisibility(View.INVISIBLE);
 
             mRightSlot.setText("");
             mRightSlot.setVisibility(View.INVISIBLE);
@@ -206,17 +227,51 @@ public class TopBarView extends FrameLayout {
         final int count = suggestions.size();
         if (count >= 3) {
             bindSlot(mLeftSlot, suggestions.get(0), false);
+            mDivider1.setVisibility(View.VISIBLE);
             bindSlot(mCenterSlot, suggestions.get(1), true);
+            mDivider2.setVisibility(View.VISIBLE);
             bindSlot(mRightSlot, suggestions.get(2), false);
         } else if (count == 2) {
             bindSlot(mLeftSlot, suggestions.get(0), false);
+            mDivider1.setVisibility(View.VISIBLE);
             bindSlot(mCenterSlot, suggestions.get(1), true);
+            mDivider2.setVisibility(View.INVISIBLE);
             bindSlot(mRightSlot, null, false);
         } else {
             bindSlot(mLeftSlot, null, false);
+            mDivider1.setVisibility(View.INVISIBLE);
             bindSlot(mCenterSlot, suggestions.get(0), boldIndex == 0);
+            mDivider2.setVisibility(View.INVISIBLE);
             bindSlot(mRightSlot, null, false);
         }
+    }
+
+    public void setClipboardSuggestion(final String fullClipText) {
+        if (fullClipText == null || fullClipText.trim().isEmpty()) {
+            setSuggestions(null, -1);
+            return;
+        }
+
+        mLeftSlot.setVisibility(View.GONE);
+        mDivider1.setVisibility(View.GONE);
+        mDivider2.setVisibility(View.GONE);
+        mRightSlot.setVisibility(View.GONE);
+
+        String cleanText = fullClipText.replace('\n', ' ').replace('\r', ' ').trim();
+        if (cleanText.length() > 200) {
+            cleanText = cleanText.substring(0, 200) + "...";
+        }
+        final String displayText = "📋 \"" + cleanText + "\"";
+
+        mCenterSlot.setText(displayText);
+        mCenterSlot.setVisibility(View.VISIBLE);
+        mCenterSlot.setTypeface(Typeface.DEFAULT_BOLD);
+        mCenterSlot.setAlpha(1.0f);
+        mCenterSlot.setOnClickListener(v -> {
+            if (mListener != null) {
+                mListener.onClipboardSuggestionClicked(fullClipText);
+            }
+        });
     }
 
     private void bindSlot(TextView slot, final CharSequence text, boolean isHighlighted) {

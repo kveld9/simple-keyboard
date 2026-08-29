@@ -396,8 +396,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
                     @Override
                     public void onSuggestionClicked(CharSequence text) {
+                        String cleanWord = "";
                         if (text != null && text.length() > 0) {
-                            String cleanWord = text.toString().trim();
+                            cleanWord = text.toString().trim();
                             if (cleanWord.startsWith("\"") && cleanWord.endsWith("\"") && cleanWord.length() >= 2) {
                                 cleanWord = cleanWord.substring(1, cleanWord.length() - 1).trim();
                             }
@@ -421,8 +422,24 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                                 mPreviousWord = cleanWord;
                             }
                         }
-                        mInputLogic.mConnection.commitSuggestion(text);
+                        final String currentWord = mInputLogic.mConnection.getWordBeforeCursor();
+                        if (currentWord == null || currentWord.isEmpty()) {
+                            mInputLogic.mConnection.commitText(cleanWord + " ", 1);
+                        } else {
+                            mInputLogic.mConnection.commitSuggestion(text);
+                        }
                         updateSuggestions();
+                    }
+
+                    @Override
+                    public void onClipboardSuggestionClicked(String fullClipText) {
+                        if (fullClipText != null && !fullClipText.isEmpty()) {
+                            mInputLogic.mConnection.commitText(fullClipText, 1);
+                            if (mClipboardHistoryManager != null) {
+                                mClipboardHistoryManager.markLatestClipUsed();
+                            }
+                            updateSuggestions();
+                        }
                     }
                 });
             }
@@ -432,7 +449,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     @Override
                     public void onPasteText(CharSequence text) {
                         mInputLogic.mConnection.commitText(text, 1);
+                        if (mClipboardHistoryManager != null) {
+                            mClipboardHistoryManager.markLatestClipUsed();
+                        }
                         hideClipboardHistory();
+                        updateSuggestions();
                     }
 
                     @Override
@@ -602,6 +623,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         switcher.loadKeyboard(editorInfo, currentSettingsValues, getCurrentAutoCapsState(),
                 getCurrentRecapitalizeState());
 
+        if (mClipboardHistoryManager != null) {
+            mClipboardHistoryManager.updateCurrentClip();
+        }
+
         if (mTopBarView != null) {
             mTopBarView.setLanguageButtonVisible(shouldShowLanguageSwitchKey());
             updateSuggestions();
@@ -609,9 +634,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         if (TRACE) Debug.startMethodTracing("/data/trace/latinime");
 
-        if (mClipboardHistoryManager != null) {
-            mClipboardHistoryManager.updateCurrentClip();
-        }
         hideClipboardHistory();
     }
 
@@ -795,13 +817,28 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             }
         }
         final String word = mInputLogic.mConnection.getWordBeforeCursor();
+        final String prevWord = (mPreviousWord != null && !mPreviousWord.isEmpty())
+                ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
+
         if (word == null || word.trim().isEmpty()) {
+            if (mClipboardHistoryManager != null) {
+                final String recentClip = mClipboardHistoryManager.getRecentClipForSuggestion();
+                if (recentClip != null) {
+                    mTopBarView.setClipboardSuggestion(recentClip);
+                    return;
+                }
+            }
+            if (prevWord != null && !prevWord.trim().isEmpty()) {
+                final java.util.List<CharSequence> nextWordPredictions =
+                        mPrefixDictionary.getNextWordPredictions(prevWord.trim(), 3);
+                if (nextWordPredictions != null && !nextWordPredictions.isEmpty()) {
+                    mTopBarView.setSuggestions(nextWordPredictions, 0);
+                    return;
+                }
+            }
             mTopBarView.setSuggestions(null, -1);
             return;
         }
-
-        final String prevWord = (mPreviousWord != null && !mPreviousWord.isEmpty())
-                ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
 
         final java.util.List<CharSequence> suggestions = new java.util.ArrayList<>();
         int boldIndex = -1;

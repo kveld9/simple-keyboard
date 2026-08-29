@@ -762,6 +762,22 @@ public class Key implements Comparable<Key> {
     }
 
     /**
+     * Gets the x-coordinate of the center of the key.
+     * @return The x-coordinate of the center.
+     */
+    public float getCenterX() {
+        return mX + mWidth / 2.0f;
+    }
+
+    /**
+     * Gets the y-coordinate of the center of the key.
+     * @return The y-coordinate of the center.
+     */
+    public float getCenterY() {
+        return mY + mHeight / 2.0f;
+    }
+
+    /**
      * Gets the amount of padding for the hitbox above the key's visible position.
      * @return The hitbox padding above the key.
      */

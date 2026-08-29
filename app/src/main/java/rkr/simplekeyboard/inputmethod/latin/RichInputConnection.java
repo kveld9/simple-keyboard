@@ -261,6 +261,58 @@ public final class RichInputConnection {
         return mTextSelection;
     }
 
+    public String getWordBeforeCursor() {
+        String text = mTextBeforeCursor;
+        if ((text == null || text.isEmpty()) && isConnected()) {
+            try {
+                final CharSequence icText = mIC.getTextBeforeCursor(40, 0);
+                if (icText != null && icText.length() > 0) {
+                    text = icText.toString();
+                }
+            } catch (Exception e) {
+                // Ignore fallback
+            }
+        }
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+        int i = text.length() - 1;
+        while (i >= 0) {
+            char c = text.charAt(i);
+            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
+                break;
+            }
+            i--;
+        }
+        return text.substring(i + 1);
+    }
+
+    public String getTextBeforeCursor(final int n, final int flags) {
+        if (mTextBeforeCursor != null && mTextBeforeCursor.length() > 0) {
+            final int len = Math.min(n, mTextBeforeCursor.length());
+            return mTextBeforeCursor.substring(mTextBeforeCursor.length() - len);
+        }
+        if (isConnected()) {
+            try {
+                final CharSequence cs = mIC.getTextBeforeCursor(n, flags);
+                if (cs != null) {
+                    return cs.toString();
+                }
+            } catch (Exception e) {
+                // Ignore fallback
+            }
+        }
+        return "";
+    }
+
+    public void commitSuggestion(final CharSequence suggestion) {
+        final String currentWord = getWordBeforeCursor();
+        if (!currentWord.isEmpty()) {
+            deleteTextBeforeCursor(currentWord.length());
+        }
+        commitText(suggestion.toString() + " ", 1);
+    }
+
     public boolean canDeleteCharacters() {
         return mExpectedSelStart > 0;
     }

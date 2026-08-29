@@ -63,6 +63,12 @@ import rkr.simplekeyboard.inputmethod.keyboard.KeyboardSwitcher;
 import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryManager;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryView;
+import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
+import rkr.simplekeyboard.inputmethod.latin.dict.UserDictionaryDatabase;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
@@ -98,6 +104,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private TopBarView mTopBarView;
     private ClipboardHistoryView mClipboardHistoryView;
     private ClipboardHistoryManager mClipboardHistoryManager;
+    private final PrefixDictionary mPrefixDictionary = new PrefixDictionary();
+    private UserDictionaryDatabase mUserDictionaryDb;
+    private Locale mLoadedLocale;
+
+    private String mOriginalTypedWordBeforeAutocorrect = null;
+    private String mAutocorrectedWord = null;
+    private boolean mCanRevertAutocorrect = false;
 
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
@@ -269,6 +282,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
         mClipboardHistoryManager.start();
+        mUserDictionaryDb = new UserDictionaryDatabase(this);
 
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
@@ -288,6 +302,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet.clearKeyboardCache();
         final SettingsValues currentSettingsValues = mSettings.getCurrent();
         AudioAndHapticFeedbackManager.getInstance().onSettingsChanged(currentSettingsValues);
+        loadDictionaryForLocale(mLocale);
     }
 
     @Override
@@ -295,6 +310,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mClipboardHistoryManager != null) {
             mClipboardHistoryManager.close();
             mClipboardHistoryManager = null;
+        }
+        if (mUserDictionaryDb != null) {
+            mUserDictionaryDb.close();
+            mUserDictionaryDb = null;
         }
         mSettings.onDestroy();
         unregisterReceiver(mRingerModeChangeReceiver);
@@ -364,6 +383,25 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     @Override
                     public void onClipboardClicked() {
                         showClipboardHistory();
+                    }
+
+                    @Override
+                    public void onSuggestionClicked(CharSequence text) {
+                        if (text != null && text.length() > 0) {
+                            String cleanWord = text.toString().trim();
+                            if (cleanWord.startsWith("\"") && cleanWord.endsWith("\"") && cleanWord.length() >= 2) {
+                                cleanWord = cleanWord.substring(1, cleanWord.length() - 1).trim();
+                            }
+                            if (cleanWord.length() > 0) {
+                                mPrefixDictionary.insert(cleanWord, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+                                if (mUserDictionaryDb != null) {
+                                    final String wordToLearn = cleanWord;
+                                    new Thread(() -> mUserDictionaryDb.learnWord(wordToLearn)).start();
+                                }
+                            }
+                        }
+                        mInputLogic.mConnection.commitSuggestion(text);
+                        updateSuggestions();
                     }
                 });
             }
@@ -447,6 +485,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onFinishInputView(final boolean finishingInput) {
+        mCanRevertAutocorrect = false;
         mInputLogic.clearCaches();
         mRichImm.resetSubtypeCycleOrder();
         mHandler.onFinishInputView(finishingInput);
@@ -461,6 +500,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void onCurrentSubtypeChanged() {
         mInputLogic.onSubtypeChanged();
         loadKeyboard();
+        loadDictionaryForLocale(mLocale);
     }
 
     void onStartInputInternal(final EditorInfo editorInfo, final boolean restarting) {
@@ -472,6 +512,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         // Switch to the null consumer to handle cases leading to early exit below, for which we
         // also wouldn't be consuming gesture data.
+        if (mTopBarView != null) {
+            mTopBarView.closeToolTray();
+        }
         final KeyboardSwitcher switcher = mKeyboardSwitcher;
         switcher.updateKeyboardTheme();
         final MainKeyboardView mainKeyboardView = switcher.getMainKeyboardView();
@@ -540,6 +583,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         if (mTopBarView != null) {
             mTopBarView.setLanguageButtonVisible(shouldShowLanguageSwitchKey());
+            updateSuggestions();
         }
 
         if (TRACE) Debug.startMethodTracing("/data/trace/latinime");
@@ -617,6 +661,157 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),
                     getCurrentRecapitalizeState());
         }
+    }
+
+    private void loadDictionaryForLocale(final Locale currentLocale) {
+        final String currentLang = (currentLocale != null) ? currentLocale.getLanguage() : "es";
+
+        final java.util.Set<String> enabledLangs = new java.util.LinkedHashSet<>();
+        if (mRichImm != null) {
+            final java.util.Set<rkr.simplekeyboard.inputmethod.latin.Subtype> subtypes =
+                    mRichImm.getEnabledSubtypes(false);
+            if (subtypes != null) {
+                for (rkr.simplekeyboard.inputmethod.latin.Subtype st : subtypes) {
+                    final String l = st.getLocale();
+                    if (l != null && l.length() >= 2) {
+                        enabledLangs.add(l.substring(0, 2).toLowerCase());
+                    }
+                }
+            }
+        }
+        if (enabledLangs.isEmpty()) {
+            enabledLangs.add(currentLang);
+        }
+
+        mPrefixDictionary.clear();
+
+        // 1. Load secondary enabled languages first (with 85% relative frequency)
+        for (String lang : enabledLangs) {
+            if (!lang.equals(currentLang)) {
+                loadSingleLanguageDictionary(lang, 0.85f);
+            }
+        }
+
+        // 2. Load primary active language with 100% frequency
+        loadSingleLanguageDictionary(currentLang, 1.0f);
+
+        // 3. Load user-learned words from database with top priority
+        if (mUserDictionaryDb != null) {
+            final java.util.Map<String, Integer> userWords = mUserDictionaryDb.getAllLearnedWords();
+            for (java.util.Map.Entry<String, Integer> entry : userWords.entrySet()) {
+                mPrefixDictionary.insert(entry.getKey(), entry.getValue());
+            }
+        }
+
+        mLoadedLocale = currentLocale;
+    }
+
+    private void loadSingleLanguageDictionary(final String lang, final float weightFactor) {
+        final String assetName = "es".equals(lang) ? "dict_es.txt" : "dict_en.txt";
+        boolean loaded = false;
+        try (InputStream is = getAssets().open(assetName);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                final int sep = line.indexOf(' ');
+                if (sep > 0) {
+                    final String word = line.substring(0, sep);
+                    try {
+                        int freq = Integer.parseInt(line.substring(sep + 1));
+                        int adjustedFreq = (int) (freq * weightFactor);
+                        mPrefixDictionary.insert(word, Math.max(1, adjustedFreq));
+                    } catch (NumberFormatException e) {
+                        mPrefixDictionary.insert(word, 1);
+                    }
+                } else {
+                    mPrefixDictionary.insert(line, 1);
+                }
+            }
+            loaded = true;
+        } catch (Exception e) {
+            Log.w(TAG, "Could not load dictionary asset: " + assetName, e);
+        }
+        if (!loaded) {
+            final String[] defaultWords = "es".equals(lang)
+                ? new String[]{"que", "de", "no", "a", "la", "el", "es", "y", "en", "lo", "un", "por", "qué", "me", "una", "te", "los", "se", "con", "para", "mi", "está", "si", "bien", "pero", "yo", "eso", "las", "sí", "hola", "teclado", "gracias", "tiempo", "donde", "cuando", "hacer", "todo", "puede", "ahora", "mucho", "nuevo", "día", "vida", "casa", "mundo"}
+                : new String[]{"the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not", "on", "with", "he", "as", "you", "do", "at", "this", "but", "his", "by", "from", "they", "we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would", "there", "their", "what", "so", "up", "out", "if", "about", "who", "get", "which", "go", "me", "when", "make", "can", "like", "time", "no", "just", "him", "know", "take", "people", "into", "year", "your", "good", "some", "could", "them", "see", "other", "than", "then", "now", "look", "only", "come", "its", "over", "think", "also", "back", "after", "use", "two", "how", "our", "work", "first", "well", "way", "even", "new", "want", "because", "any", "these", "give", "day", "most", "us", "keyboard", "simple", "great", "need", "feel", "high", "place", "thing", "things", "case", "call", "hand", "right", "world"};
+            int freq = defaultWords.length * 10;
+            for (String w : defaultWords) {
+                mPrefixDictionary.insert(w, (int) (freq-- * weightFactor));
+            }
+        }
+    }
+
+    public void updateSuggestions() {
+        if (mTopBarView == null || !isInputViewShown()) {
+            return;
+        }
+        if (!mSettings.getCurrent().mShowSuggestions) {
+            mTopBarView.setSuggestions(null, -1);
+            return;
+        }
+        final EditorInfo editorInfo = getCurrentInputEditorInfo();
+        if (editorInfo != null) {
+            final InputAttributes attr = new InputAttributes(editorInfo, isFullscreenMode());
+            if (attr.mIsPasswordField) {
+                mTopBarView.setSuggestions(null, -1);
+                return;
+            }
+        }
+        final String word = mInputLogic.mConnection.getWordBeforeCursor();
+        if (word == null || word.trim().isEmpty()) {
+            mTopBarView.setSuggestions(null, -1);
+            return;
+        }
+
+        final java.util.List<CharSequence> suggestions = new java.util.ArrayList<>();
+        int boldIndex = -1;
+
+        // 1. Slot 0 is ALWAYS the raw typed word in quotes
+        suggestions.add("\"" + word + "\"");
+
+        final boolean autoCorrectionEnabled = mSettings.getCurrent().mAutoCorrectionEnabled;
+        final java.util.List<CharSequence> matches = mPrefixDictionary.getSuggestions(word, 3);
+        final CharSequence bestCorrection;
+        if (autoCorrectionEnabled) {
+            final CharSequence exactNorm = mPrefixDictionary.getExactNormalizedCorrection(word);
+            if (exactNorm != null) {
+                bestCorrection = exactNorm;
+            } else if (matches.isEmpty()) {
+                bestCorrection = mPrefixDictionary.getBestCorrection(word);
+            } else {
+                bestCorrection = null;
+            }
+        } else {
+            bestCorrection = null;
+        }
+
+        if (bestCorrection != null) {
+            // Typo or missing accent with auto-correction enabled:
+            // 2. Slot 1: Target autocorrection in BOLD
+            suggestions.add(bestCorrection);
+            boldIndex = 1;
+            // 3. Slot 2: Alternative suggestion (from matches or fuzzy candidates)
+            final java.util.List<CharSequence> candidates = matches.isEmpty() ? mPrefixDictionary.getFuzzySuggestions(word, 3) : matches;
+            for (CharSequence s : candidates) {
+                if (!s.toString().equalsIgnoreCase(bestCorrection.toString()) && suggestions.size() < 3) {
+                    suggestions.add(s);
+                }
+            }
+        } else if (!matches.isEmpty()) {
+            // Normal typing / valid prefix / auto-correction disabled:
+            // 2. Slot 1: Top suggested completion in BOLD
+            suggestions.add(matches.get(0));
+            boldIndex = 1;
+            // 3. Slot 2: Secondary suggestion if available
+            if (matches.size() > 1) {
+                suggestions.add(matches.get(1));
+            }
+        }
+
+        mTopBarView.setSuggestions(suggestions, boldIndex);
     }
 
     @Override
@@ -844,10 +1039,67 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // This method is public for testability of LatinIME, but also in the future it should
     // completely replace #onCodeInput.
     public void onEvent(final Event event) {
+        if (mTopBarView != null && mTopBarView.isToolTrayOpen()) {
+            mTopBarView.closeToolTray();
+        }
+
+        // Check if backspace should revert previous autocorrect
+        if (event.isFunctionalKeyEvent() && event.mKeyCode == Constants.CODE_DELETE) {
+            if (mCanRevertAutocorrect && mAutocorrectedWord != null && mOriginalTypedWordBeforeAutocorrect != null) {
+                final String textBefore = mInputLogic.mConnection.getTextBeforeCursor(mAutocorrectedWord.length() + 2, 0);
+                if (textBefore != null && textBefore.endsWith(mAutocorrectedWord + " ")) {
+                    mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + 1);
+                    mInputLogic.mConnection.commitText(mOriginalTypedWordBeforeAutocorrect, 1);
+
+                    // Auto-learn reverted word
+                    mPrefixDictionary.insert(mOriginalTypedWordBeforeAutocorrect, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+                    if (mUserDictionaryDb != null) {
+                        final String raw = mOriginalTypedWordBeforeAutocorrect;
+                        new Thread(() -> mUserDictionaryDb.learnWord(raw)).start();
+                    }
+
+                    mCanRevertAutocorrect = false;
+                    mOriginalTypedWordBeforeAutocorrect = null;
+                    mAutocorrectedWord = null;
+                    mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                    updateSuggestions();
+                    return;
+                }
+            }
+            mCanRevertAutocorrect = false;
+        } else if (!event.isFunctionalKeyEvent() && event.mCodePoint != Constants.CODE_SPACE) {
+            mCanRevertAutocorrect = false;
+        }
+
+        if (!event.isFunctionalKeyEvent() && event.mCodePoint == Constants.CODE_SPACE) {
+            final SettingsValues settingsValues = mSettings.getCurrent();
+            if (settingsValues.mAutoCorrectionEnabled) {
+                final EditorInfo editorInfo = getCurrentInputEditorInfo();
+                final InputAttributes attr = editorInfo != null ? new InputAttributes(editorInfo, isFullscreenMode()) : null;
+                if (attr == null || !attr.mIsPasswordField) {
+                    final String word = mInputLogic.mConnection.getWordBeforeCursor();
+                    if (word != null && word.length() > 0) {
+                        final CharSequence correction = mPrefixDictionary.getBestCorrection(word);
+                        if (correction != null) {
+                            mInputLogic.mConnection.deleteTextBeforeCursor(word.length());
+                            mInputLogic.mConnection.commitText(correction, 1);
+                            mOriginalTypedWordBeforeAutocorrect = word;
+                            mAutocorrectedWord = correction.toString();
+                            mCanRevertAutocorrect = true;
+                        } else {
+                            mCanRevertAutocorrect = false;
+                        }
+                    } else {
+                        mCanRevertAutocorrect = false;
+                    }
+                }
+            }
+        }
         final InputTransaction completeInputTransaction =
                 mInputLogic.onCodeInput(mSettings.getCurrent(), event);
         updateStateAfterInputTransaction(completeInputTransaction);
         mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+        updateSuggestions();
     }
 
     // A helper method to split the code point and the key code. Ultimately, they should not be

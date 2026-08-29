@@ -84,10 +84,10 @@ public final class LocaleUtils {
      * language code, "cc" is a country code.
      */
     public static String getLocaleString(final Locale locale) {
-        if (!TextUtils.isEmpty(locale.getVariant())) {
+        if (!locale.getVariant().isEmpty()) {
             return locale.getLanguage() + "_" + locale.getCountry() + "_" + locale.getVariant();
         }
-        if (!TextUtils.isEmpty(locale.getCountry())) {
+        if (!locale.getCountry().isEmpty()) {
             return locale.getLanguage() + "_" + locale.getCountry();
         }
         return locale.getLanguage();

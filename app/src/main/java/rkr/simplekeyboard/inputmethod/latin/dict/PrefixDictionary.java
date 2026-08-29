@@ -84,6 +84,24 @@ public final class PrefixDictionary {
             return true;
         }
 
+        boolean removeWord(final String word) {
+            for (int i = 0; i < words.length; i++) {
+                if (words[i].equalsIgnoreCase(word)) {
+                    final int len = words.length;
+                    final String[] newW = new String[len - 1];
+                    final short[] newF = new short[len - 1];
+                    System.arraycopy(words, 0, newW, 0, i);
+                    System.arraycopy(words, i + 1, newW, i, len - i - 1);
+                    System.arraycopy(freqs, 0, newF, 0, i);
+                    System.arraycopy(freqs, i + 1, newF, i, len - i - 1);
+                    this.words = newW;
+                    this.freqs = newF;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private void sortWords() {
             for (int i = 1; i < words.length; i++) {
                 final String w = words[i];
@@ -199,7 +217,7 @@ public final class PrefixDictionary {
                 min = Math.min(min, d[i - 1][j - 1] + cost);
 
                 if (i > 1 && j > 1 && c1 == s2.charAt(j - 2) && s1.charAt(i - 2) == c2) {
-                    min = Math.min(min, d[i - 2][j - 2] + 0.8f);
+                    min = Math.min(min, d[i - 2][j - 2] + 0.5f);
                 }
                 d[i][j] = min;
             }
@@ -258,6 +276,46 @@ public final class PrefixDictionary {
         if (current.addWord(word, frequency)) {
             mWordCount++;
         }
+    }
+
+    public synchronized void syncUserWords(final Map<String, Integer> userWords) {
+        if (userWords == null || userWords.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Integer> entry : userWords.entrySet()) {
+            insert(entry.getKey(), entry.getValue());
+        }
+    }
+
+    public synchronized void syncUserBigrams(final Map<String, Map<String, Integer>> userBigrams) {
+        if (userBigrams == null || userBigrams.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Map<String, Integer>> entry : userBigrams.entrySet()) {
+            final String prev = entry.getKey();
+            for (Map.Entry<String, Integer> subEntry : entry.getValue().entrySet()) {
+                setBigram(prev, subEntry.getKey(), subEntry.getValue());
+            }
+        }
+    }
+
+    public synchronized boolean removeWord(final String word) {
+        if (word == null || word.isEmpty()) {
+            return false;
+        }
+        final String normalized = stripAccents(word.toLowerCase());
+        TrieNode current = mRoot;
+        for (int i = 0; i < normalized.length(); i++) {
+            current = current.getChild(normalized.charAt(i));
+            if (current == null) {
+                return false;
+            }
+        }
+        boolean removed = current.removeWord(word);
+        if (removed) {
+            mWordCount--;
+        }
+        return removed;
     }
 
     public synchronized void setBigram(final String prevWord, final String word, final int freq) {
@@ -394,21 +452,11 @@ public final class PrefixDictionary {
 
         Collections.sort(scoredWords);
 
-        final boolean isAllUpper = isAllUpperCase(trimmed);
-        final boolean isFirstUpper = Character.isUpperCase(trimmed.charAt(0));
-
         final List<CharSequence> results = new ArrayList<>();
         final Set<String> added = new HashSet<>();
         for (int i = 0; i < scoredWords.size() && results.size() < maxCount; i++) {
             final String word = scoredWords.get(i).word;
-            String formatted;
-            if (isAllUpper && word.length() > 1) {
-                formatted = word.toUpperCase();
-            } else if (isFirstUpper && word.length() > 0) {
-                formatted = Character.toUpperCase(word.charAt(0)) + word.substring(1);
-            } else {
-                formatted = word;
-            }
+            final String formatted = applyCasing(trimmed, word);
             if (added.add(formatted.toLowerCase())) {
                 results.add(formatted);
             }
@@ -431,16 +479,80 @@ public final class PrefixDictionary {
         }
     }
 
-    private static boolean isAllUpperCase(final String s) {
-        if (s.length() <= 1) {
-            return false;
-        }
+    public static boolean hasDigits(final String s) {
+        if (s == null) return false;
         for (int i = 0; i < s.length(); i++) {
-            if (Character.isLetter(s.charAt(i)) && !Character.isUpperCase(s.charAt(i))) {
-                return false;
+            if (Character.isDigit(s.charAt(i))) {
+                return true;
             }
         }
-        return true;
+        return false;
+    }
+
+    public static boolean hasUrlOrEmailSymbol(final String s) {
+        if (s == null) return false;
+        return s.indexOf('@') >= 0 || s.indexOf('.') >= 0;
+    }
+
+    public static boolean hasIntermediateUpperCase(final String s) {
+        if (s == null || s.length() <= 1) {
+            return false;
+        }
+        if (isAllUpperCase(s)) {
+            return false;
+        }
+        for (int i = 1; i < s.length(); i++) {
+            if (Character.isUpperCase(s.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean shouldSkipAutoCorrection(final String word) {
+        if (word == null || word.isEmpty()) {
+            return true;
+        }
+        if (hasDigits(word)) {
+            return true;
+        }
+        if (hasUrlOrEmailSymbol(word)) {
+            return true;
+        }
+        if (hasIntermediateUpperCase(word)) {
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean isAllUpperCase(final String s) {
+        if (s == null || s.length() <= 1) {
+            return false;
+        }
+        boolean hasLetter = false;
+        for (int i = 0; i < s.length(); i++) {
+            final char c = s.charAt(i);
+            if (Character.isLetter(c)) {
+                hasLetter = true;
+                if (!Character.isUpperCase(c)) {
+                    return false;
+                }
+            }
+        }
+        return hasLetter;
+    }
+
+    public static String applyCasing(final String typed, final String suggestion) {
+        if (typed == null || suggestion == null || suggestion.isEmpty()) {
+            return suggestion;
+        }
+        if (isAllUpperCase(typed)) {
+            return suggestion.toUpperCase();
+        } else if (typed.length() > 0 && Character.isUpperCase(typed.charAt(0))) {
+            return Character.toUpperCase(suggestion.charAt(0)) + (suggestion.length() > 1 ? suggestion.substring(1).toLowerCase() : "");
+        } else {
+            return suggestion.toLowerCase();
+        }
     }
 
     public synchronized boolean containsWord(final String word) {
@@ -465,7 +577,7 @@ public final class PrefixDictionary {
     }
 
     public synchronized CharSequence getExactNormalizedCorrection(final String word) {
-        if (word == null || word.isEmpty()) {
+        if (word == null || word.isEmpty() || shouldSkipAutoCorrection(word)) {
             return null;
         }
         final String lower = word.toLowerCase();
@@ -482,7 +594,7 @@ public final class PrefixDictionary {
             if (best.equalsIgnoreCase(word)) {
                 return null;
             }
-            return formatCasing(best, word);
+            return applyCasing(word, best);
         }
         return null;
     }
@@ -495,7 +607,7 @@ public final class PrefixDictionary {
         if (mAutoCorrectionThreshold <= 0.0f) {
             return null;
         }
-        if (word == null || word.isEmpty()) {
+        if (word == null || word.isEmpty() || shouldSkipAutoCorrection(word)) {
             return null;
         }
 
@@ -568,7 +680,7 @@ public final class PrefixDictionary {
             }
         }
 
-        return formatCasing(best.word, word);
+        return applyCasing(word, best.word);
     }
 
     public synchronized List<CharSequence> getFuzzySuggestions(final String word, final int maxCount) {
@@ -605,21 +717,12 @@ public final class PrefixDictionary {
         final Set<String> added = new HashSet<>();
         for (int i = 0; i < candidates.size() && results.size() < maxCount; i++) {
             final String w = candidates.get(i).word;
-            final CharSequence formatted = formatCasing(w, word);
+            final String formatted = applyCasing(word, w);
             if (added.add(w.toLowerCase())) {
                 results.add(formatted);
             }
         }
         return results;
-    }
-
-    private static CharSequence formatCasing(final String target, final String original) {
-        if (isAllUpperCase(original) && target.length() > 1) {
-            return target.toUpperCase();
-        } else if (Character.isUpperCase(original.charAt(0)) && target.length() > 0) {
-            return Character.toUpperCase(target.charAt(0)) + target.substring(1);
-        }
-        return target;
     }
 
     private void searchFuzzy(final TrieNode node, final StringBuilder currentPath,

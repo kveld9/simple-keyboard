@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="platformSettingsTheme" parent="@android:style/Theme.Material">
+    <style name="platformSettingsTheme" parent="@android:style/Theme.DeviceDefault.Settings">
         <item name="android:colorPrimary">@android:color/system_accent1_300</item>
         <item name="android:colorPrimaryDark">@android:color/system_neutral1_900</item>
         <item name="android:colorAccent">@android:color/system_accent1_300</item>
@@ -12,11 +12,22 @@
         <item name="android:textColorSecondary">@android:color/system_neutral2_200</item>
         <item name="android:colorControlActivated">@android:color/system_accent1_300</item>
         <item name="android:colorControlHighlight">@android:color/system_accent1_700</item>
+        <item name="android:listDivider">@null</item>
+        <item name="android:dividerHeight">0dp</item>
+        <item name="android:switchStyle">@style/Widget.Material3.Switch</item>
         <item name="android:actionBarStyle">@style/platformSettingsActionBar</item>
         <item name="android:actionBarTheme">@style/platformSettingsActionBarTheme</item>
     </style>
 
-    <style name="platformSettingsActionBar" parent="@android:style/Widget.Material.ActionBar.Solid">
+    <style name="Widget.Material3.Switch" parent="@android:style/Widget.Material.CompoundButton.Switch">
+        <item name="android:track">@drawable/switch_m3_track</item>
+        <item name="android:thumb">@drawable/switch_m3_thumb</item>
+        <item name="android:switchMinWidth">44dp</item>
+        <item name="android:switchPadding">8dp</item>
+        <item name="android:showText">false</item>
+    </style>
+
+    <style name="platformSettingsActionBar" parent="@android:style/Widget.DeviceDefault.ActionBar.Solid">
         <item name="android:background">@android:color/system_neutral1_900</item>
         <item name="android:elevation">0dp</item>
         <item name="android:titleTextStyle">@style/platformSettingsTitleText</item>
@@ -27,7 +38,7 @@
         <item name="android:colorControlNormal">@android:color/system_neutral1_50</item>
     </style>
 
-    <style name="platformSettingsTitleText" parent="@android:style/TextAppearance.Material.Widget.ActionBar.Title">
+    <style name="platformSettingsTitleText" parent="@android:style/TextAppearance.DeviceDefault.Widget.ActionBar.Title">
         <item name="android:textColor">@android:color/system_neutral1_50</item>
         <item name="android:textSize">20sp</item>
     </style>

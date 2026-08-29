@@ -155,6 +155,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         final int languageOnSpacebarFormatType = LanguageOnSpacebarUtils
                 .getLanguageOnSpacebarFormatType(newKeyboard.mId.mSubtype);
         keyboardView.startDisplayLanguageOnSpacebar(subtypeChanged, languageOnSpacebarFormatType);
+        
+        if (mLatinIME != null && mLatinIME.mSpatialTouchModel != null) {
+            mLatinIME.mSpatialTouchModel.setKeyboard(newKeyboard);
+        }
     }
 
     public Keyboard getKeyboard() {

@@ -110,6 +110,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private UserDictionaryDatabase mUserDictionaryDb;
     private Locale mLoadedLocale;
 
+    public final rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel mSpatialTouchModel = new rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel();
+    public rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary mBinaryTrieDictionary;
+    public rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder mBeamSearchDecoder;
+
     private String mOriginalTypedWordBeforeAutocorrect = null;
     private String mAutocorrectedWord = null;
     private String mPreviousWord = null;
@@ -713,6 +717,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mLoadedLocale = currentLocale;
         final String currentLang = (currentLocale != null) ? currentLocale.getLanguage() : "es";
 
+        loadBinaryDictionary(currentLang);
+
         final java.util.Set<String> enabledLangs = new java.util.LinkedHashSet<>();
         if (mRichImm != null) {
             final java.util.Set<rkr.simplekeyboard.inputmethod.latin.Subtype> subtypes =
@@ -760,6 +766,21 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 updateSuggestions();
             });
         });
+    }
+
+    private void loadBinaryDictionary(final String lang) {
+        final String assetName = "es".equals(lang) ? "dict_es.bin" : "dict_en.bin";
+        try {
+            java.io.InputStream is = getAssets().open(assetName);
+            byte[] bytes = new byte[is.available()];
+            is.read(bytes);
+            is.close();
+            java.nio.ByteBuffer buffer = java.nio.ByteBuffer.wrap(bytes);
+            mBinaryTrieDictionary = new rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary(buffer);
+            mBeamSearchDecoder = new rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder(mBinaryTrieDictionary, mSpatialTouchModel);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void loadSingleLanguageDictionaryInto(final PrefixDictionary targetDict, final String lang, final float weightFactor) {
@@ -847,16 +868,31 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         suggestions.add("\"" + word + "\"");
 
         final boolean autoCorrectionEnabled = mSettings.getCurrent().mAutoCorrectionEnabled;
-        final java.util.List<CharSequence> matches = mPrefixDictionary.getSuggestions(word, 3, prevWord);
+        java.util.List<CharSequence> matches = null;
+        if (mBeamSearchDecoder != null) {
+            matches = mBeamSearchDecoder.getSuggestions(word, 3, prevWord);
+        }
+        if (matches == null || matches.isEmpty()) {
+            matches = mPrefixDictionary.getSuggestions(word, 3, prevWord);
+        }
+
         final CharSequence bestCorrection;
         if (autoCorrectionEnabled) {
-            final CharSequence exactNorm = mPrefixDictionary.getExactNormalizedCorrection(word);
-            if (exactNorm != null) {
-                bestCorrection = exactNorm;
-            } else if (matches.isEmpty()) {
-                bestCorrection = mPrefixDictionary.getBestCorrection(word, prevWord);
+            String bsc = null;
+            if (mBeamSearchDecoder != null) {
+                bsc = mBeamSearchDecoder.getBestCorrection(word, 0.5f, prevWord);
+            }
+            if (bsc != null) {
+                bestCorrection = bsc;
             } else {
-                bestCorrection = null;
+                final CharSequence exactNorm = mPrefixDictionary.getExactNormalizedCorrection(word);
+                if (exactNorm != null) {
+                    bestCorrection = exactNorm;
+                } else if (matches.isEmpty()) {
+                    bestCorrection = mPrefixDictionary.getBestCorrection(word, prevWord);
+                } else {
+                    bestCorrection = null;
+                }
             }
         } else {
             bestCorrection = null;
@@ -1107,7 +1143,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onCodeInput(final int codePoint, final int x, final int y,
             final boolean isKeyRepeat) {
-        final Event event = createSoftwareKeypressEvent(getCodePointForKeyboard(codePoint), isKeyRepeat);
+        if (mBeamSearchDecoder != null) {
+            if (Character.isLetter(codePoint)) {
+                mBeamSearchDecoder.onTouch(x, y, (char) codePoint);
+            } else if (codePoint == Constants.CODE_DELETE) {
+                mBeamSearchDecoder.onBackspace();
+            } else if (codePoint == Constants.CODE_SPACE || (!Character.isLetterOrDigit(codePoint) && codePoint > 32)) {
+                mBeamSearchDecoder.reset();
+            }
+        }
+        final Event event = createSoftwareKeypressEvent(getCodePointForKeyboard(codePoint), x, y, isKeyRepeat);
         onEvent(event);
     }
 
@@ -1158,7 +1203,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 final InputAttributes attr = editorInfo != null ? new InputAttributes(editorInfo, isFullscreenMode()) : null;
                 if (attr == null || !attr.mIsPasswordField) {
                     if (word != null && word.length() > 0) {
-                        final CharSequence correction = mPrefixDictionary.getBestCorrection(word, prevWord);
+                        CharSequence correction = null;
+                        if (mBeamSearchDecoder != null) {
+                            String bsc = mBeamSearchDecoder.getBestCorrection(word, 0.5f, prevWord);
+                            if (bsc != null) {
+                                correction = bsc;
+                            }
+                        }
+                        if (correction == null) {
+                            correction = mPrefixDictionary.getBestCorrection(word, prevWord);
+                        }
                         if (correction != null) {
                             mInputLogic.mConnection.deleteTextBeforeCursor(word.length());
                             mInputLogic.mConnection.commitText(correction, 1);
@@ -1201,7 +1255,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // A helper method to split the code point and the key code. Ultimately, they should not be
     // squashed into the same variable, and this method should be removed.
     // public for testing, as we don't want to copy the same logic into test code
-    public static Event createSoftwareKeypressEvent(final int keyCodeOrCodePoint, final boolean isKeyRepeat) {
+    public static Event createSoftwareKeypressEvent(final int keyCodeOrCodePoint, final int x, final int y, final boolean isKeyRepeat) {
         final int keyCode;
         final int codePoint;
         if (keyCodeOrCodePoint <= 0) {
@@ -1211,7 +1265,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             keyCode = Event.NOT_A_KEY_CODE;
             codePoint = keyCodeOrCodePoint;
         }
-        return Event.createSoftwareKeypressEvent(codePoint, keyCode, isKeyRepeat);
+        return Event.createSoftwareKeypressEvent(codePoint, keyCode, x, y, isKeyRepeat);
     }
 
     // Called from PointerTracker through the KeyboardActionListener interface

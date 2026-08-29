@@ -81,6 +81,9 @@ public class Event {
     // NOT_A_KEY_CODE.
     final public int mKeyCode;
 
+    final public int mX;
+    final public int mY;
+
     // Some flags that can't go into the key code. It's a bit field of FLAG_*
     final private int mFlags;
 
@@ -89,18 +92,20 @@ public class Event {
 
     // This method is private - to create a new event, use one of the create* utility methods.
     private Event(final int type, final CharSequence text, final int codePoint, final int keyCode,
-            final int flags, final Event next) {
+            final int x, final int y, final int flags, final Event next) {
         mEventType = type;
         mText = text;
         mCodePoint = codePoint;
         mKeyCode = keyCode;
+        mX = x;
+        mY = y;
         mFlags = flags;
         mNextEvent = next;
     }
 
     public static Event createSoftwareKeypressEvent(final int codePoint, final int keyCode,
-            final boolean isKeyRepeat) {
-        return new Event(EVENT_TYPE_INPUT_KEYPRESS, null, codePoint, keyCode,
+            final int x, final int y, final boolean isKeyRepeat) {
+        return new Event(EVENT_TYPE_INPUT_KEYPRESS, null, codePoint, keyCode, x, y,
                 isKeyRepeat ? FLAG_REPEAT : FLAG_NONE, null);
     }
 
@@ -114,6 +119,8 @@ public class Event {
      */
     public static Event createSoftwareTextEvent(final CharSequence text, final int keyCode) {
         return new Event(EVENT_TYPE_SOFTWARE_GENERATED_STRING, text, NOT_A_CODE_POINT, keyCode,
+                rkr.simplekeyboard.inputmethod.latin.common.Constants.NOT_A_COORDINATE,
+                rkr.simplekeyboard.inputmethod.latin.common.Constants.NOT_A_COORDINATE,
                 FLAG_NONE, null /* next */);
     }
 

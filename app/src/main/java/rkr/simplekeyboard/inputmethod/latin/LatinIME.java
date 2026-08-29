@@ -51,9 +51,18 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InlineSuggestion;
 import android.view.inputmethod.InlineSuggestionsRequest;
 import android.view.inputmethod.InlineSuggestionsResponse;
+import android.content.ClipDescription;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
+import androidx.core.content.FileProvider;
+import androidx.core.view.inputmethod.InputConnectionCompat;
+import androidx.core.view.inputmethod.InputContentInfoCompat;
+import rkr.simplekeyboard.inputmethod.R;
 
+import java.io.File;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.Locale;
@@ -314,6 +323,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         super.onCreate();
 
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
+        mClipboardHistoryManager.setOnScreenshotChangeListener(this::updateSuggestions);
         mClipboardHistoryManager.start();
 
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
@@ -451,6 +461,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                             updateSuggestions();
                         }
                     }
+
+                    @Override
+                    public void onScreenshotSuggestionClicked(String imageUri) {
+                        if (imageUri != null && !imageUri.isEmpty()) {
+                            onImageSelected(imageUri);
+                            if (mClipboardHistoryManager != null) {
+                                mClipboardHistoryManager.markLatestScreenshotUsed();
+                            }
+                            updateSuggestions();
+                        }
+                    }
                 });
             }
 
@@ -464,6 +485,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                         }
                         hideClipboardHistory();
                         updateSuggestions();
+                    }
+
+                    @Override
+                    public void onPasteImage(String imageUri) {
+                        if (imageUri != null && !imageUri.isEmpty()) {
+                            onImageSelected(imageUri);
+                            if (mClipboardHistoryManager != null) {
+                                mClipboardHistoryManager.markLatestScreenshotUsed();
+                            }
+                            hideClipboardHistory();
+                            updateSuggestions();
+                        }
                     }
 
                     @Override
@@ -919,7 +952,20 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private boolean displayClipboardChipIfAvailable() {
-        if (mClipboardHistoryManager == null || !mSettings.getCurrent().mClipboardSuggestionsEnabled) {
+        if (mClipboardHistoryManager == null) {
+            return false;
+        }
+        if (mSettings.getCurrent().mSuggestScreenshots) {
+            final ClipboardHistoryManager.ScreenshotInfo screenshotInfo =
+                    mClipboardHistoryManager.getRecentScreenshotForSuggestion();
+            if (screenshotInfo != null) {
+                final Bitmap thumb = mClipboardHistoryManager.getScreenshotThumbnail(screenshotInfo);
+                final String uriString = screenshotInfo.fullPath != null ? screenshotInfo.fullPath : screenshotInfo.uri.toString();
+                mTopBarView.setScreenshotSuggestion(uriString, thumb);
+                return true;
+            }
+        }
+        if (!mSettings.getCurrent().mClipboardSuggestionsEnabled) {
             return false;
         }
         final String recentClip = mClipboardHistoryManager.getRecentClipForSuggestion();
@@ -928,6 +974,56 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return true;
         }
         return false;
+    }
+
+    public void onImageSelected(final String imageUri) {
+        final EditorInfo editorInfo = getCurrentInputEditorInfo();
+        if (editorInfo == null) {
+            return;
+        }
+
+        Uri contentUri;
+        if (imageUri.startsWith("content://")) {
+            contentUri = Uri.parse(imageUri);
+        } else {
+            final File file = new File(imageUri);
+            if (!file.exists()) return;
+            contentUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+        }
+
+        try {
+            final String mimeType = getContentResolver().getType(contentUri);
+            final String finalMimeType = mimeType != null ? mimeType : "image/png";
+
+            final InputContentInfoCompat inputContentInfoCompat = new InputContentInfoCompat(
+                    contentUri,
+                    new ClipDescription("Clipboard Image", new String[]{finalMimeType}),
+                    null);
+
+            final android.view.inputmethod.InputConnection ic = getCurrentInputConnection();
+            if (ic == null) {
+                return;
+            }
+
+            int flags = 0;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+                flags = InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION;
+            }
+
+            boolean inserted = false;
+            try {
+                inserted = InputConnectionCompat.commitContent(
+                        ic, editorInfo, inputContentInfoCompat, flags, null);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to commit content", e);
+            }
+
+            if (!inserted) {
+                Toast.makeText(this, R.string.image_pasting_not_supported, Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to paste image", e);
+        }
     }
 
     private boolean displayNextWordPredictionsIfAvailable(final String prevWord) {

@@ -256,6 +256,7 @@ public class TopBarView extends FrameLayout {
         final String displayText = "📋 \"" + cleanText + "\"";
 
         mCenterSlot.setText(displayText);
+        mCenterSlot.setCompoundDrawablesRelative(null, null, null, null);
         mCenterSlot.setVisibility(View.VISIBLE);
         mCenterSlot.setTypeface(Typeface.DEFAULT_BOLD);
         mCenterSlot.setAlpha(1.0f);
@@ -266,8 +267,43 @@ public class TopBarView extends FrameLayout {
         });
     }
 
+    public void setScreenshotSuggestion(final String imageUri, final android.graphics.Bitmap thumbnail) {
+        if (isExternalViewActive()) {
+            setExternalView(null);
+        }
+        if (imageUri == null || imageUri.trim().isEmpty()) {
+            setSuggestions(null, -1);
+            return;
+        }
+
+        mLeftSlot.setVisibility(View.GONE);
+        mDivider1.setVisibility(View.GONE);
+        mDivider2.setVisibility(View.GONE);
+        mRightSlot.setVisibility(View.GONE);
+
+        mCenterSlot.setText("🖼️ Screenshot");
+        if (thumbnail != null) {
+            android.graphics.drawable.BitmapDrawable thumbDrawable = new android.graphics.drawable.BitmapDrawable(getResources(), thumbnail);
+            int size = ViewUtils.dpToPx(getContext(), 24);
+            thumbDrawable.setBounds(0, 0, size, size);
+            mCenterSlot.setCompoundDrawablesRelative(thumbDrawable, null, null, null);
+            mCenterSlot.setCompoundDrawablePadding(ViewUtils.dpToPx(getContext(), 6));
+        } else {
+            mCenterSlot.setCompoundDrawablesRelative(null, null, null, null);
+        }
+        mCenterSlot.setVisibility(View.VISIBLE);
+        mCenterSlot.setTypeface(Typeface.DEFAULT_BOLD);
+        mCenterSlot.setAlpha(1.0f);
+        mCenterSlot.setOnClickListener(v -> {
+            if (mListener != null) {
+                mListener.onScreenshotSuggestionClicked(imageUri);
+            }
+        });
+    }
+
     private void resetSlot(TextView slot) {
         slot.setText("");
+        slot.setCompoundDrawablesRelative(null, null, null, null);
         slot.setVisibility(View.INVISIBLE);
         slot.setOnClickListener(null);
     }

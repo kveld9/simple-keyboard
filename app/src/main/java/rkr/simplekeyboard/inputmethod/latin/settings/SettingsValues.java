@@ -51,6 +51,7 @@ public class SettingsValues {
     public final boolean mDeleteSwipeEnabled;
     public final boolean mShowSuggestions;
     public final boolean mClipboardSuggestionsEnabled;
+    public final boolean mSuggestScreenshots;
     public final boolean mAutoCorrectionEnabled;
     public final float mAutoCorrectionThreshold;
     public final int mAutoCorrectionThresholdInt;
@@ -98,6 +99,7 @@ public class SettingsValues {
         mDeleteSwipeEnabled = Settings.readDeleteSwipeEnabled(prefs);
         mShowSuggestions = Settings.readShowSuggestions(prefs);
         mClipboardSuggestionsEnabled = Settings.readClipboardSuggestionsEnabled(prefs);
+        mSuggestScreenshots = Settings.readSuggestScreenshotsEnabled(prefs);
         mAutoCorrectionThreshold = Settings.readAutoCorrectionThreshold(prefs);
         mAutoCorrectionThresholdInt = Settings.readAutoCorrectionThresholdInt(prefs);
         mAutoCorrectionEnabled = Settings.readAutoCorrectionEnabled(prefs);

@@ -119,6 +119,9 @@
     <string name="clipboard_unpin">Unpin</string>
     <string name="clipboard_suggestions">Show clipboard suggestions</string>
     <string name="clipboard_suggestions_summary">Show recently copied items in suggestion bar</string>
+    <string name="suggest_screenshots">Show screenshots in clipboard</string>
+    <string name="suggest_screenshots_summary">Show recently taken screenshots in clipboard suggestions and history</string>
+    <string name="image_pasting_not_supported">This app does not support pasting images</string>
     <string name="clipboard_history_retention_time">History retention time</string>
     <string-array name="clipboard_retention_entries">
         <item>10 minutes</item>

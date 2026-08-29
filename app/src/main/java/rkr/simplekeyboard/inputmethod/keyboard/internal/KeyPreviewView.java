@@ -50,7 +50,7 @@ public class KeyPreviewView extends TextView {
     }
 
     public void setPreviewVisual(final Key key, final KeyboardIconsSet iconsSet,
-            final KeyDrawParams drawParams, final int backgroundColor) {
+            final KeyDrawParams drawParams, final int backgroundColor, final float cornerRadius) {
         // What we show as preview should match what we show on a key top in onDraw().
         final int iconId = key.getIconId();
         if (iconId != KeyboardIconsSet.ICON_UNDEFINED) {
@@ -66,6 +66,11 @@ public class KeyPreviewView extends TextView {
         // TODO Should take care of temporaryShiftLabel here.
         setTextAndScaleX(key.getPreviewLabel());
         setColor(backgroundColor);
+
+        final Drawable background = getBackground();
+        if (background instanceof android.graphics.drawable.GradientDrawable) {
+            ((android.graphics.drawable.GradientDrawable) background.mutate()).setCornerRadius(cornerRadius);
+        }
     }
 
     private void setTextAndScaleX(final String text) {

@@ -99,16 +99,16 @@ public final class KeyPreviewChoreographer {
     public void placeAndShowKeyPreview(final Key key, final KeyboardIconsSet iconsSet,
             final KeyDrawParams drawParams, final int[] keyboardOrigin,
             final ViewGroup placerView, final boolean withAnimation,
-            final int backgroundColor) {
+            final int backgroundColor, final float cornerRadius) {
         final KeyPreviewView keyPreviewView = getKeyPreviewView(key, placerView);
-        placeKeyPreview(key, keyPreviewView, iconsSet, drawParams, keyboardOrigin, backgroundColor);
+        placeKeyPreview(key, keyPreviewView, iconsSet, drawParams, keyboardOrigin, backgroundColor, cornerRadius);
         showKeyPreview(key, keyPreviewView, withAnimation);
     }
 
     private void placeKeyPreview(final Key key, final KeyPreviewView keyPreviewView,
             final KeyboardIconsSet iconsSet, final KeyDrawParams drawParams,
-            final int[] originCoords, final int backgroundColor) {
-        keyPreviewView.setPreviewVisual(key, iconsSet, drawParams, backgroundColor);
+            final int[] originCoords, final int backgroundColor, final float cornerRadius) {
+        keyPreviewView.setPreviewVisual(key, iconsSet, drawParams, backgroundColor, cornerRadius);
         keyPreviewView.measure(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         mParams.setGeometry(keyPreviewView);

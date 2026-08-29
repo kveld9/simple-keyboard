@@ -92,6 +92,7 @@ public class KeyboardView extends View {
     private static final float KET_TEXT_SHADOW_RADIUS_DISABLED = -1.0f;
     protected int mCustomColor = 0;
     protected KeyboardTheme mTheme;
+    protected String mKeyShape = Settings.KEY_SHAPE_ROUNDED;
     private boolean mIsRoundedShape = false;
 
     // The maximum key label width in the proportion to the key width.
@@ -180,18 +181,18 @@ public class KeyboardView extends View {
     }
 
     private void updateKeyBackgrounds(final SharedPreferences prefs) {
-        final String shape = Settings.readKeyShape(prefs);
-        mIsRoundedShape = Settings.KEY_SHAPE_ROUNDED.equals(shape);
+        mKeyShape = Settings.readKeyShape(prefs);
+        mIsRoundedShape = Settings.KEY_SHAPE_ROUNDED.equals(mKeyShape);
         final Context context = getContext();
-        if (Settings.KEY_SHAPE_ROUNDED.equals(shape)) {
+        if (Settings.KEY_SHAPE_ROUNDED.equals(mKeyShape)) {
             mKeyBackground = context.getDrawable(R.drawable.btn_keyboard_key_rounded);
             mFunctionalKeyBackground = mKeyBackground;
             mSpacebarBackground = context.getDrawable(R.drawable.btn_keyboard_spacebar_rounded);
-        } else if (Settings.KEY_SHAPE_RECTANGULAR.equals(shape)) {
+        } else if (Settings.KEY_SHAPE_RECTANGULAR.equals(mKeyShape)) {
             mKeyBackground = context.getDrawable(R.drawable.btn_keyboard_key_border);
             mFunctionalKeyBackground = mKeyBackground;
             mSpacebarBackground = context.getDrawable(R.drawable.btn_keyboard_spacebar);
-        } else if (Settings.KEY_SHAPE_BORDERLESS.equals(shape)) {
+        } else if (Settings.KEY_SHAPE_BORDERLESS.equals(mKeyShape)) {
             mKeyBackground = context.getDrawable(R.drawable.btn_keyboard_key_borderless);
             mFunctionalKeyBackground = mKeyBackground;
             mSpacebarBackground = context.getDrawable(R.drawable.btn_keyboard_spacebar_rounded);
@@ -451,8 +452,8 @@ public class KeyboardView extends View {
                 paint.setTextAlign(Align.LEFT);
             } else if (key.hasShiftedLetterHint()) {
                 // The hint label is placed at top-right corner of the key. Used mainly on tablet.
-                final float roundedInsetX = mIsRoundedShape ? (keyWidth * 0.09f) : 0.0f;
-                final float roundedInsetY = mIsRoundedShape ? (keyHeight * 0.08f) : 0.0f;
+                final float roundedInsetX = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getRoundedInsetRatioX(mKeyShape) * keyWidth;
+                final float roundedInsetY = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getRoundedInsetRatioY(mKeyShape) * keyHeight;
                 hintX = keyWidth - mKeyShiftedLetterHintPadding - roundedInsetX - labelCharWidth / 2.0f;
                 paint.getFontMetrics(mFontMetrics);
                 hintBaseline = -mFontMetrics.top + roundedInsetY;
@@ -461,8 +462,8 @@ public class KeyboardView extends View {
                 // The hint letter is placed at top-right corner of the key. Used mainly on phone.
                 final float hintDigitWidth = TypefaceUtils.getReferenceDigitWidth(paint);
                 final float hintLabelWidth = TypefaceUtils.getStringWidth(hintLabel, paint);
-                final float roundedInsetX = mIsRoundedShape ? (keyWidth * 0.09f) : 0.0f;
-                final float roundedInsetY = mIsRoundedShape ? (keyHeight * 0.08f) : 0.0f;
+                final float roundedInsetX = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getRoundedInsetRatioX(mKeyShape) * keyWidth;
+                final float roundedInsetY = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getRoundedInsetRatioY(mKeyShape) * keyHeight;
                 hintX = keyWidth - mKeyHintLetterPadding - roundedInsetX
                         - Math.max(hintDigitWidth, hintLabelWidth) / 2.0f;
                 hintBaseline = -paint.ascent() + roundedInsetY;

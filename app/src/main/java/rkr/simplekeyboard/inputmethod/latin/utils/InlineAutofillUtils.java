@@ -94,14 +94,6 @@ public final class InlineAutofillUtils {
     public static InlineContentClipView createView(final List<InlineSuggestion> inlineSuggestions,
                                                    final Context context) {
         final LinearLayout container = new LinearLayout(context);
-        for (InlineSuggestion inlineSuggestion : inlineSuggestions) {
-            inlineSuggestion.inflate(context, new Size(ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT), context.getMainExecutor(), (view) -> {
-                if (view != null)
-                    container.addView(view);
-            });
-        }
-
         final HorizontalScrollView inlineSuggestionView = new HorizontalScrollView(context);
         inlineSuggestionView.setHorizontalScrollBarEnabled(false);
         inlineSuggestionView.setOverScrollMode(View.OVER_SCROLL_NEVER);
@@ -109,6 +101,17 @@ public final class InlineAutofillUtils {
 
         final InlineContentClipView scrollableSuggestionsClip = new InlineContentClipView(context);
         scrollableSuggestionsClip.addView(inlineSuggestionView);
+
+        for (InlineSuggestion inlineSuggestion : inlineSuggestions) {
+            inlineSuggestion.inflate(context, new Size(ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT), context.getMainExecutor(), (view) -> {
+                if (view != null) {
+                    container.addView(view);
+                    scrollableSuggestionsClip.postInvalidate();
+                }
+            });
+        }
+
         return scrollableSuggestionsClip;
     }
 
@@ -142,8 +145,12 @@ public final class InlineAutofillUtils {
             getViewTreeObserver().removeOnDrawListener(mOnDrawListener);
         }
         private void clipDescendantInlineContentViews() {
-            mParentBounds.right = getWidth();
-            mParentBounds.bottom = getHeight();
+            final int width = getWidth();
+            final int height = getHeight();
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+            mParentBounds.set(0, 0, width, height);
             clipDescendantInlineContentViews(this);
         }
         private void clipDescendantInlineContentViews(@Nullable View root) {

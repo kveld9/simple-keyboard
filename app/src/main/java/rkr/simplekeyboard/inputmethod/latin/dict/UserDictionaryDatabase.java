@@ -93,57 +93,49 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) {
-            db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_BIGRAMS + " (" +
-                    COL_BIGRAM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    COL_PREV_WORD + " TEXT, " +
-                    COL_BIGRAM_WORD + " TEXT, " +
-                    COL_BIGRAM_FREQ + " INTEGER DEFAULT " + BASE_LEARNED_FREQUENCY + ", " +
-                    COL_BIGRAM_LAST_USED + " INTEGER, " +
-                    "UNIQUE(" + COL_PREV_WORD + ", " + COL_BIGRAM_WORD + "))");
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_bigram_prev ON " + TABLE_BIGRAMS + " (" + COL_PREV_WORD + ")");
+            upgradeToVersion2(db);
         }
-
         if (oldVersion < 3) {
-            final long now = System.currentTimeMillis();
+            upgradeToVersion3(db);
+        }
+    }
 
-            // 1. Upgrade user_words
-            if (!columnExists(db, TABLE_NAME, COL_FREQ)) {
-                db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COL_FREQ + " INTEGER DEFAULT " + BASE_LEARNED_FREQUENCY);
-                if (columnExists(db, TABLE_NAME, "frequency")) {
-                    db.execSQL("UPDATE " + TABLE_NAME + " SET " + COL_FREQ + " = frequency WHERE " + COL_FREQ + " IS NULL");
-                }
-            }
-            if (!columnExists(db, TABLE_NAME, COL_LAST_USED)) {
-                db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COL_LAST_USED + " INTEGER");
-                if (columnExists(db, TABLE_NAME, "timestamp")) {
-                    db.execSQL("UPDATE " + TABLE_NAME + " SET " + COL_LAST_USED + " = timestamp WHERE " + COL_LAST_USED + " IS NULL");
-                }
-                db.execSQL("UPDATE " + TABLE_NAME + " SET " + COL_LAST_USED + " = " + now + " WHERE " + COL_LAST_USED + " IS NULL");
-            }
-            if (!columnExists(db, TABLE_NAME, COL_CREATED_AT)) {
-                db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COL_CREATED_AT + " INTEGER");
-                if (columnExists(db, TABLE_NAME, "timestamp")) {
-                    db.execSQL("UPDATE " + TABLE_NAME + " SET " + COL_CREATED_AT + " = timestamp WHERE " + COL_CREATED_AT + " IS NULL");
-                }
-                db.execSQL("UPDATE " + TABLE_NAME + " SET " + COL_CREATED_AT + " = " + now + " WHERE " + COL_CREATED_AT + " IS NULL");
-            }
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_last_used ON " + TABLE_NAME + " (" + COL_LAST_USED + ")");
+    private void upgradeToVersion2(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_BIGRAMS + " (" +
+                COL_BIGRAM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COL_PREV_WORD + " TEXT, " +
+                COL_BIGRAM_WORD + " TEXT, " +
+                COL_BIGRAM_FREQ + " INTEGER DEFAULT " + BASE_LEARNED_FREQUENCY + ", " +
+                COL_BIGRAM_LAST_USED + " INTEGER, " +
+                "UNIQUE(" + COL_PREV_WORD + ", " + COL_BIGRAM_WORD + "))");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_bigram_prev ON " + TABLE_BIGRAMS + " (" + COL_PREV_WORD + ")");
+    }
 
-            // 2. Upgrade user_bigrams
-            if (!columnExists(db, TABLE_BIGRAMS, COL_BIGRAM_FREQ)) {
-                db.execSQL("ALTER TABLE " + TABLE_BIGRAMS + " ADD COLUMN " + COL_BIGRAM_FREQ + " INTEGER DEFAULT " + BASE_LEARNED_FREQUENCY);
-                if (columnExists(db, TABLE_BIGRAMS, "frequency")) {
-                    db.execSQL("UPDATE " + TABLE_BIGRAMS + " SET " + COL_BIGRAM_FREQ + " = frequency WHERE " + COL_BIGRAM_FREQ + " IS NULL");
-                }
+    private void upgradeToVersion3(SQLiteDatabase db) {
+        final long now = System.currentTimeMillis();
+        final String nowStr = String.valueOf(now);
+
+        // 1. Upgrade user_words
+        ensureColumn(db, TABLE_NAME, COL_FREQ, "INTEGER DEFAULT " + BASE_LEARNED_FREQUENCY, "frequency", null);
+        ensureColumn(db, TABLE_NAME, COL_LAST_USED, "INTEGER", "timestamp", nowStr);
+        ensureColumn(db, TABLE_NAME, COL_CREATED_AT, "INTEGER", "timestamp", nowStr);
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_last_used ON " + TABLE_NAME + " (" + COL_LAST_USED + ")");
+
+        // 2. Upgrade user_bigrams
+        ensureColumn(db, TABLE_BIGRAMS, COL_BIGRAM_FREQ, "INTEGER DEFAULT " + BASE_LEARNED_FREQUENCY, "frequency", null);
+        ensureColumn(db, TABLE_BIGRAMS, COL_BIGRAM_LAST_USED, "INTEGER", "timestamp", nowStr);
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_bigram_last_used ON " + TABLE_BIGRAMS + " (" + COL_BIGRAM_LAST_USED + ")");
+    }
+
+    private static void ensureColumn(SQLiteDatabase db, String table, String colName, String typeDef, String legacyCol, String defaultVal) {
+        if (!columnExists(db, table, colName)) {
+            db.execSQL("ALTER TABLE " + table + " ADD COLUMN " + colName + " " + typeDef);
+            if (legacyCol != null && columnExists(db, table, legacyCol)) {
+                db.execSQL("UPDATE " + table + " SET " + colName + " = " + legacyCol + " WHERE " + colName + " IS NULL");
             }
-            if (!columnExists(db, TABLE_BIGRAMS, COL_BIGRAM_LAST_USED)) {
-                db.execSQL("ALTER TABLE " + TABLE_BIGRAMS + " ADD COLUMN " + COL_BIGRAM_LAST_USED + " INTEGER");
-                if (columnExists(db, TABLE_BIGRAMS, "timestamp")) {
-                    db.execSQL("UPDATE " + TABLE_BIGRAMS + " SET " + COL_BIGRAM_LAST_USED + " = timestamp WHERE " + COL_BIGRAM_LAST_USED + " IS NULL");
-                }
-                db.execSQL("UPDATE " + TABLE_BIGRAMS + " SET " + COL_BIGRAM_LAST_USED + " = " + now + " WHERE " + COL_BIGRAM_LAST_USED + " IS NULL");
+            if (defaultVal != null) {
+                db.execSQL("UPDATE " + table + " SET " + colName + " = " + defaultVal + " WHERE " + colName + " IS NULL");
             }
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_bigram_last_used ON " + TABLE_BIGRAMS + " (" + COL_BIGRAM_LAST_USED + ")");
         }
     }
 
@@ -163,6 +155,32 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
         return false;
     }
 
+    private static class WordData {
+        final int freq;
+        final long createdAt;
+        WordData(int freq, long createdAt) {
+            this.freq = freq;
+            this.createdAt = createdAt;
+        }
+    }
+
+    private WordData queryExistingWordData(SQLiteDatabase db, String word, long now) {
+        try (Cursor cursor = db.query(TABLE_NAME, new String[]{COL_FREQ, COL_CREATED_AT}, COL_WORD + "=?",
+                new String[]{word}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int freq = Math.min(MAX_LEARNED_FREQUENCY, cursor.getInt(0) + FREQUENCY_STEP);
+                long createdAt = cursor.isNull(1) ? now : cursor.getLong(1);
+                return new WordData(freq, createdAt);
+            }
+        }
+        return new WordData(BASE_LEARNED_FREQUENCY, now);
+    }
+
+    private static void pruneTable(SQLiteDatabase db, String table, String idCol, String orderCol, int limit) {
+        db.execSQL("DELETE FROM " + table + " WHERE " + idCol + " NOT IN (" +
+                "SELECT " + idCol + " FROM " + table + " ORDER BY " + orderCol + " DESC LIMIT " + limit + ")");
+    }
+
     public synchronized void learnWord(final String rawWord) {
         if (rawWord == null) return;
         final String word = rawWord.trim();
@@ -175,31 +193,16 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             db.beginTransaction();
             try {
                 final long now = System.currentTimeMillis();
-                int freq = BASE_LEARNED_FREQUENCY;
-                long createdAt = now;
-
-                try (Cursor cursor = db.query(TABLE_NAME, new String[]{COL_FREQ, COL_CREATED_AT}, COL_WORD + "=?",
-                        new String[]{word}, null, null, null)) {
-                    if (cursor != null && cursor.moveToFirst()) {
-                        freq = Math.min(MAX_LEARNED_FREQUENCY, cursor.getInt(0) + FREQUENCY_STEP);
-                        if (!cursor.isNull(1)) {
-                            createdAt = cursor.getLong(1);
-                        }
-                    }
-                }
+                final WordData data = queryExistingWordData(db, word, now);
 
                 ContentValues values = new ContentValues();
                 values.put(COL_WORD, word);
-                values.put(COL_FREQ, freq);
+                values.put(COL_FREQ, data.freq);
                 values.put(COL_LAST_USED, now);
-                values.put(COL_CREATED_AT, createdAt);
+                values.put(COL_CREATED_AT, data.createdAt);
 
                 db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
-
-                // Prune if exceeds max limit
-                db.execSQL("DELETE FROM " + TABLE_NAME + " WHERE " + COL_ID + " NOT IN (" +
-                        "SELECT " + COL_ID + " FROM " + TABLE_NAME + " ORDER BY " + COL_LAST_USED + " DESC LIMIT " + MAX_LEARNED_WORDS + ")");
-
+                pruneTable(db, TABLE_NAME, COL_ID, COL_LAST_USED, MAX_LEARNED_WORDS);
                 db.setTransactionSuccessful();
             } finally {
                 db.endTransaction();
@@ -247,11 +250,26 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
         return loadUserWords();
     }
 
+    private int queryExistingBigramFrequency(SQLiteDatabase db, String prevWord, String word) {
+        try (Cursor cursor = db.query(TABLE_BIGRAMS, new String[]{COL_BIGRAM_FREQ},
+                COL_PREV_WORD + "=? AND " + COL_BIGRAM_WORD + "=?",
+                new String[]{prevWord, word}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                return Math.min(MAX_LEARNED_FREQUENCY, cursor.getInt(0) + FREQUENCY_STEP);
+            }
+        }
+        return BASE_LEARNED_FREQUENCY;
+    }
+
+    private static boolean isValidBigramWord(String word) {
+        return !word.isEmpty() && word.length() <= 64;
+    }
+
     public synchronized void learnBigram(final String rawPrevWord, final String rawWord) {
         if (rawPrevWord == null || rawWord == null) return;
         final String prevWord = rawPrevWord.trim();
         final String word = rawWord.trim();
-        if (prevWord.isEmpty() || word.isEmpty() || prevWord.length() > 64 || word.length() > 64) {
+        if (!isValidBigramWord(prevWord) || !isValidBigramWord(word)) {
             return;
         }
 
@@ -260,14 +278,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             db.beginTransaction();
             try {
                 final long now = System.currentTimeMillis();
-                int freq = BASE_LEARNED_FREQUENCY;
-                try (Cursor cursor = db.query(TABLE_BIGRAMS, new String[]{COL_BIGRAM_FREQ},
-                        COL_PREV_WORD + "=? AND " + COL_BIGRAM_WORD + "=?",
-                        new String[]{prevWord, word}, null, null, null)) {
-                    if (cursor != null && cursor.moveToFirst()) {
-                        freq = Math.min(MAX_LEARNED_FREQUENCY, cursor.getInt(0) + FREQUENCY_STEP);
-                    }
-                }
+                final int freq = queryExistingBigramFrequency(db, prevWord, word);
 
                 ContentValues values = new ContentValues();
                 values.put(COL_PREV_WORD, prevWord);
@@ -276,11 +287,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
                 values.put(COL_BIGRAM_LAST_USED, now);
 
                 db.insertWithOnConflict(TABLE_BIGRAMS, null, values, SQLiteDatabase.CONFLICT_REPLACE);
-
-                // Prune if exceeds max limit
-                db.execSQL("DELETE FROM " + TABLE_BIGRAMS + " WHERE " + COL_BIGRAM_ID + " NOT IN (" +
-                        "SELECT " + COL_BIGRAM_ID + " FROM " + TABLE_BIGRAMS + " ORDER BY " + COL_BIGRAM_LAST_USED + " DESC LIMIT " + MAX_LEARNED_BIGRAMS + ")");
-
+                pruneTable(db, TABLE_BIGRAMS, COL_BIGRAM_ID, COL_BIGRAM_LAST_USED, MAX_LEARNED_BIGRAMS);
                 db.setTransactionSuccessful();
             } finally {
                 db.endTransaction();
@@ -366,59 +373,56 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
         return loadUserBigrams();
     }
 
+    private void fetchWordsFromQuery(final String table, final String column, final String selection,
+                                     final String[] selectionArgs, final String orderBy, final int queryLimit,
+                                     final int targetLimit, final Set<String> added, final List<CharSequence> results) {
+        try {
+            final SQLiteDatabase db = getReadableDatabase();
+            try (Cursor cursor = db.query(table, new String[]{column}, selection, selectionArgs,
+                    null, null, orderBy, String.valueOf(queryLimit))) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    do {
+                        final String w = cursor.getString(0);
+                        if (w != null && added.add(w.toLowerCase())) {
+                            results.add(w);
+                        }
+                    } while (cursor.moveToNext() && results.size() < targetLimit);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to query words from " + table, e);
+        }
+    }
+
+    private static void appendDefaultFallbacks(final int limit, final Set<String> added, final List<CharSequence> results) {
+        final String[] defaultFallback = {"the", "to", "and", "a", "in", "is", "it", "you", "that", "he", "que", "de", "no", "la", "el", "es", "en"};
+        for (String w : defaultFallback) {
+            if (results.size() >= limit) break;
+            if (added.add(w.toLowerCase())) {
+                results.add(w);
+            }
+        }
+    }
+
     public synchronized List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
         final List<CharSequence> results = new ArrayList<>(Math.max(0, limit));
         if (limit <= 0) return results;
         final Set<String> added = new HashSet<>();
 
         if (prevWord != null && !prevWord.trim().isEmpty()) {
-            try {
-                final SQLiteDatabase db = getReadableDatabase();
-                try (Cursor cursor = db.query(TABLE_BIGRAMS, new String[]{COL_BIGRAM_WORD},
-                        COL_PREV_WORD + "=?", new String[]{prevWord.trim()}, null, null,
-                        COL_BIGRAM_FREQ + " DESC, " + COL_BIGRAM_LAST_USED + " DESC", String.valueOf(limit))) {
-                    if (cursor != null && cursor.moveToFirst()) {
-                        do {
-                            final String w = cursor.getString(0);
-                            if (w != null && added.add(w.toLowerCase())) {
-                                results.add(w);
-                            }
-                        } while (cursor.moveToNext() && results.size() < limit);
-                    }
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Failed to query next word predictions for: " + prevWord, e);
-            }
+            fetchWordsFromQuery(TABLE_BIGRAMS, COL_BIGRAM_WORD, COL_PREV_WORD + "=?",
+                    new String[]{prevWord.trim()}, COL_BIGRAM_FREQ + " DESC, " + COL_BIGRAM_LAST_USED + " DESC",
+                    limit, limit, added, results);
         }
 
         if (results.size() < limit) {
-            try {
-                final SQLiteDatabase db = getReadableDatabase();
-                try (Cursor cursor = db.query(TABLE_NAME, new String[]{COL_WORD},
-                        null, null, null, null,
-                        COL_FREQ + " DESC, " + COL_LAST_USED + " DESC", String.valueOf(limit * 2))) {
-                    if (cursor != null && cursor.moveToFirst()) {
-                        do {
-                            final String w = cursor.getString(0);
-                            if (w != null && added.add(w.toLowerCase())) {
-                                results.add(w);
-                            }
-                        } while (cursor.moveToNext() && results.size() < limit);
-                    }
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Failed to query fallback user words", e);
-            }
+            fetchWordsFromQuery(TABLE_NAME, COL_WORD, null, null,
+                    COL_FREQ + " DESC, " + COL_LAST_USED + " DESC",
+                    limit * 2, limit, added, results);
         }
 
         if (results.size() < limit) {
-            final String[] defaultFallback = {"the", "to", "and", "a", "in", "is", "it", "you", "that", "he", "que", "de", "no", "la", "el", "es", "en"};
-            for (String w : defaultFallback) {
-                if (added.add(w.toLowerCase())) {
-                    results.add(w);
-                    if (results.size() >= limit) break;
-                }
-            }
+            appendDefaultFallbacks(limit, added, results);
         }
 
         return results;

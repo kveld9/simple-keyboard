@@ -69,23 +69,9 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         if (mClipboardManager != null) {
             try {
                 if (mClipboardManager.hasPrimaryClip()) {
-                    ClipData clip = mClipboardManager.getPrimaryClip();
-                    if (clip != null && clip.getItemCount() > 0) {
-                        CharSequence text = clip.getItemAt(0).getText();
-                        if (!TextUtils.isEmpty(text)) {
-                            final String currentText = text.toString();
-                            if (!currentText.equals(mLastText)) {
-                                mLastText = currentText;
-                                mLastTextTime = System.currentTimeMillis();
-                                mLastTextUsed = false;
-                                final long retentionMinutes = getRetentionMinutes();
-                                mExecutor.execute(() -> {
-                                    mDatabase.deleteExpiredClips(retentionMinutes);
-                                    mDatabase.insertClip(currentText);
-                                });
-                            }
-                            return currentText;
-                        }
+                    final String currentText = processPrimaryClip(mClipboardManager.getPrimaryClip());
+                    if (currentText != null) {
+                        return currentText;
                     }
                 }
             } catch (Exception e) {
@@ -93,6 +79,35 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
             }
         }
         return mLastText;
+    }
+
+    private String processPrimaryClip(ClipData clip) {
+        if (clip == null || clip.getItemCount() == 0) {
+            return null;
+        }
+        ClipData.Item item = clip.getItemAt(0);
+        CharSequence text = item != null ? item.coerceToText(mContext) : null;
+        if (TextUtils.isEmpty(text)) {
+            return null;
+        }
+        final String currentText = text.toString();
+        storeClipTextIfChanged(currentText);
+        return currentText;
+    }
+
+    private void storeClipTextIfChanged(final String currentText) {
+        if (!currentText.equals(mLastText)) {
+            mLastText = currentText;
+            mLastTextTime = System.currentTimeMillis();
+            mLastTextUsed = false;
+            final long retentionMinutes = getRetentionMinutes();
+            mExecutor.execute(() -> {
+                mDatabase.deleteExpiredClips(retentionMinutes);
+                mDatabase.insertClip(currentText);
+            });
+        } else if (mLastTextTime <= 0) {
+            mLastTextTime = System.currentTimeMillis();
+        }
     }
 
     public String getRecentClipForSuggestion() {
@@ -143,23 +158,8 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         if (mClipboardManager == null) return;
 
         try {
-            if (!mClipboardManager.hasPrimaryClip()) return;
-            ClipData clip = mClipboardManager.getPrimaryClip();
-            if (clip != null && clip.getItemCount() > 0) {
-                CharSequence text = clip.getItemAt(0).getText();
-                if (!TextUtils.isEmpty(text)) {
-                    final String currentText = text.toString();
-                    if (!currentText.equals(mLastText)) {
-                        mLastText = currentText;
-                        mLastTextTime = System.currentTimeMillis();
-                        mLastTextUsed = false;
-                        final long retentionMinutes = getRetentionMinutes();
-                        mExecutor.execute(() -> {
-                            mDatabase.deleteExpiredClips(retentionMinutes);
-                            mDatabase.insertClip(currentText);
-                        });
-                    }
-                }
+            if (mClipboardManager.hasPrimaryClip()) {
+                processPrimaryClip(mClipboardManager.getPrimaryClip());
             }
         } catch (Exception e) {
             Log.w(TAG, "Error handling clipboard change", e);

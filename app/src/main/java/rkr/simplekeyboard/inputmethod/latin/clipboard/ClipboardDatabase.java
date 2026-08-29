@@ -101,30 +101,12 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     }
 
     private void cleanupOldClips(SQLiteDatabase db) {
-        Cursor cursor = null;
         try {
-            cursor = db.query(TABLE_NAME, new String[]{COL_ID}, COL_PINNED + "=0",
-                    null, null, null, COL_TIMESTAMP + " DESC");
-            if (cursor != null && cursor.getCount() > MAX_CLIPS) {
-                if (cursor.moveToPosition(MAX_CLIPS - 1)) {
-                    StringBuilder inClause = new StringBuilder();
-                    boolean first = true;
-                    while (cursor.moveToNext()) {
-                        if (!first) inClause.append(",");
-                        inClause.append(cursor.getLong(0));
-                        first = false;
-                    }
-                    if (inClause.length() > 0) {
-                        db.delete(TABLE_NAME, COL_ID + " IN (" + inClause.toString() + ")", null);
-                    }
-                }
-            }
+            db.execSQL("DELETE FROM " + TABLE_NAME + " WHERE " + COL_PINNED + "=0 AND "
+                    + COL_ID + " NOT IN (SELECT " + COL_ID + " FROM " + TABLE_NAME
+                    + " WHERE " + COL_PINNED + "=0 ORDER BY " + COL_TIMESTAMP + " DESC LIMIT " + MAX_CLIPS + ")");
         } catch (Exception e) {
             Log.e(TAG, "Error cleaning up old clips", e);
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
         }
     }
 

@@ -79,17 +79,24 @@ public final class KeyPreviewChoreographer {
             return;
         }
         final Object tag = keyPreviewView.getTag();
-        if (withAnimation) {
-            if (tag instanceof KeyPreviewAnimators) {
-                final KeyPreviewAnimators animators = (KeyPreviewAnimators)tag;
-                animators.startDismiss();
-                return;
-            }
+        if (withAnimation && dismissWithAnimation(tag)) {
+            return;
         }
-        // Dismiss preview without animation.
+        dismissImmediately(key, keyPreviewView, tag);
+    }
+
+    private boolean dismissWithAnimation(final Object tag) {
+        if (tag instanceof KeyPreviewAnimators) {
+            ((KeyPreviewAnimators) tag).startDismiss();
+            return true;
+        }
+        return false;
+    }
+
+    private void dismissImmediately(final Key key, final KeyPreviewView keyPreviewView, final Object tag) {
         mShowingKeyPreviewViews.remove(key);
         if (tag instanceof Animator) {
-            ((Animator)tag).cancel();
+            ((Animator) tag).cancel();
         }
         keyPreviewView.setTag(null);
         keyPreviewView.setVisibility(View.INVISIBLE);

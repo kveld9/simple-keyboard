@@ -247,4 +247,117 @@ public final class StringUtils {
         return codePointCount(titleCaseLabel) == 1
                 ? titleCaseLabel.codePointAt(0) : Constants.CODE_UNSPECIFIED;
     }
+
+    private static final char[] ACCENT_MAP = new char[512];
+
+    static {
+        for (int i = 0; i < ACCENT_MAP.length; i++) {
+            ACCENT_MAP[i] = (char) i;
+        }
+        // Lowercase vowels and accented characters
+        ACCENT_MAP['á'] = 'a';
+        ACCENT_MAP['à'] = 'a';
+        ACCENT_MAP['ä'] = 'a';
+        ACCENT_MAP['â'] = 'a';
+        ACCENT_MAP['ã'] = 'a';
+        ACCENT_MAP['é'] = 'e';
+        ACCENT_MAP['è'] = 'e';
+        ACCENT_MAP['ë'] = 'e';
+        ACCENT_MAP['ê'] = 'e';
+        ACCENT_MAP['í'] = 'i';
+        ACCENT_MAP['ì'] = 'i';
+        ACCENT_MAP['ï'] = 'i';
+        ACCENT_MAP['î'] = 'i';
+        ACCENT_MAP['ó'] = 'o';
+        ACCENT_MAP['ò'] = 'o';
+        ACCENT_MAP['ö'] = 'o';
+        ACCENT_MAP['ô'] = 'o';
+        ACCENT_MAP['õ'] = 'o';
+        ACCENT_MAP['ú'] = 'u';
+        ACCENT_MAP['ù'] = 'u';
+        ACCENT_MAP['ü'] = 'u';
+        ACCENT_MAP['û'] = 'u';
+        ACCENT_MAP['ñ'] = 'n';
+        ACCENT_MAP['ç'] = 'c';
+        // Uppercase vowels and accented characters
+        ACCENT_MAP['Á'] = 'A';
+        ACCENT_MAP['À'] = 'A';
+        ACCENT_MAP['Ä'] = 'A';
+        ACCENT_MAP['Â'] = 'A';
+        ACCENT_MAP['Ã'] = 'A';
+        ACCENT_MAP['É'] = 'E';
+        ACCENT_MAP['È'] = 'E';
+        ACCENT_MAP['Ë'] = 'E';
+        ACCENT_MAP['Ê'] = 'E';
+        ACCENT_MAP['Í'] = 'I';
+        ACCENT_MAP['Ì'] = 'I';
+        ACCENT_MAP['Ï'] = 'I';
+        ACCENT_MAP['Î'] = 'I';
+        ACCENT_MAP['Ó'] = 'O';
+        ACCENT_MAP['Ò'] = 'O';
+        ACCENT_MAP['Ö'] = 'O';
+        ACCENT_MAP['Ô'] = 'O';
+        ACCENT_MAP['Õ'] = 'O';
+        ACCENT_MAP['Ú'] = 'U';
+        ACCENT_MAP['Ù'] = 'U';
+        ACCENT_MAP['Ü'] = 'U';
+        ACCENT_MAP['Û'] = 'U';
+        ACCENT_MAP['Ñ'] = 'N';
+        ACCENT_MAP['Ç'] = 'C';
+    }
+
+    public static char removeAccents(final char c) {
+        return (c < ACCENT_MAP.length) ? ACCENT_MAP[c] : c;
+    }
+
+    public static String stripAccents(final String s) {
+        if (s == null) {
+            return "";
+        }
+        final StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            sb.append(removeAccents(s.charAt(i)));
+        }
+        return sb.toString();
+    }
+
+    public static boolean isAllUpperCase(final String s) {
+        if (s == null || s.length() <= 1) {
+            return false;
+        }
+        boolean hasLetter = false;
+        for (int i = 0; i < s.length(); i++) {
+            final char c = s.charAt(i);
+            if (Character.isLowerCase(c)) {
+                return false;
+            }
+            if (Character.isLetter(c)) {
+                hasLetter = true;
+            }
+        }
+        return hasLetter;
+    }
+
+    public static String applyCasing(final String typed, final String suggestion) {
+        if (typed == null || suggestion == null || suggestion.isEmpty()) {
+            return suggestion;
+        }
+        if (isAllUpperCase(typed)) {
+            return suggestion.toUpperCase();
+        }
+        if (Character.isUpperCase(typed.charAt(0))) {
+            return capitalizeFirst(suggestion);
+        }
+        return suggestion.toLowerCase();
+    }
+
+    public static String capitalizeFirst(final String s) {
+        if (s == null || s.isEmpty()) {
+            return s;
+        }
+        if (s.length() == 1) {
+            return s.toUpperCase();
+        }
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
+    }
 }

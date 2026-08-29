@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
+
 /**
  * Lightweight in-memory Trie dictionary with Accent-Folding, Physical Proximity scoring,
  * Long Word correction bonuses, and Bigram context support.
@@ -169,25 +171,7 @@ public final class PrefixDictionary {
     }
 
     public static String stripAccents(final String s) {
-        if (s == null) return "";
-        final StringBuilder sb = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            final char c = s.charAt(i);
-            switch (c) {
-                case 'á': case 'à': case 'ä': case 'â': case 'ã': sb.append('a'); break;
-                case 'é': case 'è': case 'ë': case 'ê': sb.append('e'); break;
-                case 'í': case 'ì': case 'ï': case 'î': sb.append('i'); break;
-                case 'ó': case 'ò': case 'ö': case 'ô': case 'õ': sb.append('o'); break;
-                case 'ú': case 'ù': case 'ü': case 'û': sb.append('u'); break;
-                case 'Á': case 'À': case 'Ä': case 'Â': case 'Ã': sb.append('A'); break;
-                case 'É': case 'È': case 'Ë': case 'Ê': sb.append('E'); break;
-                case 'Í': case 'Ì': case 'Ï': case 'Î': sb.append('I'); break;
-                case 'Ó': case 'Ò': case 'Ö': case 'Ô': case 'Õ': sb.append('O'); break;
-                case 'Ú': case 'Ù': case 'Ü': case 'Û': sb.append('U'); break;
-                default: sb.append(c); break;
-            }
-        }
-        return sb.toString();
+        return StringUtils.stripAccents(s);
     }
 
     /**
@@ -455,42 +439,63 @@ public final class PrefixDictionary {
 
         final String trimmed = prefix.trim();
         final String normPrefix = stripAccents(trimmed.toLowerCase());
-        TrieNode current = mRoot;
-
-        for (int i = 0; i < normPrefix.length(); i++) {
-            final char ch = normPrefix.charAt(i);
-            current = current.getChild(ch);
-            if (current == null) {
-                return Collections.emptyList();
-            }
+        final TrieNode current = findPrefixNode(normPrefix);
+        if (current == null) {
+            return Collections.emptyList();
         }
 
         final List<ScoredWord> rawWords = new ArrayList<>();
         collectWords(current, rawWords, 40);
 
+        final List<ScoredWord> scoredWords = scorePrefixWords(rawWords, normPrefix, prevWord);
+        return formatSuggestions(scoredWords, trimmed, maxCount);
+    }
+
+    private TrieNode findPrefixNode(final String normPrefix) {
+        TrieNode current = mRoot;
+        for (int i = 0; i < normPrefix.length(); i++) {
+            current = current.getChild(normPrefix.charAt(i));
+            if (current == null) {
+                return null;
+            }
+        }
+        return current;
+    }
+
+    private List<ScoredWord> scorePrefixWords(final List<ScoredWord> rawWords, final String normPrefix, final String prevWord) {
         final List<ScoredWord> scoredWords = new ArrayList<>(rawWords.size());
         for (ScoredWord sw : rawWords) {
-            float score = sw.frequency;
-            final boolean isExact = stripAccents(sw.word.toLowerCase()).equals(normPrefix);
-            if (isExact) {
-                score += 500.0f;
-            }
-            if (prevWord != null && !prevWord.isEmpty()) {
-                final int bigramFreq = getBigramFrequency(prevWord, sw.word);
-                if (bigramFreq > 0) {
-                    score += bigramFreq * 2.0f;
-                }
-            }
+            final float score = calcPrefixWordScore(sw, normPrefix, prevWord);
             scoredWords.add(new ScoredWord(sw.word, sw.frequency, score));
         }
-
         Collections.sort(scoredWords);
+        return scoredWords;
+    }
 
+    private float calcPrefixWordScore(final ScoredWord sw, final String normPrefix, final String prevWord) {
+        float score = sw.frequency;
+        if (stripAccents(sw.word.toLowerCase()).equals(normPrefix)) {
+            score += 500.0f;
+        }
+        return score + getPrefixBigramBonus(prevWord, sw.word);
+    }
+
+    private float getPrefixBigramBonus(final String prevWord, final String word) {
+        if (prevWord == null || prevWord.isEmpty()) {
+            return 0.0f;
+        }
+        final int bigramFreq = getBigramFrequency(prevWord, word);
+        return bigramFreq > 0 ? bigramFreq * 2.0f : 0.0f;
+    }
+
+    private List<CharSequence> formatSuggestions(final List<ScoredWord> scoredWords, final String originalPrefix, final int maxCount) {
         final List<CharSequence> results = new ArrayList<>();
         final Set<String> added = new HashSet<>();
-        for (int i = 0; i < scoredWords.size() && results.size() < maxCount; i++) {
-            final String word = scoredWords.get(i).word;
-            final String formatted = applyCasing(trimmed, word);
+        for (ScoredWord sw : scoredWords) {
+            if (results.size() >= maxCount) {
+                break;
+            }
+            final String formatted = applyCasing(originalPrefix, sw.word);
             if (added.add(formatted.toLowerCase())) {
                 results.add(formatted);
             }
@@ -560,33 +565,11 @@ public final class PrefixDictionary {
     }
 
     public static boolean isAllUpperCase(final String s) {
-        if (s == null || s.length() <= 1) {
-            return false;
-        }
-        boolean hasLetter = false;
-        for (int i = 0; i < s.length(); i++) {
-            final char c = s.charAt(i);
-            if (Character.isLetter(c)) {
-                hasLetter = true;
-                if (!Character.isUpperCase(c)) {
-                    return false;
-                }
-            }
-        }
-        return hasLetter;
+        return StringUtils.isAllUpperCase(s);
     }
 
     public static String applyCasing(final String typed, final String suggestion) {
-        if (typed == null || suggestion == null || suggestion.isEmpty()) {
-            return suggestion;
-        }
-        if (isAllUpperCase(typed)) {
-            return suggestion.toUpperCase();
-        } else if (typed.length() > 0 && Character.isUpperCase(typed.charAt(0))) {
-            return Character.toUpperCase(suggestion.charAt(0)) + (suggestion.length() > 1 ? suggestion.substring(1).toLowerCase() : "");
-        } else {
-            return suggestion.toLowerCase();
-        }
+        return StringUtils.applyCasing(typed, suggestion);
     }
 
     public synchronized boolean containsWord(final String word) {
@@ -638,10 +621,7 @@ public final class PrefixDictionary {
     }
 
     public synchronized CharSequence getBestCorrection(final String word, final String prevWord) {
-        if (mAutoCorrectionThreshold <= 0.0f) {
-            return null;
-        }
-        if (word == null || word.isEmpty() || shouldSkipAutoCorrection(word)) {
+        if (isSkipCorrection(word)) {
             return null;
         }
 
@@ -652,69 +632,106 @@ public final class PrefixDictionary {
         }
 
         final boolean isWordValid = containsWord(word);
-        if (isWordValid && (prevWord == null || prevWord.isEmpty())) {
+        if (shouldSkipValidWord(isWordValid, prevWord)) {
             return null;
         }
 
-        // 2. Fuzzy search for typo corrections
-        if (word.length() <= 1) {
+        return getBestFuzzyCorrection(word, prevWord, isWordValid);
+    }
+
+    private boolean isSkipCorrection(final String word) {
+        return mAutoCorrectionThreshold <= 0.0f || word == null || word.length() <= 1 || shouldSkipAutoCorrection(word);
+    }
+
+    private boolean shouldSkipValidWord(final boolean isWordValid, final String prevWord) {
+        return isWordValid && (prevWord == null || prevWord.isEmpty());
+    }
+
+    private CharSequence getBestFuzzyCorrection(final String word, final String prevWord, final boolean isWordValid) {
+        final String norm = stripAccents(word.toLowerCase());
+        final ScoredWord best = findBestFuzzyCandidate(norm, prevWord);
+        if (best == null || !isValidCorrection(best, word, norm, prevWord, isWordValid)) {
             return null;
         }
-        final String lower = word.toLowerCase();
-        final String norm = stripAccents(lower);
-        final int maxDistance = (mAutoCorrectionThreshold >= 3.0f && norm.length() >= 5) ? 2 : 1;
+        return applyCasing(word, best.word);
+    }
+
+    private ScoredWord findBestFuzzyCandidate(final String norm, final String prevWord) {
+        final List<ScoredWord> candidates = searchAndScoreFuzzyCandidates(norm, prevWord);
+        return candidates.isEmpty() ? null : candidates.get(0);
+    }
+
+    private List<ScoredWord> searchAndScoreFuzzyCandidates(final String norm, final String prevWord) {
+        final int maxDistance = getMaxFuzzyDistance(norm.length());
         final List<ScoredWord> rawCandidates = new ArrayList<>();
         searchFuzzy(mRoot, new StringBuilder(), norm, 0, maxDistance, rawCandidates);
-
         if (rawCandidates.isEmpty()) {
-            return null;
+            return Collections.emptyList();
         }
+        return scoreFuzzyCandidates(rawCandidates, norm, prevWord);
+    }
 
+    private int getMaxFuzzyDistance(final int normLen) {
+        return (mAutoCorrectionThreshold >= 3.0f && normLen >= 5) ? 2 : 1;
+    }
+
+    private List<ScoredWord> scoreFuzzyCandidates(final List<ScoredWord> rawCandidates, final String norm, final String prevWord) {
         final List<ScoredWord> candidates = new ArrayList<>(rawCandidates.size());
         for (ScoredWord cw : rawCandidates) {
-            float score = calcNormalizedScore(norm, cw.word, cw.frequency);
-            if (prevWord != null && !prevWord.isEmpty()) {
-                final int bigramFreq = getBigramFrequency(prevWord, cw.word);
-                if (bigramFreq > 0) {
-                    score += bigramFreq * 1.5f;
-                }
-            }
+            final float score = calcFuzzyCandidateScore(norm, cw.word, cw.frequency, prevWord);
             candidates.add(new ScoredWord(cw.word, cw.frequency, score));
         }
-
         Collections.sort(candidates);
-        final ScoredWord best = candidates.get(0);
+        return candidates;
+    }
 
-        final float minCandidateScore;
-        final float validWordDelta;
+    private float calcFuzzyCandidateScore(final String norm, final String candidateWord, final int candidateFreq, final String prevWord) {
+        float score = calcNormalizedScore(norm, candidateWord, candidateFreq);
+        return score + getFuzzyBigramBonus(prevWord, candidateWord);
+    }
+
+    private float getFuzzyBigramBonus(final String prevWord, final String word) {
+        if (prevWord == null || prevWord.isEmpty()) {
+            return 0.0f;
+        }
+        final int bigramFreq = getBigramFrequency(prevWord, word);
+        return bigramFreq > 0 ? bigramFreq * 1.5f : 0.0f;
+    }
+
+    private boolean isValidCorrection(final ScoredWord best, final String word, final String norm, final String prevWord, final boolean isWordValid) {
+        if (best.score < getMinCandidateScore()) {
+            return false;
+        }
+        if (isWordValid && !isSuperiorToValidWord(best.score, word, norm, prevWord)) {
+            return false;
+        }
+        return true;
+    }
+
+    private float getMinCandidateScore() {
         if (mAutoCorrectionThreshold >= 3.0f) {
-            minCandidateScore = -60.0f;
-            validWordDelta = 60.0f;
-        } else if (mAutoCorrectionThreshold >= 2.0f) {
-            minCandidateScore = -25.0f;
-            validWordDelta = 120.0f;
-        } else {
-            minCandidateScore = 0.0f;
-            validWordDelta = 200.0f;
+            return -60.0f;
         }
-
-        if (best.score < minCandidateScore) {
-            return null;
+        if (mAutoCorrectionThreshold >= 2.0f) {
+            return -25.0f;
         }
+        return 0.0f;
+    }
 
-        // Valid word protection: never replace valid words unless top candidate is vastly superior
-        if (isWordValid) {
-            final int selfFreq = getWordFrequency(word);
-            float selfScore = calcNormalizedScore(norm, norm, selfFreq);
-            if (prevWord != null && !prevWord.isEmpty()) {
-                selfScore += getBigramFrequency(prevWord, word) * 1.5f;
-            }
-            if (best.score < selfScore + validWordDelta) {
-                return null;
-            }
+    private float getValidWordDelta() {
+        if (mAutoCorrectionThreshold >= 3.0f) {
+            return 60.0f;
         }
+        if (mAutoCorrectionThreshold >= 2.0f) {
+            return 120.0f;
+        }
+        return 200.0f;
+    }
 
-        return applyCasing(word, best.word);
+    private boolean isSuperiorToValidWord(final float bestScore, final String word, final String norm, final String prevWord) {
+        final int selfFreq = getWordFrequency(word);
+        float selfScore = calcNormalizedScore(norm, norm, selfFreq) + getFuzzyBigramBonus(prevWord, word);
+        return bestScore >= selfScore + getValidWordDelta();
     }
 
     public synchronized List<CharSequence> getFuzzySuggestions(final String word, final int maxCount) {
@@ -725,52 +742,18 @@ public final class PrefixDictionary {
         if (word == null || word.length() <= 1 || maxCount <= 0) {
             return Collections.emptyList();
         }
-        final String lower = word.toLowerCase();
-        final String norm = stripAccents(lower);
-        final int maxDistance = (mAutoCorrectionThreshold >= 3.0f && norm.length() >= 5) ? 2 : 1;
-        final List<ScoredWord> rawCandidates = new ArrayList<>();
-        searchFuzzy(mRoot, new StringBuilder(), norm, 0, maxDistance, rawCandidates);
-        if (rawCandidates.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        final List<ScoredWord> candidates = new ArrayList<>(rawCandidates.size());
-        for (ScoredWord cw : rawCandidates) {
-            float score = calcNormalizedScore(norm, cw.word, cw.frequency);
-            if (prevWord != null && !prevWord.isEmpty()) {
-                final int bigramFreq = getBigramFrequency(prevWord, cw.word);
-                if (bigramFreq > 0) {
-                    score += bigramFreq * 1.5f;
-                }
-            }
-            candidates.add(new ScoredWord(cw.word, cw.frequency, score));
-        }
-
-        Collections.sort(candidates);
-        final List<CharSequence> results = new ArrayList<>();
-        final Set<String> added = new HashSet<>();
-        for (int i = 0; i < candidates.size() && results.size() < maxCount; i++) {
-            final String w = candidates.get(i).word;
-            final String formatted = applyCasing(word, w);
-            if (added.add(w.toLowerCase())) {
-                results.add(formatted);
-            }
-        }
-        return results;
+        final String norm = stripAccents(word.toLowerCase());
+        final List<ScoredWord> candidates = searchAndScoreFuzzyCandidates(norm, prevWord);
+        return formatSuggestions(candidates, word, maxCount);
     }
 
     private void searchFuzzy(final TrieNode node, final StringBuilder currentPath,
                              final String target, final int targetIdx, final int remainingDistance,
                              final List<ScoredWord> candidates) {
-        if (targetIdx == target.length() && node.words.length > 0) {
-            for (int i = 0; i < node.words.length; i++) {
-                candidates.add(new ScoredWord(node.words[i], node.freqs[i], node.freqs[i]));
-            }
-        }
-
         if (remainingDistance < 0) {
             return;
         }
+        recordExactLengthMatches(node, target, targetIdx, candidates);
 
         // 1. Deletion from target (extra character typed by user)
         if (targetIdx < target.length() && remainingDistance > 0) {
@@ -778,37 +761,53 @@ public final class PrefixDictionary {
         }
 
         for (int i = 0; i < node.keys.length; i++) {
-            final char ch = node.keys[i];
-            final TrieNode child = node.children[i];
+            exploreFuzzyBranch(node.children[i], node.keys[i], currentPath, target, targetIdx, remainingDistance, candidates);
+        }
+    }
 
-            currentPath.append(ch);
-
-            if (targetIdx < target.length()) {
-                if (target.charAt(targetIdx) == ch) {
-                    // Exact character match
-                    searchFuzzy(child, currentPath, target, targetIdx + 1, remainingDistance, candidates);
-                } else if (remainingDistance > 0) {
-                    // Substitution
-                    searchFuzzy(child, currentPath, target, targetIdx + 1, remainingDistance - 1, candidates);
-
-                    // Transposition
-                    if (targetIdx + 1 < target.length() && target.charAt(targetIdx + 1) == ch) {
-                        final char nextTargetChar = target.charAt(targetIdx);
-                        final TrieNode transChild = child.getChild(nextTargetChar);
-                        if (transChild != null) {
-                            currentPath.append(nextTargetChar);
-                            searchFuzzy(transChild, currentPath, target, targetIdx + 2, remainingDistance - 1, candidates);
-                            currentPath.setLength(currentPath.length() - 1);
-                        }
-                    }
-                }
+    private void recordExactLengthMatches(final TrieNode node, final String target, final int targetIdx, final List<ScoredWord> candidates) {
+        if (targetIdx == target.length() && node.words.length > 0) {
+            for (int i = 0; i < node.words.length; i++) {
+                candidates.add(new ScoredWord(node.words[i], node.freqs[i], node.freqs[i]));
             }
+        }
+    }
 
-            // Insertion
-            if (remainingDistance > 0) {
-                searchFuzzy(child, currentPath, target, targetIdx, remainingDistance - 1, candidates);
-            }
+    private void exploreFuzzyBranch(final TrieNode child, final char ch, final StringBuilder currentPath,
+                                    final String target, final int targetIdx, final int remainingDistance,
+                                    final List<ScoredWord> candidates) {
+        currentPath.append(ch);
+        if (targetIdx < target.length()) {
+            exploreMatchOrEdit(child, ch, currentPath, target, targetIdx, remainingDistance, candidates);
+        }
+        if (remainingDistance > 0) {
+            searchFuzzy(child, currentPath, target, targetIdx, remainingDistance - 1, candidates);
+        }
+        currentPath.setLength(currentPath.length() - 1);
+    }
 
+    private void exploreMatchOrEdit(final TrieNode child, final char ch, final StringBuilder currentPath,
+                                    final String target, final int targetIdx, final int remainingDistance,
+                                    final List<ScoredWord> candidates) {
+        if (target.charAt(targetIdx) == ch) {
+            searchFuzzy(child, currentPath, target, targetIdx + 1, remainingDistance, candidates);
+        } else if (remainingDistance > 0) {
+            searchFuzzy(child, currentPath, target, targetIdx + 1, remainingDistance - 1, candidates);
+            exploreTransposition(child, ch, currentPath, target, targetIdx, remainingDistance, candidates);
+        }
+    }
+
+    private void exploreTransposition(final TrieNode child, final char ch, final StringBuilder currentPath,
+                                      final String target, final int targetIdx, final int remainingDistance,
+                                      final List<ScoredWord> candidates) {
+        if (targetIdx + 1 >= target.length() || target.charAt(targetIdx + 1) != ch) {
+            return;
+        }
+        final char nextTargetChar = target.charAt(targetIdx);
+        final TrieNode transChild = child.getChild(nextTargetChar);
+        if (transChild != null) {
+            currentPath.append(nextTargetChar);
+            searchFuzzy(transChild, currentPath, target, targetIdx + 2, remainingDistance - 1, candidates);
             currentPath.setLength(currentPath.length() - 1);
         }
     }

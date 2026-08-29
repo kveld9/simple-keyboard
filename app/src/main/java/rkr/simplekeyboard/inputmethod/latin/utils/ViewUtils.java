@@ -1,0 +1,100 @@
+/*
+ * Copyright (C) 2026 Raimondas Rimkus
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package rkr.simplekeyboard.inputmethod.latin.utils;
+
+import android.content.Context;
+import android.content.res.TypedArray;
+import android.graphics.drawable.Drawable;
+import android.util.TypedValue;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+
+public final class ViewUtils {
+    private ViewUtils() {
+        // Utility class
+    }
+
+    public static int dpToPx(final Context context, final float dp) {
+        return (int) TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_DIP, dp, context.getResources().getDisplayMetrics());
+    }
+
+    public static int getSelectableItemBackgroundResId(final Context context, final boolean borderless) {
+        final TypedValue outValue = new TypedValue();
+        if (borderless && context.getTheme().resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outValue, true)) {
+            return outValue.resourceId;
+        }
+        if (context.getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)) {
+            return outValue.resourceId;
+        }
+        return 0;
+    }
+
+    public static void applySelectableItemBackground(final View view, final boolean borderless) {
+        final int resId = getSelectableItemBackgroundResId(view.getContext(), borderless);
+        if (resId != 0) {
+            view.setBackgroundResource(resId);
+        }
+    }
+
+    public static ImageView createIconButton(final Context context, final int drawableResId,
+            final int widthPx, final int heightPx, final int paddingPx, final boolean borderlessRipple) {
+        final ImageView iv = new ImageView(context);
+        iv.setImageResource(drawableResId);
+        iv.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        if (paddingPx > 0) {
+            iv.setPadding(paddingPx, paddingPx, paddingPx, paddingPx);
+        }
+        iv.setLayoutParams(new LinearLayout.LayoutParams(widthPx, heightPx));
+        iv.setClickable(true);
+        iv.setFocusable(false);
+        applySelectableItemBackground(iv, borderlessRipple);
+        return iv;
+    }
+
+    public static ImageView createSquareIconButton(final Context context, final int drawableResId,
+            final int sizePx, final int paddingPx, final int colorFilter, final boolean borderlessRipple) {
+        final ImageView iv = createIconButton(context, drawableResId, sizePx, sizePx, paddingPx, borderlessRipple);
+        if (colorFilter != 0) {
+            iv.setColorFilter(colorFilter);
+        }
+        return iv;
+    }
+
+    public static ImageView createBarIconButton(final Context context, final int drawableResId,
+            final int widthPx) {
+        return createIconButton(context, drawableResId, widthPx, ViewGroup.LayoutParams.MATCH_PARENT, 0, false);
+    }
+
+    public static int getThemeColor(final Context context, final int attrResId, final int defaultColor) {
+        final TypedValue typedValue = new TypedValue();
+        if (context.getTheme().resolveAttribute(attrResId, typedValue, true)) {
+            return typedValue.data;
+        }
+        return defaultColor;
+    }
+
+    public static Drawable getThemeDrawable(final Context context, final int styleAttr,
+            final int defStyleRes, final int attr) {
+        final TypedArray a = context.obtainStyledAttributes(null, new int[]{attr}, styleAttr, defStyleRes);
+        final Drawable d = a.getDrawable(0);
+        a.recycle();
+        return d;
+    }
+}

@@ -97,4 +97,5 @@
         <item>Muy agresiva</item>
     </string-array>
     <string name="settings_screen_autocorrect">Corrección de texto</string>
+    <string name="settings_screen_clipboard">Portapapeles</string>
 </resources>

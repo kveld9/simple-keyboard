@@ -46,20 +46,4 @@
         android:key="pref_delete_swipe"
         android:title="@string/delete_swipe"
         android:defaultValue="false" />
-    <SwitchPreference
-        android:key="pref_clipboard_suggestions"
-        android:title="@string/clipboard_suggestions"
-        android:summary="@string/clipboard_suggestions_summary"
-        android:defaultValue="false" />
-    <SwitchPreference
-        android:key="pref_suggest_screenshots"
-        android:title="@string/suggest_screenshots"
-        android:summary="@string/suggest_screenshots_summary"
-        android:defaultValue="false" />
-    <ListPreference
-        android:key="pref_clipboard_retention_time"
-        android:title="@string/clipboard_history_retention_time"
-        android:entries="@array/clipboard_retention_entries"
-        android:entryValues="@array/clipboard_retention_values"
-        android:defaultValue="1440" />
 </PreferenceScreen>

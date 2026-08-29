@@ -44,22 +44,33 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized void insertClip(String text) {
+        insertClip(text, false, System.currentTimeMillis());
+    }
+
+    public synchronized void insertClip(String text, boolean pinned) {
+        insertClip(text, pinned, System.currentTimeMillis());
+    }
+
+    public synchronized void insertClip(String text, boolean pinned, long timestamp) {
         if (text == null || text.trim().isEmpty()) {
             return;
         }
         if (text.length() > MAX_TEXT_LENGTH) {
             text = text.substring(0, MAX_TEXT_LENGTH);
         }
+        if (timestamp <= 0) {
+            timestamp = System.currentTimeMillis();
+        }
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
             // Check if exists and whether it was pinned
-            boolean isPinned = false;
+            boolean isPinned = pinned;
             Cursor cursor = db.query(TABLE_NAME, new String[]{COL_PINNED}, COL_TEXT + "=?",
                     new String[]{text}, null, null, null);
             if (cursor != null) {
                 if (cursor.moveToFirst()) {
-                    isPinned = cursor.getInt(0) == 1;
+                    isPinned = isPinned || (cursor.getInt(0) == 1);
                 }
                 cursor.close();
             }
@@ -69,7 +80,7 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
 
             ContentValues values = new ContentValues();
             values.put(COL_TEXT, text);
-            values.put(COL_TIMESTAMP, System.currentTimeMillis());
+            values.put(COL_TIMESTAMP, timestamp);
             values.put(COL_PINNED, isPinned ? 1 : 0);
             db.insert(TABLE_NAME, null, values);
 

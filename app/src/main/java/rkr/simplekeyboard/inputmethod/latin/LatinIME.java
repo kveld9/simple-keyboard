@@ -678,9 +678,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @RequiresApi(api = Build.VERSION_CODES.R)
     public InlineSuggestionsRequest onCreateInlineSuggestionsRequest(@NonNull Bundle uiExtras) {
         Log.i(TAG, "onCreateInlineSuggestionsRequest called");
-        if (!mSettings.getCurrent().mShowSuggestions) {
-            return null;
-        }
         return rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createInlineSuggestionRequest(getDisplayContext());
     }
 
@@ -688,9 +685,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @RequiresApi(api = Build.VERSION_CODES.R)
     public boolean onInlineSuggestionsResponse(InlineSuggestionsResponse response) {
         Log.i(TAG, "onInlineSuggestionsResponse called");
-        if (!mSettings.getCurrent().mShowSuggestions) {
-            return false;
-        }
         final java.util.List<InlineSuggestion> inlineSuggestions = response.getInlineSuggestions();
         if (inlineSuggestions == null || inlineSuggestions.isEmpty()) {
             Log.i(TAG, "onInlineSuggestionsResponse: empty suggestions");

@@ -160,36 +160,6 @@ jobs:
           sha256sum simple-keyboard-*.apk > SHA256SUMS.txt
           cd ..
 
-      - name: Format release body
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        id: body
-        run: |
-          set -euo pipefail
-          VERSION="${{ needs.prepare-version.outputs.version }}"
-          CHANGELOG="${{ needs.prepare-version.outputs.changelog }}"
-          CHECKSUMS="$(cat artifacts/SHA256SUMS.txt || echo '')"
-          
-          {
-            echo "release_body<<EOF_BODY"
-            echo "## Changes"
-            echo ""
-            echo "${CHANGELOG}"
-            echo ""
-            echo "## Downloads"
-            echo ""
-            echo "| File | Description |"
-            echo "|------|-------------|"
-            echo "| \`simple-keyboard-${VERSION}-release.apk\` | Production build (Optimized & Minified with R8) |"
-            echo "| \`simple-keyboard-${VERSION}-debug.apk\` | Debug build |"
-            echo "| \`SHA256SUMS.txt\` | Checksum verification file |"
-            echo ""
-            echo "### SHA-256 Checksums"
-            echo "\`\`\`"
-            echo "${CHECKSUMS}"
-            echo "\`\`\`"
-            echo "EOF_BODY"
-          } >> "$GITHUB_OUTPUT"
-
       # Tag and create GitHub Release directly from the same machine (zero artifact transfer latency)
       - name: Create tag + GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -197,7 +167,18 @@ jobs:
         with:
           tag_name: v${{ needs.prepare-version.outputs.version }}
           name: v${{ needs.prepare-version.outputs.version }}
-          body: ${{ steps.body.outputs.release_body }}
+          body: |
+            ## Changes
+
+            ${{ needs.prepare-version.outputs.changelog }}
+
+            ## Downloads
+
+            | File | Description |
+            |------|-------------|
+            | `simple-keyboard-${{ needs.prepare-version.outputs.version }}-release.apk` | Production build (Optimized & Minified with R8) |
+            | `simple-keyboard-${{ needs.prepare-version.outputs.version }}-debug.apk` | Debug build |
+            | `SHA256SUMS.txt` | Checksum verification file |
           files: artifacts/*
           fail_on_unmatched_files: true
           generate_release_notes: false

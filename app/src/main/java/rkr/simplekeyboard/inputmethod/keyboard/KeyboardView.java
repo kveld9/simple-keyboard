@@ -90,8 +90,6 @@ public class KeyboardView extends View {
     private Drawable mSpacebarBackground;
     private final Rect mKeyBackgroundPadding = new Rect();
     private static final float KET_TEXT_SHADOW_RADIUS_DISABLED = -1.0f;
-    protected int mCustomColor = 0;
-    protected KeyboardTheme mTheme;
     protected String mKeyShape = Settings.KEY_SHAPE_ROUNDED;
     private boolean mIsRoundedShape = false;
 
@@ -173,8 +171,6 @@ public class KeyboardView extends View {
         mKeyDrawParams.updateParams(keyHeight, mKeyVisualAttributes);
         mKeyDrawParams.updateParams(keyHeight, keyboard.mKeyVisualAttributes);
         final SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(getContext());
-        mCustomColor = Settings.readKeyboardColor(prefs, getContext());
-        mTheme = Settings.getKeyboardTheme(getContext());
         updateKeyBackgrounds(prefs);
         invalidateAllKeys();
         requestLayout();
@@ -283,22 +279,10 @@ public class KeyboardView extends View {
         }
 
         final Drawable background = getBackground();
-        applyCustomColorFilter(keyboard, background);
         drawKeys(canvas, mPaint, keyboard, background);
 
         mInvalidatedKeys.clear();
         mInvalidateAllKeys = false;
-    }
-
-    private void applyCustomColorFilter(final Keyboard keyboard, final Drawable background) {
-        if (background == null || !mTheme.mCustomColorSupport) {
-            return;
-        }
-        if (keyboard.getClass() == MoreKeysKeyboard.class) {
-            background.setColorFilter(mCustomColor, PorterDuff.Mode.OVERLAY);
-        } else {
-            setBackgroundColor(mCustomColor);
-        }
     }
 
     private void drawKeys(final Canvas canvas, final Paint paint, final Keyboard keyboard,

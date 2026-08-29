@@ -92,12 +92,6 @@
         android:entryValues="@array/keyboard_theme_ids_string"
         android:defaultValue="5" />
     <restriction
-        android:key="pref_keyboard_color"
-        android:title="@string/keyboard_color"
-        android:restrictionType="string"
-        android:description="@string/pref_keyboard_color_description"
-        android:defaultValue="" />
-    <restriction
         android:key="pref_keyboard_height"
         android:title="@string/prefs_keyboard_height_settings"
         android:restrictionType="integer"

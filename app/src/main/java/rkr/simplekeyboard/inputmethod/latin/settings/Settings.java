@@ -59,7 +59,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_KEY_LONGPRESS_TIMEOUT = "pref_key_longpress_timeout";
     public static final String PREF_KEYBOARD_HEIGHT = "pref_keyboard_height";
     public static final String PREF_BOTTOM_OFFSET_PORTRAIT = "pref_bottom_offset_portrait";
-    public static final String PREF_KEYBOARD_COLOR = "pref_keyboard_color";
     public static final String PREF_SHOW_SPECIAL_CHARS = "pref_show_special_chars";
     public static final String PREF_SHOW_NUMBER_ROW = "pref_show_number_row";
     public static final String PREF_SPACE_SWIPE = "pref_space_swipe";
@@ -164,17 +163,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         return restrictionKeys;
     }
 
-    private static void applyColorRestriction(final String key, final String color, final SharedPreferences.Editor prefsEditor) {
-        if (color != null && color.startsWith("#")) {
-            try {
-                final String hexColor = "FF" + color.substring(1);
-                prefsEditor.putInt(key, Integer.parseUnsignedInt(hexColor, 16));
-                return;
-            } catch (NumberFormatException ignored) { }
-        }
-        prefsEditor.remove(key);
-    }
-
     private static void applySingleRestriction(final String key, final Bundle appRestrictions, final SharedPreferences.Editor prefsEditor) {
         switch (key) {
             case PREF_ENABLED_SUBTYPES:
@@ -209,10 +197,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
             case PREF_BOTTOM_OFFSET_PORTRAIT:
                 Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getInt(key));
                 prefsEditor.putInt(key, appRestrictions.getInt(key));
-                break;
-            case PREF_KEYBOARD_COLOR:
-                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
-                applyColorRestriction(key, appRestrictions.getString(key), prefsEditor);
                 break;
             default:
                 Log.e(TAG, "Unhandled restriction: " + key);
@@ -374,14 +358,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     public static KeyboardTheme getKeyboardTheme(final Context context) {
         return KeyboardTheme.getKeyboardTheme(context);
-    }
-
-    public static int readKeyboardColor(final SharedPreferences prefs, final Context context) {
-        return prefs.getInt(PREF_KEYBOARD_COLOR, readKeyboardDefaultColor(context));
-    }
-
-    public static void removeKeyboardColor(final SharedPreferences prefs) {
-        prefs.edit().remove(PREF_KEYBOARD_COLOR).apply();
     }
 
     public static boolean readUseFullscreenMode(final Resources res) {

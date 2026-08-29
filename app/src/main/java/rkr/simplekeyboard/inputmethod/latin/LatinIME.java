@@ -1793,8 +1793,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             if (window == null) {
                 return;
             }
-            final SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(this);
-            final int keyboardColor = Settings.readKeyboardColor(prefs, this);
+            final int keyboardColor = Settings.readKeyboardDefaultColor(this);
             window.setNavigationBarColor(keyboardColor);
             window.setNavigationBarContrastEnforced(false);
             final int flag = WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;

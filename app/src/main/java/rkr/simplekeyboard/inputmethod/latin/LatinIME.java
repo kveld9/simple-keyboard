@@ -387,10 +387,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return mKeyboardSwitcher.onCreateInputView();
     }
 
+    private rkr.simplekeyboard.inputmethod.latin.utils.InsetsOutlineProvider mInsetsUpdater;
+
     @Override
     public void setInputView(final View view) {
         super.setInputView(view);
         mInputView = view;
+        mInsetsUpdater = new rkr.simplekeyboard.inputmethod.latin.utils.InsetsOutlineProvider(view);
         updateSoftInputWindowLayoutParameters();
         view.requestApplyInsets();
 
@@ -562,6 +565,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // also wouldn't be consuming gesture data.
         if (mTopBarView != null) {
             mTopBarView.closeToolTray();
+            if (!restarting) {
+                mTopBarView.setExternalView(null);
+            }
         }
         final KeyboardSwitcher switcher = mKeyboardSwitcher;
         switcher.updateKeyboardTheme();
@@ -695,7 +701,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         Log.i(TAG, "onInlineSuggestionsResponse called");
         final java.util.List<InlineSuggestion> inlineSuggestions = response.getInlineSuggestions();
         if (inlineSuggestions == null || inlineSuggestions.isEmpty()) {
-            Log.i(TAG, "onInlineSuggestionsResponse: empty suggestions (retaining inline session)");
+            Log.i(TAG, "onInlineSuggestionsResponse: empty suggestions (clearing stale view, retaining inline session)");
+            if (mTopBarView != null && mTopBarView.isExternalViewActive()) {
+                mTopBarView.setExternalView(null);
+            }
             return true;
         }
         Log.i(TAG, "onInlineSuggestionsResponse: received " + inlineSuggestions.size() + " suggestions");
@@ -1051,6 +1060,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         outInsets.contentTopInsets = visibleTopY;
         outInsets.visibleTopInsets = visibleTopY;
+        if (mInsetsUpdater != null) {
+            mInsetsUpdater.setInsets(outInsets);
+        }
     }
 
     @Override

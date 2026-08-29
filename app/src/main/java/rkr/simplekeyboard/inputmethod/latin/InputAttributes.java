@@ -80,9 +80,11 @@ public final class InputAttributes {
         final boolean flagAutoComplete =
                 0 != (inputType & InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE);
 
-        // TODO: Have a helper method in InputTypeUtils
-        // Make sure that passwords are not displayed in {@link SuggestionStripView}.
+        // Make sure that passwords and incognito/private fields are not displayed in SuggestionStripView.
+        final boolean flagNoPersonalizedLearning = 0 != (null != editorInfo
+                ? (editorInfo.imeOptions & EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) : 0);
         final boolean shouldSuppressSuggestions = mIsPasswordField
+                || flagNoPersonalizedLearning
                 || InputTypeUtils.isEmailVariation(variation)
                 || InputType.TYPE_TEXT_VARIATION_URI == variation
                 || InputType.TYPE_TEXT_VARIATION_FILTER == variation

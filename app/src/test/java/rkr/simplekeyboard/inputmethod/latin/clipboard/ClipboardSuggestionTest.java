@@ -48,4 +48,9 @@ public class ClipboardSuggestionTest {
         String displayText = "📋 \"" + cleanText + "\"";
         assertEquals("📋 \"Hello World  Test\"", displayText);
     }
+
+    @Test
+    public void testIsSensitiveClipNullHandling() {
+        assertFalse(ClipboardHistoryManager.isSensitiveClip(null));
+    }
 }

@@ -52,24 +52,4 @@
         android:entries="@array/clipboard_retention_entries"
         android:entryValues="@array/clipboard_retention_values"
         android:defaultValue="1440" />
-    <PreferenceCategory android:title="@string/settings_category_autocorrect">
-        <SwitchPreference
-            android:key="auto_cap"
-            android:title="@string/auto_cap"
-            android:summary="@string/auto_cap_summary"
-            android:defaultValue="true"
-            android:persistent="true" />
-        <SwitchPreference
-            android:key="pref_show_suggestions"
-            android:title="@string/show_suggestions"
-            android:defaultValue="true"
-            android:persistent="true" />
-        <ListPreference
-            android:key="auto_correction_threshold"
-            android:title="@string/auto_correction_threshold"
-            android:summary="@string/auto_correction_threshold_summary"
-            android:entries="@array/auto_correction_threshold_entries"
-            android:entryValues="@array/auto_correction_threshold_values"
-            android:defaultValue="1" />
-    </PreferenceCategory>
 </PreferenceScreen>

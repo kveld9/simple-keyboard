@@ -101,7 +101,7 @@ public final class InlineAutofillUtils {
 
         for (InlineSuggestion inlineSuggestion : inlineSuggestions) {
             inlineSuggestion.inflate(context, new Size(ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT), context.getMainExecutor(), (view) -> {
+                    ViewGroup.LayoutParams.WRAP_CONTENT), context.getMainExecutor(), (view) -> {
                 if (view != null) {
                     container.addView(view);
                 }

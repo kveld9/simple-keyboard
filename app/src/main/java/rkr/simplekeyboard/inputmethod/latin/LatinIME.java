@@ -329,11 +329,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mClipboardHistoryManager.start();
 
         mContactsDictionary = new rkr.simplekeyboard.inputmethod.latin.dict.ContactsDictionary(this);
-        loadContactsIfEnabled();
 
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
         loadSettings();
+        loadContactsIfEnabled();
 
         // Register to receive ringer mode change.
         final IntentFilter filter = new IntentFilter();
@@ -342,7 +342,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void loadContactsIfEnabled() {
-        if (mContactsDictionary != null && mSettings.getCurrent().mUseContacts) {
+        if (mContactsDictionary != null && mSettings.getCurrent() != null && mSettings.getCurrent().mUseContacts) {
             mContactsDictionary.loadAsync(mDictExecutor, this::updateSuggestions);
         }
     }

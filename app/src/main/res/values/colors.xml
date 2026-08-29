@@ -50,6 +50,15 @@
     <color name="key_hint_letter_color_lxx_dark">#80FFFFFF</color>
     <color name="key_background_normal_lxx_dark">#2AAAAAAA</color>
     <color name="key_background_pressed_lxx_dark">#4AAAAAAA</color>
+    <!-- Color resources for LXX_Black (AMOLED) theme. -->
+    <color name="background_lxx_black">#000000</color>
+    <color name="background_secondary_lxx_black">#121212</color>
+    <color name="key_text_color_lxx_black">#FFFFFF</color>
+    <color name="key_functional_text_color_lxx_black">#FFFFFF</color>
+    <color name="key_text_inactive_color_lxx_black">#B3FFFFFF</color>
+    <color name="key_hint_letter_color_lxx_black">#80FFFFFF</color>
+    <color name="key_background_normal_lxx_black">#1E1E1E</color>
+    <color name="key_background_pressed_lxx_black">#383838</color>
     <!-- Dimensions for all themes. -->
     <dimen name="button_corner_radius_lxx">6dp</dimen>
     <dimen name="button_corner_radius_rounded">20dp</dimen>

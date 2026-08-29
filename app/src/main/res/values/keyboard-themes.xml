@@ -24,23 +24,27 @@
         <item>@string/keyboard_theme_system</item>
         <item>@string/keyboard_theme_light</item>
         <item>@string/keyboard_theme_dark</item>
+        <item>@string/keyboard_theme_black</item>
     </string-array>
 
     <integer-array name="keyboard_theme_ids" translatable="false">
         <item>5</item>
         <item>3</item>
         <item>4</item>
+        <item>7</item>
     </integer-array>
 
     <string-array name="keyboard_theme_ids_string" translatable="false">
         <item>5</item>
         <item>3</item>
         <item>4</item>
+        <item>7</item>
     </string-array>
 
     <array name="keyboard_theme_colors" translatable="false">
         <item>@color/background_lxx_system</item>
         <item>@color/background_lxx_light</item>
         <item>@color/background_lxx_dark</item>
+        <item>@color/background_lxx_black</item>
     </array>
 </resources>

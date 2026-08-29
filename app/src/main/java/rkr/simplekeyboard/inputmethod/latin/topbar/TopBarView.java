@@ -186,12 +186,12 @@ public class TopBarView extends FrameLayout {
     }
 
     public void setSuggestions(List<CharSequence> suggestions, int boldIndex) {
-        if (isExternalViewActive()) {
-            setExternalView(null);
-        }
         if (suggestions == null || suggestions.isEmpty()) {
             clearSuggestions();
             return;
+        }
+        if (isExternalViewActive()) {
+            setExternalView(null);
         }
         dispatchSuggestions(suggestions, boldIndex);
     }

@@ -51,6 +51,8 @@ public class SettingsValues {
     public final boolean mDeleteSwipeEnabled;
     public final boolean mShowSuggestions;
     public final boolean mAutoCorrectionEnabled;
+    public final float mAutoCorrectionThreshold;
+    public final int mAutoCorrectionThresholdInt;
 
     // From the input box
     public final InputAttributes mInputAttributes;
@@ -94,6 +96,8 @@ public class SettingsValues {
         mSpaceSwipeEnabled = Settings.readSpaceSwipeEnabled(prefs);
         mDeleteSwipeEnabled = Settings.readDeleteSwipeEnabled(prefs);
         mShowSuggestions = Settings.readShowSuggestions(prefs);
+        mAutoCorrectionThreshold = Settings.readAutoCorrectionThreshold(prefs);
+        mAutoCorrectionThresholdInt = Settings.readAutoCorrectionThresholdInt(prefs);
         mAutoCorrectionEnabled = Settings.readAutoCorrectionEnabled(prefs);
     }
 

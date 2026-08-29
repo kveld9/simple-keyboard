@@ -112,6 +112,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private String mOriginalTypedWordBeforeAutocorrect = null;
     private String mAutocorrectedWord = null;
+    private String mPreviousWord = null;
     private boolean mCanRevertAutocorrect = false;
 
     private RichInputMethodManager mRichImm;
@@ -304,6 +305,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet.clearKeyboardCache();
         final SettingsValues currentSettingsValues = mSettings.getCurrent();
         AudioAndHapticFeedbackManager.getInstance().onSettingsChanged(currentSettingsValues);
+        mPrefixDictionary.setAutoCorrectionThreshold(currentSettingsValues.mAutoCorrectionThreshold);
         loadDictionaryForLocale(mLocale);
     }
 
@@ -397,10 +399,22 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                             }
                             if (cleanWord.length() > 0) {
                                 mPrefixDictionary.insert(cleanWord, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+                                final String prevWord = (mPreviousWord != null && !mPreviousWord.isEmpty())
+                                        ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
+                                if (prevWord != null && !prevWord.isEmpty()) {
+                                    mPrefixDictionary.setBigram(prevWord, cleanWord, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+                                }
                                 if (mUserDictionaryDb != null) {
                                     final String wordToLearn = cleanWord;
-                                    new Thread(() -> mUserDictionaryDb.learnWord(wordToLearn)).start();
+                                    final String pWord = prevWord;
+                                    new Thread(() -> {
+                                        mUserDictionaryDb.learnWord(wordToLearn);
+                                        if (pWord != null && !pWord.isEmpty()) {
+                                            mUserDictionaryDb.learnBigram(pWord, wordToLearn);
+                                        }
+                                    }).start();
                                 }
+                                mPreviousWord = cleanWord;
                             }
                         }
                         mInputLogic.mConnection.commitSuggestion(text);
@@ -692,6 +706,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         mDictExecutor.execute(() -> {
             final PrefixDictionary newDict = new PrefixDictionary();
+            final SettingsValues settingsValues = mSettings.getCurrent();
+            if (settingsValues != null) {
+                newDict.setAutoCorrectionThreshold(settingsValues.mAutoCorrectionThreshold);
+            }
             // 1. Load secondary enabled languages first (with 85% relative frequency)
             for (String lang : enabledLangs) {
                 if (!lang.equals(currentLang)) {
@@ -702,11 +720,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // 2. Load primary active language with 100% frequency
             loadSingleLanguageDictionaryInto(newDict, currentLang, 1.0f);
 
-            // 3. Load user-learned words from database with top priority
+            // 3. Load user-learned words and bigrams from database with top priority
             if (mUserDictionaryDb != null) {
                 final java.util.Map<String, Integer> userWords = mUserDictionaryDb.getAllLearnedWords();
                 for (java.util.Map.Entry<String, Integer> entry : userWords.entrySet()) {
                     newDict.insert(entry.getKey(), entry.getValue());
+                }
+                final java.util.Map<String, java.util.Map<String, Integer>> userBigrams = mUserDictionaryDb.getAllBigrams();
+                for (java.util.Map.Entry<String, java.util.Map<String, Integer>> entry : userBigrams.entrySet()) {
+                    final String prev = entry.getKey();
+                    for (java.util.Map.Entry<String, Integer> subEntry : entry.getValue().entrySet()) {
+                        newDict.setBigram(prev, subEntry.getKey(), subEntry.getValue());
+                    }
                 }
             }
 
@@ -777,6 +802,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
 
+        final String prevWord = (mPreviousWord != null && !mPreviousWord.isEmpty())
+                ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
+
         final java.util.List<CharSequence> suggestions = new java.util.ArrayList<>();
         int boldIndex = -1;
 
@@ -784,14 +812,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         suggestions.add("\"" + word + "\"");
 
         final boolean autoCorrectionEnabled = mSettings.getCurrent().mAutoCorrectionEnabled;
-        final java.util.List<CharSequence> matches = mPrefixDictionary.getSuggestions(word, 3);
+        final java.util.List<CharSequence> matches = mPrefixDictionary.getSuggestions(word, 3, prevWord);
         final CharSequence bestCorrection;
         if (autoCorrectionEnabled) {
             final CharSequence exactNorm = mPrefixDictionary.getExactNormalizedCorrection(word);
             if (exactNorm != null) {
                 bestCorrection = exactNorm;
             } else if (matches.isEmpty()) {
-                bestCorrection = mPrefixDictionary.getBestCorrection(word);
+                bestCorrection = mPrefixDictionary.getBestCorrection(word, prevWord);
             } else {
                 bestCorrection = null;
             }
@@ -805,7 +833,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             suggestions.add(bestCorrection);
             boldIndex = 1;
             // 3. Slot 2: Alternative suggestion (from matches or fuzzy candidates)
-            final java.util.List<CharSequence> candidates = matches.isEmpty() ? mPrefixDictionary.getFuzzySuggestions(word, 3) : matches;
+            final java.util.List<CharSequence> candidates = matches.isEmpty()
+                    ? mPrefixDictionary.getFuzzySuggestions(word, 3, prevWord) : matches;
             for (CharSequence s : candidates) {
                 if (!s.toString().equalsIgnoreCase(bestCorrection.toString()) && suggestions.size() < 3) {
                     suggestions.add(s);
@@ -1083,19 +1112,24 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
 
         if (!event.isFunctionalKeyEvent() && event.mCodePoint == Constants.CODE_SPACE) {
+            final String word = mInputLogic.mConnection.getWordBeforeCursor();
+            final String prevWord = (mPreviousWord != null && !mPreviousWord.isEmpty())
+                    ? mPreviousWord : mInputLogic.mConnection.getPreviousWordBeforeCursor();
+            String committedWord = word;
+
             final SettingsValues settingsValues = mSettings.getCurrent();
             if (settingsValues.mAutoCorrectionEnabled) {
                 final EditorInfo editorInfo = getCurrentInputEditorInfo();
                 final InputAttributes attr = editorInfo != null ? new InputAttributes(editorInfo, isFullscreenMode()) : null;
                 if (attr == null || !attr.mIsPasswordField) {
-                    final String word = mInputLogic.mConnection.getWordBeforeCursor();
                     if (word != null && word.length() > 0) {
-                        final CharSequence correction = mPrefixDictionary.getBestCorrection(word);
+                        final CharSequence correction = mPrefixDictionary.getBestCorrection(word, prevWord);
                         if (correction != null) {
                             mInputLogic.mConnection.deleteTextBeforeCursor(word.length());
                             mInputLogic.mConnection.commitText(correction, 1);
                             mOriginalTypedWordBeforeAutocorrect = word;
                             mAutocorrectedWord = correction.toString();
+                            committedWord = mAutocorrectedWord;
                             mCanRevertAutocorrect = true;
                         } else {
                             mCanRevertAutocorrect = false;
@@ -1104,6 +1138,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                         mCanRevertAutocorrect = false;
                     }
                 }
+            }
+            if (committedWord != null && !committedWord.trim().isEmpty()) {
+                final String cleanCommitted = committedWord.trim();
+                if (prevWord != null && !prevWord.isEmpty()) {
+                    mPrefixDictionary.setBigram(prevWord, cleanCommitted, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+                    if (mUserDictionaryDb != null) {
+                        final String p = prevWord;
+                        final String c = cleanCommitted;
+                        new Thread(() -> mUserDictionaryDb.learnBigram(p, c)).start();
+                    }
+                }
+                mPreviousWord = cleanCommitted;
             }
         }
         final InputTransaction completeInputTransaction =

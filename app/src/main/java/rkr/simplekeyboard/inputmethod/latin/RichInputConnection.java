@@ -287,6 +287,52 @@ public final class RichInputConnection {
         return text.substring(i + 1);
     }
 
+    public String getPreviousWordBeforeCursor() {
+        String text = mTextBeforeCursor;
+        if ((text == null || text.isEmpty()) && isConnected()) {
+            try {
+                final CharSequence icText = mIC.getTextBeforeCursor(60, 0);
+                if (icText != null && icText.length() > 0) {
+                    text = icText.toString();
+                }
+            } catch (Exception e) {
+                // Ignore fallback
+            }
+        }
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+        int i = text.length() - 1;
+        // Skip current word (if any)
+        while (i >= 0) {
+            char c = text.charAt(i);
+            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
+                break;
+            }
+            i--;
+        }
+        // Skip spaces and separators between previous word and current position
+        while (i >= 0) {
+            char c = text.charAt(i);
+            if (Character.isLetter(c) || c == '\'' || c == '-') {
+                break;
+            }
+            i--;
+        }
+        if (i < 0) {
+            return "";
+        }
+        int end = i + 1;
+        while (i >= 0) {
+            char c = text.charAt(i);
+            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
+                break;
+            }
+            i--;
+        }
+        return text.substring(i + 1, end);
+    }
+
     public String getTextBeforeCursor(final int n, final int flags) {
         if (mTextBeforeCursor != null && mTextBeforeCursor.length() > 0) {
             final int len = Math.min(n, mTextBeforeCursor.length());

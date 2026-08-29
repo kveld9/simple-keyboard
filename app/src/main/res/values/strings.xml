@@ -160,4 +160,5 @@
         <item>2</item>
         <item>3</item>
     </string-array>
+    <string name="settings_category_autocorrect">Text correction</string>
 </resources>

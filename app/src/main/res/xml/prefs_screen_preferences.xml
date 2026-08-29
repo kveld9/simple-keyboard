@@ -46,6 +46,11 @@
         android:key="pref_delete_swipe"
         android:title="@string/delete_swipe"
         android:defaultValue="false" />
+    <SwitchPreference
+        android:key="pref_clipboard_suggestions"
+        android:title="@string/clipboard_suggestions"
+        android:summary="@string/clipboard_suggestions_summary"
+        android:defaultValue="false" />
     <ListPreference
         android:key="pref_clipboard_retention_time"
         android:title="@string/clipboard_history_retention_time"

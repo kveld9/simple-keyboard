@@ -117,6 +117,8 @@
     <string name="clipboard_delete">Delete</string>
     <string name="clipboard_pin">Pin</string>
     <string name="clipboard_unpin">Unpin</string>
+    <string name="clipboard_suggestions">Show clipboard suggestions</string>
+    <string name="clipboard_suggestions_summary">Show recently copied items in suggestion bar</string>
     <string name="clipboard_history_retention_time">History retention time</string>
     <string-array name="clipboard_retention_entries">
         <item>10 minutes</item>

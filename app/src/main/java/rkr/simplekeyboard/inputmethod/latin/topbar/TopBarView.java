@@ -137,6 +137,16 @@ public class TopBarView extends FrameLayout {
         mToolTrayContainer.setVisibility(mode == MODE_TOOL_TRAY ? View.VISIBLE : View.GONE);
     }
 
+    public boolean isToolTrayOpen() {
+        return mCurrentMode == MODE_TOOL_TRAY;
+    }
+
+    public void closeToolTray() {
+        if (mCurrentMode != MODE_NORMAL) {
+            setMode(MODE_NORMAL);
+        }
+    }
+
     public void setSuggestions(List<CharSequence> suggestions) {
         setSuggestions(suggestions, -1);
     }

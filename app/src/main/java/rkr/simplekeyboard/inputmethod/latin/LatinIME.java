@@ -108,6 +108,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private UserDictionaryDatabase mUserDictionaryDb;
     private Locale mLoadedLocale;
 
+    private String mOriginalTypedWordBeforeAutocorrect = null;
+    private String mAutocorrectedWord = null;
+    private boolean mCanRevertAutocorrect = false;
+
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
 
@@ -485,6 +489,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onFinishInputView(final boolean finishingInput) {
+        mCanRevertAutocorrect = false;
         mInputLogic.clearCaches();
         mRichImm.resetSubtypeCycleOrder();
         mHandler.onFinishInputView(finishingInput);
@@ -1041,6 +1046,35 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mTopBarView != null && mTopBarView.isToolTrayOpen()) {
             mTopBarView.closeToolTray();
         }
+
+        // Check if backspace should revert previous autocorrect
+        if (event.isFunctionalKeyEvent() && event.mKeyCode == Constants.CODE_DELETE) {
+            if (mCanRevertAutocorrect && mAutocorrectedWord != null && mOriginalTypedWordBeforeAutocorrect != null) {
+                final String textBefore = mInputLogic.mConnection.getTextBeforeCursor(mAutocorrectedWord.length() + 2, 0);
+                if (textBefore != null && textBefore.endsWith(mAutocorrectedWord + " ")) {
+                    mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + 1);
+                    mInputLogic.mConnection.commitText(mOriginalTypedWordBeforeAutocorrect, 1);
+
+                    // Auto-learn reverted word
+                    mPrefixDictionary.insert(mOriginalTypedWordBeforeAutocorrect, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+                    if (mUserDictionaryDb != null) {
+                        final String raw = mOriginalTypedWordBeforeAutocorrect;
+                        new Thread(() -> mUserDictionaryDb.learnWord(raw)).start();
+                    }
+
+                    mCanRevertAutocorrect = false;
+                    mOriginalTypedWordBeforeAutocorrect = null;
+                    mAutocorrectedWord = null;
+                    mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+                    updateSuggestions();
+                    return;
+                }
+            }
+            mCanRevertAutocorrect = false;
+        } else if (!event.isFunctionalKeyEvent() && event.mCodePoint != Constants.CODE_SPACE) {
+            mCanRevertAutocorrect = false;
+        }
+
         if (!event.isFunctionalKeyEvent() && event.mCodePoint == Constants.CODE_SPACE) {
             final SettingsValues settingsValues = mSettings.getCurrent();
             if (settingsValues.mAutoCorrectionEnabled) {
@@ -1053,7 +1087,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                         if (correction != null) {
                             mInputLogic.mConnection.deleteTextBeforeCursor(word.length());
                             mInputLogic.mConnection.commitText(correction, 1);
+                            mOriginalTypedWordBeforeAutocorrect = word;
+                            mAutocorrectedWord = correction.toString();
+                            mCanRevertAutocorrect = true;
+                        } else {
+                            mCanRevertAutocorrect = false;
                         }
+                    } else {
+                        mCanRevertAutocorrect = false;
                     }
                 }
             }

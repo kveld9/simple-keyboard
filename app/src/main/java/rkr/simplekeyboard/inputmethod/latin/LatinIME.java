@@ -843,6 +843,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     public void updateSuggestions() {
+        if (mTopBarView != null && mTopBarView.isExternalViewActive()) {
+            return;
+        }
         if (isSuggestionsDisabled()) {
             return;
         }
@@ -1235,6 +1238,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // completely replace #onCodeInput.
     public void onEvent(final Event event) {
         closeToolTrayIfOpen();
+        if (mTopBarView != null && mTopBarView.isExternalViewActive()) {
+            mTopBarView.setExternalView(null);
+        }
 
         if (handleBackspaceRevert(event)) {
             return;

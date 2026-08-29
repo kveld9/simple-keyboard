@@ -321,7 +321,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
 
         locatePreviewPlacerView();
         getLocationInWindow(mOriginCoords);
-        final int backgroundColor = mTheme.mCustomColorSupport ? mCustomColor : Color.TRANSPARENT;
+        final int backgroundColor = Color.TRANSPARENT;
         final float cornerRadius = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getCornerRadius(getContext(), mKeyShape);
         mKeyPreviewChoreographer.placeAndShowKeyPreview(key, keyboard.mIconsSet, getKeyDrawParams(),
                 mOriginCoords, mDrawingPreviewPlacerView, isHardwareAccelerated(), backgroundColor, cornerRadius);

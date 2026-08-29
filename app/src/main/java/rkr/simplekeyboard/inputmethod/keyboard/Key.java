@@ -252,7 +252,11 @@ public class Key implements Comparable<Key> {
 
         final String[] rawMoreKeys = style.getStringArray(keyAttr, R.styleable.Keyboard_Key_moreKeys);
         mMoreKeysColumnAndFlags = parseMoreKeysColumnAndFlags(style, keyAttr, params, rawMoreKeys);
-        mMoreKeys = parseMoreKeys(style, keyAttr, mLabelFlags, needsToUpcase, localeForUpcasing);
+        final String[] additionalMoreKeys = ((mLabelFlags & LABEL_FLAGS_DISABLE_ADDITIONAL_MORE_KEYS) != 0)
+                ? null
+                : style.getStringArray(keyAttr, R.styleable.Keyboard_Key_additionalMoreKeys);
+        final String[] moreKeys = MoreKeySpec.insertAdditionalMoreKeys(rawMoreKeys, additionalMoreKeys);
+        mMoreKeys = parseMoreKeys(moreKeys, needsToUpcase, localeForUpcasing);
 
         final int initialActionFlags = style.getFlags(keyAttr, R.styleable.Keyboard_Key_keyActionFlags);
         mActionFlags = (mMoreKeys != null)
@@ -298,13 +302,8 @@ public class Key implements Comparable<Key> {
         return moreKeysColumnAndFlags;
     }
 
-    private static MoreKeySpec[] parseMoreKeys(final KeyStyle style, final TypedArray keyAttr,
-            final int labelFlags, final boolean needsToUpcase, final Locale localeForUpcasing) {
-        final String[] rawMoreKeys = style.getStringArray(keyAttr, R.styleable.Keyboard_Key_moreKeys);
-        final String[] additionalMoreKeys = ((labelFlags & LABEL_FLAGS_DISABLE_ADDITIONAL_MORE_KEYS) != 0)
-                ? null
-                : style.getStringArray(keyAttr, R.styleable.Keyboard_Key_additionalMoreKeys);
-        final String[] moreKeys = MoreKeySpec.insertAdditionalMoreKeys(rawMoreKeys, additionalMoreKeys);
+    private static MoreKeySpec[] parseMoreKeys(final String[] moreKeys,
+            final boolean needsToUpcase, final Locale localeForUpcasing) {
         if (moreKeys == null) {
             return null;
         }

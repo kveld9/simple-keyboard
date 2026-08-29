@@ -29,10 +29,10 @@ public final class KeyShapeHelper {
     }
 
     public static float getRoundedInsetRatioX(final String keyShape) {
-        return Settings.KEY_SHAPE_ROUNDED.equals(keyShape) ? 0.09f : 0.0f;
+        return Settings.KEY_SHAPE_ROUNDED.equals(keyShape) ? 0.08f : 0.0f;
     }
 
     public static float getRoundedInsetRatioY(final String keyShape) {
-        return Settings.KEY_SHAPE_ROUNDED.equals(keyShape) ? 0.08f : 0.0f;
+        return Settings.KEY_SHAPE_ROUNDED.equals(keyShape) ? 0.02f : 0.0f;
     }
 }

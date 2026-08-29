@@ -94,6 +94,7 @@
     <string name="prefs_bottom_offset_portrait_settings">Bottom offset</string>
     <string name="show_special_chars">Show special characters</string>
     <string name="show_language_switch_key">Show language switch key</string>
+    <string name="show_language_on_spacebar">Show language on spacebar</string>
     <string name="pref_use_on_screen">Show on-screen keyboard</string>
     <string name="pref_use_on_screen_summary">Show on-screen keyboard while using physical keyboard</string>
     <string name="pref_enable_ime_switch">Switch to other keyboards</string>

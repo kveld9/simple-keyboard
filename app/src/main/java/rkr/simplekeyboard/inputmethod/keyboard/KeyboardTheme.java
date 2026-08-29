@@ -43,11 +43,11 @@ public final class KeyboardTheme {
     /* package private for testing */
     static final KeyboardTheme[] KEYBOARD_THEMES = {
         new KeyboardTheme(THEME_ID_SYSTEM, "LXXSystem", R.style.KeyboardTheme_LXX_System, false),
-        new KeyboardTheme(THEME_ID_SYSTEM_BORDER, "LXXSystemBorder", R.style.KeyboardTheme_LXX_System_Border, false),
+        new KeyboardTheme(THEME_ID_SYSTEM_BORDER, "LXXSystemBorder", R.style.KeyboardTheme_LXX_System, false),
         new KeyboardTheme(THEME_ID_LIGHT, "LXXLight", R.style.KeyboardTheme_LXX_Light, true),
         new KeyboardTheme(THEME_ID_DARK, "LXXDark", R.style.KeyboardTheme_LXX_Dark, true),
-        new KeyboardTheme(THEME_ID_LIGHT_BORDER, "LXXLightBorder", R.style.KeyboardTheme_LXX_Light_Border, true),
-        new KeyboardTheme(THEME_ID_DARK_BORDER, "LXXDarkBorder", R.style.KeyboardTheme_LXX_Dark_Border, true),
+        new KeyboardTheme(THEME_ID_LIGHT_BORDER, "LXXLightBorder", R.style.KeyboardTheme_LXX_Light, true),
+        new KeyboardTheme(THEME_ID_DARK_BORDER, "LXXDarkBorder", R.style.KeyboardTheme_LXX_Dark, true),
     };
 
     public final int mThemeId;

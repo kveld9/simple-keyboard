@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -109,6 +110,17 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         }
     }
 
+    private void deleteCachedFileIfPresent(String uri) {
+        if (uri != null && uri.startsWith("/")) {
+            try {
+                File file = new File(uri);
+                if (file.exists() && file.isFile()) {
+                    file.delete();
+                }
+            } catch (Exception ignored) {}
+        }
+    }
+
     public synchronized void deleteExpiredClips(long retentionMinutes) {
         if (retentionMinutes <= 0) {
             return; // Never / Unlimited
@@ -117,6 +129,14 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         db.beginTransaction();
         try {
             long cutoffTimestamp = System.currentTimeMillis() - (retentionMinutes * 60 * 1000L);
+            Cursor c = db.query(TABLE_NAME, new String[]{COL_URI}, COL_PINNED + "=0 AND " + COL_TIMESTAMP + " < ?",
+                    new String[]{String.valueOf(cutoffTimestamp)}, null, null, null);
+            if (c != null) {
+                while (c.moveToNext()) {
+                    deleteCachedFileIfPresent(c.getString(0));
+                }
+                c.close();
+            }
             db.delete(TABLE_NAME, COL_PINNED + "=0 AND " + COL_TIMESTAMP + " < ?",
                     new String[]{String.valueOf(cutoffTimestamp)});
             db.setTransactionSuccessful();
@@ -129,9 +149,18 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
 
     private void cleanupOldClips(SQLiteDatabase db) {
         try {
+            String subquery = "SELECT " + COL_ID + " FROM " + TABLE_NAME
+                    + " WHERE " + COL_PINNED + "=0 ORDER BY " + COL_TIMESTAMP + " DESC LIMIT " + MAX_CLIPS;
+            Cursor c = db.query(TABLE_NAME, new String[]{COL_URI}, COL_PINNED + "=0 AND " + COL_ID + " NOT IN (" + subquery + ")",
+                    null, null, null, null);
+            if (c != null) {
+                while (c.moveToNext()) {
+                    deleteCachedFileIfPresent(c.getString(0));
+                }
+                c.close();
+            }
             db.execSQL("DELETE FROM " + TABLE_NAME + " WHERE " + COL_PINNED + "=0 AND "
-                    + COL_ID + " NOT IN (SELECT " + COL_ID + " FROM " + TABLE_NAME
-                    + " WHERE " + COL_PINNED + "=0 ORDER BY " + COL_TIMESTAMP + " DESC LIMIT " + MAX_CLIPS + ")");
+                    + COL_ID + " NOT IN (" + subquery + ")");
         } catch (Exception e) {
             Log.e(TAG, "Error cleaning up old clips", e);
         }
@@ -140,6 +169,14 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     public synchronized void deleteClip(long id) {
         try {
             SQLiteDatabase db = getWritableDatabase();
+            Cursor c = db.query(TABLE_NAME, new String[]{COL_URI}, COL_ID + "=?",
+                    new String[]{String.valueOf(id)}, null, null, null);
+            if (c != null) {
+                if (c.moveToFirst()) {
+                    deleteCachedFileIfPresent(c.getString(0));
+                }
+                c.close();
+            }
             db.delete(TABLE_NAME, COL_ID + "=?", new String[]{String.valueOf(id)});
         } catch (Exception e) {
             Log.e(TAG, "Error deleting clip", e);
@@ -160,6 +197,14 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     public synchronized void clearUnpinned() {
         try {
             SQLiteDatabase db = getWritableDatabase();
+            Cursor c = db.query(TABLE_NAME, new String[]{COL_URI}, COL_PINNED + "=0",
+                    null, null, null, null);
+            if (c != null) {
+                while (c.moveToNext()) {
+                    deleteCachedFileIfPresent(c.getString(0));
+                }
+                c.close();
+            }
             db.delete(TABLE_NAME, COL_PINNED + "=0", null);
         } catch (Exception e) {
             Log.e(TAG, "Error clearing unpinned clips", e);

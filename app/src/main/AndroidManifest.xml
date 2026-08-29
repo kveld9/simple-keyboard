@@ -24,6 +24,8 @@
     <application
         android:allowBackup="true"
         android:fullBackupOnly="true"
+        android:dataExtractionRules="@xml/backup_rules"
+        android:fullBackupContent="@xml/backup_rules_legacy"
         android:hardwareAccelerated="false"
         android:icon="@drawable/ic_launcher"
         android:label="@string/english_ime_name"

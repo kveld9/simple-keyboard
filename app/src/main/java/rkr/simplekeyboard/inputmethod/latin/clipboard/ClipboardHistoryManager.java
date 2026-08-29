@@ -2,6 +2,7 @@ package rkr.simplekeyboard.inputmethod.latin.clipboard;
 
 import android.Manifest;
 import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.ContentUris;
 import android.content.Context;
@@ -14,6 +15,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PersistableBundle;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
@@ -116,11 +118,36 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         onPrimaryClipChanged();
     }
 
+    public static boolean isSensitiveClip(ClipData clip) {
+        if (clip == null) {
+            return false;
+        }
+        ClipDescription description = clip.getDescription();
+        if (description == null) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            PersistableBundle extras = description.getExtras();
+            if (extras != null) {
+                if (extras.getBoolean("android.content.extra.IS_SENSITIVE", false)
+                        || extras.getBoolean("android.content.extra.IS_CONFIDENTIAL", false)
+                        || extras.getBoolean("android.content.extra.IS_PASSWORD", false)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public String getLatestClipText() {
         if (mClipboardManager != null) {
             try {
                 if (mClipboardManager.hasPrimaryClip()) {
-                    final String currentText = processPrimaryClip(mClipboardManager.getPrimaryClip());
+                    final ClipData clip = mClipboardManager.getPrimaryClip();
+                    if (isSensitiveClip(clip)) {
+                        return null;
+                    }
+                    final String currentText = processPrimaryClip(clip);
                     if (currentText != null) {
                         return currentText;
                     }
@@ -134,6 +161,12 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
     private String processPrimaryClip(ClipData clip) {
         if (clip == null || clip.getItemCount() == 0) {
+            return null;
+        }
+        if (isSensitiveClip(clip)) {
+            mLastText = null;
+            mLastTextTime = 0L;
+            mLastTextUsed = true;
             return null;
         }
         ClipData.Item item = clip.getItemAt(0);

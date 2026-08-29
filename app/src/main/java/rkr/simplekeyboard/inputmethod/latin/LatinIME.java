@@ -943,19 +943,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mTopBarView == null || !isInputViewShown()) {
             return true;
         }
-        if (!mSettings.getCurrent().mShowSuggestions || isPasswordField()) {
+        if (!mSettings.getCurrent().mShowSuggestions || shouldSuppressSuggestions()) {
             mTopBarView.setSuggestions(null, -1);
             return true;
         }
         return false;
     }
 
-    private boolean isPasswordField() {
+    private boolean shouldSuppressSuggestions() {
         final EditorInfo editorInfo = getCurrentInputEditorInfo();
         if (editorInfo == null) {
             return false;
         }
-        return new InputAttributes(editorInfo, isFullscreenMode()).mIsPasswordField;
+        return !new InputAttributes(editorInfo, isFullscreenMode()).mShouldShowSuggestions;
     }
 
     private void displayEmptyWordSuggestions(final String w1, final String w2) {
@@ -1513,7 +1513,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private boolean shouldPerformAutoCorrection(final String word) {
-        if (!mSettings.getCurrent().mAutoCorrectionEnabled || isPasswordField()) {
+        if (!mSettings.getCurrent().mAutoCorrectionEnabled || shouldSuppressSuggestions()) {
             return false;
         }
         return !isWordEmpty(word);

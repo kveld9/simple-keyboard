@@ -180,10 +180,6 @@ public class TopBarView extends FrameLayout {
         }
     }
 
-    public void setSuggestions(List<CharSequence> suggestions) {
-        setSuggestions(suggestions, -1);
-    }
-
     public void setSuggestions(List<CharSequence> suggestions, int boldIndex) {
         if (suggestions == null || suggestions.isEmpty()) {
             clearSuggestions();

@@ -64,7 +64,6 @@ import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryManager;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryView;
 import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
-import rkr.simplekeyboard.inputmethod.latin.dict.UserDictionaryDatabase;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -107,7 +106,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private final PrefixDictionary mPrefixDictionary = new PrefixDictionary();
     private final java.util.concurrent.ExecutorService mDictExecutor =
             java.util.concurrent.Executors.newSingleThreadExecutor();
-    private UserDictionaryDatabase mUserDictionaryDb;
     private Locale mLoadedLocale;
 
     public final rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel mSpatialTouchModel = new rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel();
@@ -289,8 +287,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
         mClipboardHistoryManager.start();
-        mUserDictionaryDb = new UserDictionaryDatabase(this);
-        mUserDictionaryDb.decayAndCleanupAsync();
 
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
@@ -303,9 +299,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void loadSettings() {
-        if (mUserDictionaryDb != null) {
-            mUserDictionaryDb.decayAndCleanupAsync();
-        }
         mLocale = mRichImm.getCurrentSubtype().getLocaleObject();
         final EditorInfo editorInfo = getCurrentInputEditorInfo();
         final InputAttributes inputAttributes = new InputAttributes(editorInfo, isFullscreenMode());
@@ -322,10 +315,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mClipboardHistoryManager != null) {
             mClipboardHistoryManager.close();
             mClipboardHistoryManager = null;
-        }
-        if (mUserDictionaryDb != null) {
-            mUserDictionaryDb.close();
-            mUserDictionaryDb = null;
         }
         mDictExecutor.shutdownNow();
         mSettings.onDestroy();
@@ -743,15 +732,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
             // 2. Load primary active language with 100% frequency
             loadSingleLanguageDictionaryInto(newDict, currentLang, 1.0f);
-
-            // 3. Load user-learned words and bigrams from database with top priority
-            if (mUserDictionaryDb != null) {
-                final java.util.Map<String, Integer> userWords = mUserDictionaryDb.loadUserWords();
-                newDict.syncUserWords(userWords);
-
-                final java.util.Map<String, java.util.Map<String, Integer>> userBigrams = mUserDictionaryDb.loadUserBigrams();
-                newDict.syncUserBigrams(userBigrams);
-            }
 
             mHandler.post(() -> {
                 mPrefixDictionary.copyFrom(newDict);
@@ -1346,29 +1326,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (isWordEmpty(prevWord) || isWordEmpty(word)) {
             return;
         }
-        mPrefixDictionary.setBigram(prevWord, word, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
-        if (mUserDictionaryDb != null) {
-            new Thread(() -> {
-                if (mUserDictionaryDb != null) {
-                    mUserDictionaryDb.learnBigram(prevWord, word);
-                }
-            }).start();
-        }
+        mPrefixDictionary.setBigram(prevWord, word, PrefixDictionary.BASE_LEARNED_FREQUENCY);
     }
 
     private void learnWordAsync(final String word, final String prevWord) {
         if (isWordEmpty(word)) {
             return;
         }
-        mPrefixDictionary.insert(word, UserDictionaryDatabase.BASE_LEARNED_FREQUENCY);
+        mPrefixDictionary.insert(word, PrefixDictionary.BASE_LEARNED_FREQUENCY);
         learnBigramAsync(prevWord, word);
-        if (mUserDictionaryDb != null) {
-            new Thread(() -> {
-                if (mUserDictionaryDb != null) {
-                    mUserDictionaryDb.learnWord(word);
-                }
-            }).start();
-        }
     }
 
     public static String applyCasing(final String typed, final String suggestion) {

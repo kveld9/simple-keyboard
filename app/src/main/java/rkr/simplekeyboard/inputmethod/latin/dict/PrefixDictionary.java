@@ -124,6 +124,7 @@ public final class PrefixDictionary {
     private TrieNode mRoot = new TrieNode();
     private int mWordCount = 0;
     private float mAutoCorrectionThreshold = 1.0f;
+    private final Map<String, Map<String, Short>> mTrigrams = new HashMap<>();
     private final Map<String, Map<String, Short>> mBigrams = new HashMap<>();
     private final List<ScoredWord> mTopWords = new ArrayList<>();
 
@@ -144,6 +145,10 @@ public final class PrefixDictionary {
                 this.mRoot = other.mRoot;
                 this.mWordCount = other.mWordCount;
                 this.mAutoCorrectionThreshold = other.mAutoCorrectionThreshold;
+                this.mTrigrams.clear();
+                for (Map.Entry<String, Map<String, Short>> entry : other.mTrigrams.entrySet()) {
+                    this.mTrigrams.put(entry.getKey(), new HashMap<>(entry.getValue()));
+                }
                 this.mBigrams.clear();
                 for (Map.Entry<String, Map<String, Short>> entry : other.mBigrams.entrySet()) {
                     this.mBigrams.put(entry.getKey(), new HashMap<>(entry.getValue()));
@@ -274,6 +279,40 @@ public final class PrefixDictionary {
         }
     }
 
+    public synchronized void setTrigram(final String w1, final String w2, final String word, final int freq) {
+        if (w1 == null || w2 == null || word == null || w1.isEmpty() || w2.isEmpty() || word.isEmpty()) {
+            return;
+        }
+        final String normW1 = stripAccents(w1.toLowerCase());
+        final String normW2 = stripAccents(w2.toLowerCase());
+        final String normWord = stripAccents(word.toLowerCase());
+        final String key = normW1 + " " + normW2;
+        Map<String, Short> nextMap = mTrigrams.get(key);
+        if (nextMap == null) {
+            nextMap = new HashMap<>();
+            mTrigrams.put(key, nextMap);
+        }
+        short currentFreq = nextMap.containsKey(normWord) ? nextMap.get(normWord) : 0;
+        short newFreq = (short) Math.min(Short.MAX_VALUE, currentFreq > 0 ? currentFreq + 25 : Math.max(1, freq));
+        nextMap.put(normWord, newFreq);
+    }
+
+    public synchronized int getTrigramFrequency(final String w1, final String w2, final String word) {
+        if (w1 == null || w2 == null || word == null || w1.isEmpty() || w2.isEmpty() || word.isEmpty()) {
+            return 0;
+        }
+        final String normW1 = stripAccents(w1.toLowerCase());
+        final String normW2 = stripAccents(w2.toLowerCase());
+        final String normWord = stripAccents(word.toLowerCase());
+        final String key = normW1 + " " + normW2;
+        final Map<String, Short> nextMap = mTrigrams.get(key);
+        if (nextMap == null) {
+            return 0;
+        }
+        final Short freq = nextMap.get(normWord);
+        return freq != null ? (freq & 0xFFFF) : 0;
+    }
+
     public synchronized void setBigram(final String prevWord, final String word, final int freq) {
         if (prevWord == null || word == null || prevWord.isEmpty() || word.isEmpty()) {
             return;
@@ -285,7 +324,9 @@ public final class PrefixDictionary {
             nextMap = new HashMap<>();
             mBigrams.put(normPrev, nextMap);
         }
-        nextMap.put(normWord, (short) Math.min(Short.MAX_VALUE, Math.max(1, freq)));
+        short currentFreq = nextMap.containsKey(normWord) ? nextMap.get(normWord) : 0;
+        short newFreq = (short) Math.min(Short.MAX_VALUE, currentFreq > 0 ? currentFreq + 25 : Math.max(1, freq));
+        nextMap.put(normWord, newFreq);
     }
 
     public synchronized int getBigramFrequency(final String prevWord, final String word) {
@@ -319,10 +360,14 @@ public final class PrefixDictionary {
     }
 
     public synchronized List<CharSequence> getSuggestions(final String prefix, final int maxCount) {
-        return getSuggestions(prefix, maxCount, null);
+        return getSuggestions(prefix, maxCount, null, null);
     }
 
     public synchronized List<CharSequence> getSuggestions(final String prefix, final int maxCount, final String prevWord) {
+        return getSuggestions(prefix, maxCount, null, prevWord);
+    }
+
+    public synchronized List<CharSequence> getSuggestions(final String prefix, final int maxCount, final String w1, final String w2) {
         if (prefix == null || prefix.trim().isEmpty() || maxCount <= 0) {
             return Collections.emptyList();
         }
@@ -337,7 +382,7 @@ public final class PrefixDictionary {
         final List<ScoredWord> rawWords = new ArrayList<>();
         collectWords(current, rawWords, 40);
 
-        final List<ScoredWord> scoredWords = scorePrefixWords(rawWords, normPrefix, prevWord);
+        final List<ScoredWord> scoredWords = scorePrefixWords(rawWords, normPrefix, w1, w2);
         return formatSuggestions(scoredWords, trimmed, maxCount);
     }
 
@@ -352,30 +397,33 @@ public final class PrefixDictionary {
         return current;
     }
 
-    private List<ScoredWord> scorePrefixWords(final List<ScoredWord> rawWords, final String normPrefix, final String prevWord) {
+    private List<ScoredWord> scorePrefixWords(final List<ScoredWord> rawWords, final String normPrefix, final String w1, final String w2) {
         final List<ScoredWord> scoredWords = new ArrayList<>(rawWords.size());
         for (ScoredWord sw : rawWords) {
-            final float score = calcPrefixWordScore(sw, normPrefix, prevWord);
+            final float score = calcPrefixWordScore(sw, normPrefix, w1, w2);
             scoredWords.add(new ScoredWord(sw.word, sw.frequency, score));
         }
         Collections.sort(scoredWords);
         return scoredWords;
     }
 
-    private float calcPrefixWordScore(final ScoredWord sw, final String normPrefix, final String prevWord) {
+    private float calcPrefixWordScore(final ScoredWord sw, final String normPrefix, final String w1, final String w2) {
         float score = sw.frequency;
         if (stripAccents(sw.word.toLowerCase()).equals(normPrefix)) {
             score += 500.0f;
         }
-        return score + getPrefixBigramBonus(prevWord, sw.word);
+        return score + getPrefixContextBonus(w1, w2, sw.word);
     }
 
-    private float getPrefixBigramBonus(final String prevWord, final String word) {
-        if (prevWord == null || prevWord.isEmpty()) {
-            return 0.0f;
+    private float getPrefixContextBonus(final String w1, final String w2, final String word) {
+        final int triFreq = getTrigramFrequency(w1, w2, word);
+        final int biFreq = getBigramFrequency(w2, word);
+        if (triFreq > 0) {
+            return 800.0f + (triFreq * 3.0f) + (biFreq * 1.0f);
+        } else if (biFreq > 0) {
+            return 400.0f + (biFreq * 2.0f);
         }
-        final int bigramFreq = getBigramFrequency(prevWord, word);
-        return bigramFreq > 0 ? bigramFreq * 2.0f : 0.0f;
+        return 0.0f;
     }
 
     private List<CharSequence> formatSuggestions(final List<ScoredWord> scoredWords, final String originalPrefix, final int maxCount) {
@@ -507,10 +555,14 @@ public final class PrefixDictionary {
     }
 
     public synchronized CharSequence getBestCorrection(final String word) {
-        return getBestCorrection(word, null);
+        return getBestCorrection(word, null, null);
     }
 
     public synchronized CharSequence getBestCorrection(final String word, final String prevWord) {
+        return getBestCorrection(word, null, prevWord);
+    }
+
+    public synchronized CharSequence getBestCorrection(final String word, final String w1, final String w2) {
         if (isSkipCorrection(word)) {
             return null;
         }
@@ -522,11 +574,11 @@ public final class PrefixDictionary {
         }
 
         final boolean isWordValid = containsWord(word);
-        if (shouldSkipValidWord(isWordValid, prevWord)) {
+        if (shouldSkipValidWord(isWordValid, w2)) {
             return null;
         }
 
-        return getBestFuzzyCorrection(word, prevWord, isWordValid);
+        return getBestFuzzyCorrection(word, w1, w2, isWordValid);
     }
 
     private boolean isSkipCorrection(final String word) {
@@ -537,62 +589,65 @@ public final class PrefixDictionary {
         return isWordValid && (prevWord == null || prevWord.isEmpty());
     }
 
-    private CharSequence getBestFuzzyCorrection(final String word, final String prevWord, final boolean isWordValid) {
+    private CharSequence getBestFuzzyCorrection(final String word, final String w1, final String w2, final boolean isWordValid) {
         final String norm = stripAccents(word.toLowerCase());
-        final ScoredWord best = findBestFuzzyCandidate(norm, prevWord);
-        if (best == null || !isValidCorrection(best, word, norm, prevWord, isWordValid)) {
+        final ScoredWord best = findBestFuzzyCandidate(norm, w1, w2);
+        if (best == null || !isValidCorrection(best, word, norm, w1, w2, isWordValid)) {
             return null;
         }
         return applyCasing(word, best.word);
     }
 
-    private ScoredWord findBestFuzzyCandidate(final String norm, final String prevWord) {
-        final List<ScoredWord> candidates = searchAndScoreFuzzyCandidates(norm, prevWord);
+    private ScoredWord findBestFuzzyCandidate(final String norm, final String w1, final String w2) {
+        final List<ScoredWord> candidates = searchAndScoreFuzzyCandidates(norm, w1, w2);
         return candidates.isEmpty() ? null : candidates.get(0);
     }
 
-    private List<ScoredWord> searchAndScoreFuzzyCandidates(final String norm, final String prevWord) {
+    private List<ScoredWord> searchAndScoreFuzzyCandidates(final String norm, final String w1, final String w2) {
         final int maxDistance = getMaxFuzzyDistance(norm.length());
         final List<ScoredWord> rawCandidates = new ArrayList<>();
         searchFuzzy(mRoot, new StringBuilder(), norm, 0, maxDistance, rawCandidates);
         if (rawCandidates.isEmpty()) {
             return Collections.emptyList();
         }
-        return scoreFuzzyCandidates(rawCandidates, norm, prevWord);
+        return scoreFuzzyCandidates(rawCandidates, norm, w1, w2);
     }
 
     private int getMaxFuzzyDistance(final int normLen) {
         return (mAutoCorrectionThreshold >= 3.0f && normLen >= 5) ? 2 : 1;
     }
 
-    private List<ScoredWord> scoreFuzzyCandidates(final List<ScoredWord> rawCandidates, final String norm, final String prevWord) {
+    private List<ScoredWord> scoreFuzzyCandidates(final List<ScoredWord> rawCandidates, final String norm, final String w1, final String w2) {
         final List<ScoredWord> candidates = new ArrayList<>(rawCandidates.size());
         for (ScoredWord cw : rawCandidates) {
-            final float score = calcFuzzyCandidateScore(norm, cw.word, cw.frequency, prevWord);
+            final float score = calcFuzzyCandidateScore(norm, cw.word, cw.frequency, w1, w2);
             candidates.add(new ScoredWord(cw.word, cw.frequency, score));
         }
         Collections.sort(candidates);
         return candidates;
     }
 
-    private float calcFuzzyCandidateScore(final String norm, final String candidateWord, final int candidateFreq, final String prevWord) {
+    private float calcFuzzyCandidateScore(final String norm, final String candidateWord, final int candidateFreq, final String w1, final String w2) {
         float score = calcNormalizedScore(norm, candidateWord, candidateFreq);
-        return score + getFuzzyBigramBonus(prevWord, candidateWord);
+        return score + getFuzzyContextBonus(w1, w2, candidateWord);
     }
 
-    private float getFuzzyBigramBonus(final String prevWord, final String word) {
-        if (prevWord == null || prevWord.isEmpty()) {
-            return 0.0f;
+    private float getFuzzyContextBonus(final String w1, final String w2, final String word) {
+        final int triFreq = getTrigramFrequency(w1, w2, word);
+        final int biFreq = getBigramFrequency(w2, word);
+        if (triFreq > 0) {
+            return 600.0f + (triFreq * 2.5f);
+        } else if (biFreq > 0) {
+            return 300.0f + (biFreq * 1.5f);
         }
-        final int bigramFreq = getBigramFrequency(prevWord, word);
-        return bigramFreq > 0 ? bigramFreq * 1.5f : 0.0f;
+        return 0.0f;
     }
 
-    private boolean isValidCorrection(final ScoredWord best, final String word, final String norm, final String prevWord, final boolean isWordValid) {
+    private boolean isValidCorrection(final ScoredWord best, final String word, final String norm, final String w1, final String w2, final boolean isWordValid) {
         if (best.score < getMinCandidateScore()) {
             return false;
         }
-        if (isWordValid && !isSuperiorToValidWord(best.score, word, norm, prevWord)) {
+        if (isWordValid && !isSuperiorToValidWord(best.score, word, norm, w1, w2)) {
             return false;
         }
         return true;
@@ -618,22 +673,26 @@ public final class PrefixDictionary {
         return 200.0f;
     }
 
-    private boolean isSuperiorToValidWord(final float bestScore, final String word, final String norm, final String prevWord) {
+    private boolean isSuperiorToValidWord(final float bestScore, final String word, final String norm, final String w1, final String w2) {
         final int selfFreq = getWordFrequency(word);
-        float selfScore = calcNormalizedScore(norm, norm, selfFreq) + getFuzzyBigramBonus(prevWord, word);
+        float selfScore = calcNormalizedScore(norm, norm, selfFreq) + getFuzzyContextBonus(w1, w2, word);
         return bestScore >= selfScore + getValidWordDelta();
     }
 
     public synchronized List<CharSequence> getFuzzySuggestions(final String word, final int maxCount) {
-        return getFuzzySuggestions(word, maxCount, null);
+        return getFuzzySuggestions(word, maxCount, null, null);
     }
 
     public synchronized List<CharSequence> getFuzzySuggestions(final String word, final int maxCount, final String prevWord) {
+        return getFuzzySuggestions(word, maxCount, null, prevWord);
+    }
+
+    public synchronized List<CharSequence> getFuzzySuggestions(final String word, final int maxCount, final String w1, final String w2) {
         if (word == null || word.length() <= 1 || maxCount <= 0) {
             return Collections.emptyList();
         }
         final String norm = stripAccents(word.toLowerCase());
-        final List<ScoredWord> candidates = searchAndScoreFuzzyCandidates(norm, prevWord);
+        final List<ScoredWord> candidates = searchAndScoreFuzzyCandidates(norm, w1, w2);
         return formatSuggestions(candidates, word, maxCount);
     }
 
@@ -717,15 +776,22 @@ public final class PrefixDictionary {
     }
 
     public synchronized List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
+        return getNextWordPredictions(null, prevWord, limit);
+    }
+
+    public synchronized List<CharSequence> getNextWordPredictions(final String w1, final String w2, final int limit) {
         if (limit <= 0) {
             return Collections.emptyList();
         }
         final List<CharSequence> results = new ArrayList<>(limit);
         final Set<String> added = new HashSet<>();
 
-        if (prevWord != null && !prevWord.trim().isEmpty()) {
-            final String normPrev = stripAccents(prevWord.trim().toLowerCase());
-            final Map<String, Short> nextMap = mBigrams.get(normPrev);
+        // 1. Trigram Lookup (w1 + w2 -> w3)
+        if (w1 != null && !w1.trim().isEmpty() && w2 != null && !w2.trim().isEmpty()) {
+            final String normW1 = stripAccents(w1.trim().toLowerCase());
+            final String normW2 = stripAccents(w2.trim().toLowerCase());
+            final String key = normW1 + " " + normW2;
+            final Map<String, Short> nextMap = mTrigrams.get(key);
             if (nextMap != null && !nextMap.isEmpty()) {
                 final List<Map.Entry<String, Short>> sortedEntries = new ArrayList<>(nextMap.entrySet());
                 Collections.sort(sortedEntries, (a, b) -> Integer.compare(b.getValue() & 0xFFFF, a.getValue() & 0xFFFF));
@@ -734,14 +800,33 @@ public final class PrefixDictionary {
                     if (added.add(candidate.toLowerCase())) {
                         results.add(candidate);
                         if (results.size() >= limit) {
-                            break;
+                            return results;
                         }
                     }
                 }
             }
         }
 
-        // Fallback to top frequent words from dictionary if not enough bigrams
+        // 2. Bigram Lookup Backoff (w2 -> w3)
+        if (w2 != null && !w2.trim().isEmpty()) {
+            final String normW2 = stripAccents(w2.trim().toLowerCase());
+            final Map<String, Short> nextMap = mBigrams.get(normW2);
+            if (nextMap != null && !nextMap.isEmpty()) {
+                final List<Map.Entry<String, Short>> sortedEntries = new ArrayList<>(nextMap.entrySet());
+                Collections.sort(sortedEntries, (a, b) -> Integer.compare(b.getValue() & 0xFFFF, a.getValue() & 0xFFFF));
+                for (Map.Entry<String, Short> entry : sortedEntries) {
+                    final String candidate = getCanonicalWord(entry.getKey());
+                    if (added.add(candidate.toLowerCase())) {
+                        results.add(candidate);
+                        if (results.size() >= limit) {
+                            return results;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback to top frequent words from dictionary if not enough n-grams
         if (results.size() < limit) {
             for (ScoredWord sw : mTopWords) {
                 final String candidate = sw.word;
@@ -754,7 +839,7 @@ public final class PrefixDictionary {
             }
         }
 
-        // Final fallback to common frequent words if dictionary is small/empty
+        // 4. Final fallback to common frequent words if dictionary is small/empty
         if (results.size() < limit) {
             final String[] defaultFallback = {"the", "to", "and", "a", "in", "is", "it", "you", "that", "he", "que", "de", "no", "la", "el", "es", "en"};
             for (String w : defaultFallback) {
@@ -777,6 +862,7 @@ public final class PrefixDictionary {
     public synchronized void clear() {
         mRoot = new TrieNode();
         mWordCount = 0;
+        mTrigrams.clear();
         mBigrams.clear();
         mTopWords.clear();
     }

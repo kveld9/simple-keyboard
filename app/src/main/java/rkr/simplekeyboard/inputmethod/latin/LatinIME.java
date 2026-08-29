@@ -130,7 +130,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private String mOriginalTypedWordBeforeAutocorrect = null;
     private String mAutocorrectedWord = null;
+    private String mPrevPrevWord = null;
     private String mPreviousWord = null;
+    private rkr.simplekeyboard.inputmethod.latin.dict.ContactsDictionary mContactsDictionary;
     private boolean mCanRevertAutocorrect = false;
     private int mLastInlineFieldId = 0;
 
@@ -326,6 +328,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mClipboardHistoryManager.setOnScreenshotChangeListener(this::updateSuggestions);
         mClipboardHistoryManager.start();
 
+        mContactsDictionary = new rkr.simplekeyboard.inputmethod.latin.dict.ContactsDictionary(this);
+        loadContactsIfEnabled();
+
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
         loadSettings();
@@ -334,6 +339,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final IntentFilter filter = new IntentFilter();
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         registerReceiver(mRingerModeChangeReceiver, filter);
+    }
+
+    private void loadContactsIfEnabled() {
+        if (mContactsDictionary != null && mSettings.getCurrent().mUseContacts) {
+            mContactsDictionary.loadAsync(mDictExecutor, this::updateSuggestions);
+        }
     }
 
     private void loadSettings() {
@@ -438,8 +449,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                                 cleanWord = cleanWord.substring(1, cleanWord.length() - 1).trim();
                             }
                             if (cleanWord.length() > 0) {
-                                learnWordAsync(cleanWord, getEffectivePreviousWord());
-                                mPreviousWord = cleanWord;
+                                final String[] context = getEffectivePreviousWords();
+                                recordCommittedWord(cleanWord, context[0], context[1]);
                             }
                         }
                         final String currentWord = mInputLogic.mConnection.getWordBeforeCursor();
@@ -912,14 +923,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         final String word = mInputLogic.mConnection.getWordBeforeCursor();
-        final String prevWord = getEffectivePreviousWord();
+        final String[] context = getEffectivePreviousWords();
+        final String w1 = context[0];
+        final String w2 = context[1];
 
         if (isWordEmpty(word)) {
-            displayEmptyWordSuggestions(prevWord);
+            displayEmptyWordSuggestions(w1, w2);
             return;
         }
 
-        displayComposingSuggestions(word, prevWord);
+        displayComposingSuggestions(word, w1, w2);
     }
 
     private boolean isSuggestionsDisabled() {
@@ -941,11 +954,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return new InputAttributes(editorInfo, isFullscreenMode()).mIsPasswordField;
     }
 
-    private void displayEmptyWordSuggestions(final String prevWord) {
+    private void displayEmptyWordSuggestions(final String w1, final String w2) {
         if (displayClipboardChipIfAvailable()) {
             return;
         }
-        if (displayNextWordPredictionsIfAvailable(prevWord)) {
+        if (displayNextWordPredictionsIfAvailable(w1, w2)) {
             return;
         }
         mTopBarView.setSuggestions(null, -1);
@@ -1026,28 +1039,78 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
-    private boolean displayNextWordPredictionsIfAvailable(final String prevWord) {
-        if (isWordEmpty(prevWord)) {
+    private boolean displayNextWordPredictionsIfAvailable(final String w1, final String w2) {
+        if (isWordEmpty(w2)) {
             return false;
         }
-        final java.util.List<CharSequence> nextWordPredictions =
-                mPrefixDictionary.getNextWordPredictions(prevWord.trim(), 3);
-        if (nextWordPredictions != null && !nextWordPredictions.isEmpty()) {
-            mTopBarView.setSuggestions(nextWordPredictions, 0);
+        final java.util.List<CharSequence> predictions = new java.util.ArrayList<>(3);
+        final java.util.Set<String> added = new java.util.HashSet<>();
+
+        if (mContactsDictionary != null && mSettings.getCurrent().mUseContacts) {
+            final java.util.List<CharSequence> contactPreds = mContactsDictionary.getNextWordPredictions(w1, w2, 1);
+            if (contactPreds != null) {
+                for (CharSequence cp : contactPreds) {
+                    if (added.add(cp.toString().toLowerCase())) {
+                        predictions.add(cp);
+                    }
+                }
+            }
+        }
+
+        final java.util.List<CharSequence> nextWordPredictions = mPrefixDictionary.getNextWordPredictions(w1, w2, 3);
+        if (nextWordPredictions != null) {
+            for (CharSequence np : nextWordPredictions) {
+                if (predictions.size() >= 3) break;
+                if (added.add(np.toString().toLowerCase())) {
+                    predictions.add(np);
+                }
+            }
+        }
+
+        if (!predictions.isEmpty()) {
+            mTopBarView.setSuggestions(predictions, 0);
             return true;
         }
         return false;
     }
 
-    private java.util.List<CharSequence> getSuggestionsForWord(final String word, final String prevWord) {
-        if (mBeamSearchDecoder != null) {
-            final java.util.List<CharSequence> matches = mBeamSearchDecoder.getSuggestions(word, 3, prevWord);
-            if (matches != null && !matches.isEmpty()) {
-                return matches;
+    private java.util.List<CharSequence> getSuggestionsForWord(final String word, final String w1, final String w2) {
+        final java.util.List<CharSequence> merged = new java.util.ArrayList<>(3);
+        final java.util.Set<String> added = new java.util.HashSet<>();
+
+        if (mContactsDictionary != null && mSettings.getCurrent().mUseContacts) {
+            final java.util.List<CharSequence> contactMatches = mContactsDictionary.getSuggestions(word, 2, w1, w2);
+            if (contactMatches != null) {
+                for (CharSequence c : contactMatches) {
+                    if (added.add(c.toString().toLowerCase())) {
+                        merged.add(c);
+                    }
+                }
             }
         }
-        final java.util.List<CharSequence> dictMatches = mPrefixDictionary.getSuggestions(word, 3, prevWord);
-        return dictMatches != null ? dictMatches : java.util.Collections.emptyList();
+
+        if (mBeamSearchDecoder != null) {
+            final java.util.List<CharSequence> matches = mBeamSearchDecoder.getSuggestions(word, 3, w2);
+            if (matches != null && !matches.isEmpty()) {
+                for (CharSequence m : matches) {
+                    if (merged.size() >= 3) break;
+                    if (added.add(m.toString().toLowerCase())) {
+                        merged.add(m);
+                    }
+                }
+                if (!merged.isEmpty()) return merged;
+            }
+        }
+        final java.util.List<CharSequence> dictMatches = mPrefixDictionary.getSuggestions(word, 3, w1, w2);
+        if (dictMatches != null) {
+            for (CharSequence d : dictMatches) {
+                if (merged.size() >= 3) break;
+                if (added.add(d.toString().toLowerCase())) {
+                    merged.add(d);
+                }
+            }
+        }
+        return merged;
     }
 
     private CharSequence getDecoderBestCorrection(final String word, final String prevWord) {
@@ -1057,11 +1120,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return null;
     }
 
-    private CharSequence resolveBestCorrection(final String word, final String prevWord, final boolean hasMatches) {
+    private CharSequence resolveBestCorrection(final String word, final String w1, final String w2, final boolean hasMatches) {
         if (!mSettings.getCurrent().mAutoCorrectionEnabled) {
             return null;
         }
-        final CharSequence decoderCorrection = getDecoderBestCorrection(word, prevWord);
+        final CharSequence decoderCorrection = getDecoderBestCorrection(word, w2);
         if (decoderCorrection != null) {
             return decoderCorrection;
         }
@@ -1069,15 +1132,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (exactNorm != null) {
             return exactNorm;
         }
-        return hasMatches ? null : mPrefixDictionary.getBestCorrection(word, prevWord);
+        return hasMatches ? null : mPrefixDictionary.getBestCorrection(word, w1, w2);
     }
 
     private void appendCorrectionAndCandidates(final java.util.List<CharSequence> suggestions,
-            final String word, final String prevWord, final CharSequence bestCorrection,
+            final String word, final String w1, final String w2, final CharSequence bestCorrection,
             final java.util.List<CharSequence> matches) {
         suggestions.add(bestCorrection);
         final java.util.List<CharSequence> candidates = matches.isEmpty()
-                ? mPrefixDictionary.getFuzzySuggestions(word, 3, prevWord) : matches;
+                ? mPrefixDictionary.getFuzzySuggestions(word, 3, w1, w2) : matches;
         final String bestStr = bestCorrection.toString();
         for (CharSequence s : candidates) {
             if (suggestions.size() >= 3) {
@@ -1101,16 +1164,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return 1;
     }
 
-    private void displayComposingSuggestions(final String word, final String prevWord) {
+    private void displayComposingSuggestions(final String word, final String w1, final String w2) {
         final java.util.List<CharSequence> suggestions = new java.util.ArrayList<>();
         suggestions.add("\"" + word + "\"");
 
-        final java.util.List<CharSequence> matches = getSuggestionsForWord(word, prevWord);
-        final CharSequence bestCorrection = resolveBestCorrection(word, prevWord, !matches.isEmpty());
+        final java.util.List<CharSequence> matches = getSuggestionsForWord(word, w1, w2);
+        final CharSequence bestCorrection = resolveBestCorrection(word, w1, w2, !matches.isEmpty());
 
         final int boldIndex;
         if (bestCorrection != null) {
-            appendCorrectionAndCandidates(suggestions, word, prevWord, bestCorrection, matches);
+            appendCorrectionAndCandidates(suggestions, word, w1, w2, bestCorrection, matches);
             boldIndex = 1;
         } else {
             boldIndex = appendMatchingSuggestions(suggestions, matches);
@@ -1431,7 +1494,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + 1);
         mInputLogic.mConnection.commitText(mOriginalTypedWordBeforeAutocorrect, 1);
 
-        learnWordAsync(mOriginalTypedWordBeforeAutocorrect, null);
+        final String[] context = getEffectivePreviousWords();
+        recordCommittedWord(mOriginalTypedWordBeforeAutocorrect, context[0], context[1]);
 
         mCanRevertAutocorrect = false;
         mOriginalTypedWordBeforeAutocorrect = null;
@@ -1451,20 +1515,20 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return !isWordEmpty(word);
     }
 
-    private CharSequence getBestCorrection(final String word, final String prevWord) {
-        final CharSequence decoderCorrection = getDecoderBestCorrection(word, prevWord);
+    private CharSequence getBestCorrection(final String word, final String w1, final String w2) {
+        final CharSequence decoderCorrection = getDecoderBestCorrection(word, w2);
         if (decoderCorrection != null) {
             return decoderCorrection;
         }
-        return mPrefixDictionary.getBestCorrection(word, prevWord);
+        return mPrefixDictionary.getBestCorrection(word, w1, w2);
     }
 
-    private String applySpaceAutoCorrection(final String word, final String prevWord) {
+    private String applySpaceAutoCorrection(final String word, final String w1, final String w2) {
         if (!shouldPerformAutoCorrection(word)) {
             mCanRevertAutocorrect = false;
             return word;
         }
-        final CharSequence correction = getBestCorrection(word, prevWord);
+        final CharSequence correction = getBestCorrection(word, w1, w2);
         if (correction != null) {
             mInputLogic.mConnection.deleteTextBeforeCursor(word.length());
             mInputLogic.mConnection.commitText(correction, 1);
@@ -1477,12 +1541,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return word;
     }
 
-    private void recordCommittedWord(final String committedWord, final String prevWord) {
+    private void recordCommittedWord(final String committedWord, final String w1, final String w2) {
         if (isWordEmpty(committedWord)) {
             return;
         }
         final String cleanCommitted = committedWord.trim();
-        learnBigramAsync(prevWord, cleanCommitted);
+        learnNgramAsync(w1, w2, cleanCommitted);
+        mPrevPrevWord = w2;
         mPreviousWord = cleanCommitted;
     }
 
@@ -1491,9 +1556,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         final String word = mInputLogic.mConnection.getWordBeforeCursor();
-        final String prevWord = getEffectivePreviousWord();
-        final String committedWord = applySpaceAutoCorrection(word, prevWord);
-        recordCommittedWord(committedWord, prevWord);
+        final String[] context = getEffectivePreviousWords();
+        final String w1 = context[0];
+        final String w2 = context[1];
+        final String committedWord = applySpaceAutoCorrection(word, w1, w2);
+        recordCommittedWord(committedWord, w1, w2);
+    }
+
+    private String[] getEffectivePreviousWords() {
+        if (mPreviousWord != null && !mPreviousWord.isEmpty()) {
+            return new String[]{ mPrevPrevWord != null ? mPrevPrevWord : "", mPreviousWord };
+        }
+        return mInputLogic.mConnection.getTwoPreviousWordsBeforeCursor();
     }
 
     private String getEffectivePreviousWord() {
@@ -1505,19 +1579,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return word == null || word.trim().isEmpty();
     }
 
-    private void learnBigramAsync(final String prevWord, final String word) {
-        if (isWordEmpty(prevWord) || isWordEmpty(word)) {
-            return;
-        }
-        mPrefixDictionary.setBigram(prevWord, word, PrefixDictionary.BASE_LEARNED_FREQUENCY);
-    }
-
-    private void learnWordAsync(final String word, final String prevWord) {
+    private void learnNgramAsync(final String w1, final String w2, final String word) {
         if (isWordEmpty(word)) {
             return;
         }
-        mPrefixDictionary.insert(word, PrefixDictionary.BASE_LEARNED_FREQUENCY);
-        learnBigramAsync(prevWord, word);
+        final String cleanWord = word.trim();
+        mPrefixDictionary.insert(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+        if (!isWordEmpty(w2)) {
+            mPrefixDictionary.setBigram(w2.trim(), cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+            if (!isWordEmpty(w1)) {
+                mPrefixDictionary.setTrigram(w1.trim(), w2.trim(), cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+            }
+        }
     }
 
     public static String applyCasing(final String typed, final String suggestion) {

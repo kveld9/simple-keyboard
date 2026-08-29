@@ -333,6 +333,74 @@ public final class RichInputConnection {
         return text.substring(i + 1, end);
     }
 
+    public String[] getTwoPreviousWordsBeforeCursor() {
+        String text = mTextBeforeCursor;
+        if ((text == null || text.isEmpty()) && isConnected()) {
+            try {
+                final CharSequence icText = mIC.getTextBeforeCursor(100, 0);
+                if (icText != null && icText.length() > 0) {
+                    text = icText.toString();
+                }
+            } catch (Exception e) {
+                // Ignore fallback
+            }
+        }
+        if (text == null || text.isEmpty()) {
+            return new String[]{"", ""};
+        }
+        int i = text.length() - 1;
+        // Skip current word (if any)
+        while (i >= 0) {
+            char c = text.charAt(i);
+            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
+                break;
+            }
+            i--;
+        }
+        // Skip whitespace/separators before w2
+        while (i >= 0) {
+            char c = text.charAt(i);
+            if (Character.isLetter(c) || c == '\'' || c == '-') {
+                break;
+            }
+            i--;
+        }
+        if (i < 0) {
+            return new String[]{"", ""};
+        }
+        int end2 = i + 1;
+        while (i >= 0) {
+            char c = text.charAt(i);
+            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
+                break;
+            }
+            i--;
+        }
+        String w2 = text.substring(i + 1, end2);
+
+        // Skip whitespace/separators before w1
+        while (i >= 0) {
+            char c = text.charAt(i);
+            if (Character.isLetter(c) || c == '\'' || c == '-') {
+                break;
+            }
+            i--;
+        }
+        if (i < 0) {
+            return new String[]{"", w2};
+        }
+        int end1 = i + 1;
+        while (i >= 0) {
+            char c = text.charAt(i);
+            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
+                break;
+            }
+            i--;
+        }
+        String w1 = text.substring(i + 1, end1);
+        return new String[]{w1, w2};
+    }
+
     public String getTextBeforeCursor(final int n, final int flags) {
         if (mTextBeforeCursor != null && mTextBeforeCursor.length() > 0) {
             final int len = Math.min(n, mTextBeforeCursor.length());

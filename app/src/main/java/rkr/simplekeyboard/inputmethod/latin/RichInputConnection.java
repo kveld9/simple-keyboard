@@ -287,6 +287,24 @@ public final class RichInputConnection {
         return text.substring(i + 1);
     }
 
+    public String getTextBeforeCursor(final int n, final int flags) {
+        if (mTextBeforeCursor != null && mTextBeforeCursor.length() > 0) {
+            final int len = Math.min(n, mTextBeforeCursor.length());
+            return mTextBeforeCursor.substring(mTextBeforeCursor.length() - len);
+        }
+        if (isConnected()) {
+            try {
+                final CharSequence cs = mIC.getTextBeforeCursor(n, flags);
+                if (cs != null) {
+                    return cs.toString();
+                }
+            } catch (Exception e) {
+                // Ignore fallback
+            }
+        }
+        return "";
+    }
+
     public void commitSuggestion(final CharSequence suggestion) {
         final String currentWord = getWordBeforeCursor();
         if (!currentWord.isEmpty()) {

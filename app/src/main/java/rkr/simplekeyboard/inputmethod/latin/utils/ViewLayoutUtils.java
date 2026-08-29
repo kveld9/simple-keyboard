@@ -53,6 +53,7 @@ public final class ViewLayoutUtils {
             marginLayoutParams.width = w;
             marginLayoutParams.height = h;
             marginLayoutParams.setMargins(x, y, -50, 0);
+            view.setLayoutParams(marginLayoutParams);
         }
     }
 

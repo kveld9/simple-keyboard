@@ -275,6 +275,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
     private void locatePreviewPlacerView() {
         getLocationInWindow(mOriginCoords);
         mDrawingPreviewPlacerView.setKeyboardViewGeometry(mOriginCoords);
+        mDrawingPreviewPlacerView.bringToFront();
     }
 
     private void installPreviewPlacerView() {
@@ -289,7 +290,12 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
             Log.w(TAG, "Cannot find android.R.id.content view to add DrawingPreviewPlacerView");
             return;
         }
-        windowContentView.addView(mDrawingPreviewPlacerView);
+        final ViewGroup currentParent = (ViewGroup) mDrawingPreviewPlacerView.getParent();
+        if (currentParent != null) {
+            currentParent.removeView(mDrawingPreviewPlacerView);
+        }
+        windowContentView.addView(mDrawingPreviewPlacerView,
+                new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
     // Implements {@link DrawingProxy#onKeyPressed(Key,boolean)}.
@@ -316,8 +322,9 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         locatePreviewPlacerView();
         getLocationInWindow(mOriginCoords);
         final int backgroundColor = mTheme.mCustomColorSupport ? mCustomColor : Color.TRANSPARENT;
+        final float cornerRadius = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getCornerRadius(getContext(), mKeyShape);
         mKeyPreviewChoreographer.placeAndShowKeyPreview(key, keyboard.mIconsSet, getKeyDrawParams(),
-                mOriginCoords, mDrawingPreviewPlacerView, isHardwareAccelerated(), backgroundColor);
+                mOriginCoords, mDrawingPreviewPlacerView, isHardwareAccelerated(), backgroundColor, cornerRadius);
     }
 
     private void dismissKeyPreviewWithoutDelay(final Key key) {

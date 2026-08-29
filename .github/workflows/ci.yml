@@ -140,6 +140,7 @@ jobs:
           set -euo pipefail
           VERSION="${{ needs.prepare-version.outputs.version }}"
           VERSION_CODE="${{ needs.prepare-version.outputs.version_code }}"
+          if [ -z "$VERSION_CODE" ]; then VERSION_CODE="70000"; fi
           echo "Burning version ${VERSION} (${VERSION_CODE}) into app/build.gradle"
           sed -i "s/def appVersionName = .*/def appVersionName = \"${VERSION}\"/" app/build.gradle
           sed -i "s/def appVersionCode = .*/def appVersionCode = ${VERSION_CODE}/" app/build.gradle

@@ -42,7 +42,8 @@ public final class PreferencesSettingsFragment extends SubScreenFragment {
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
         if (key.equals(Settings.PREF_SHOW_SPECIAL_CHARS) ||
-                key.equals(Settings.PREF_SHOW_NUMBER_ROW)) {
+                key.equals(Settings.PREF_SHOW_NUMBER_ROW) ||
+                key.equals(Settings.PREF_SHOW_LANGUAGE_ON_SPACEBAR)) {
             KeyboardLayoutSet.onKeyboardThemeChanged();
         }
     }

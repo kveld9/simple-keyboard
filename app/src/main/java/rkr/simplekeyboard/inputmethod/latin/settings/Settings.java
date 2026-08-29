@@ -52,6 +52,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_SOUND_ON = "sound_on";
     public static final String PREF_POPUP_ON = "popup_on";
     public static final String PREF_SHOW_LANGUAGE_SWITCH_KEY = "pref_show_language_switch_key";
+    public static final String PREF_SHOW_LANGUAGE_ON_SPACEBAR = "pref_show_language_on_spacebar";
     public static final String PREF_USE_ON_SCREEN = "pref_use_on_screen";
     public static final String PREF_ENABLE_IME_SWITCH = "pref_enable_ime_switch";
     public static final String PREF_ENABLED_SUBTYPES = "pref_enabled_subtypes";
@@ -178,6 +179,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
             case PREF_SHOW_NUMBER_ROW:
             case PREF_SHOW_SPECIAL_CHARS:
             case PREF_SHOW_LANGUAGE_SWITCH_KEY:
+            case PREF_SHOW_LANGUAGE_ON_SPACEBAR:
             case PREF_USE_ON_SCREEN:
             case PREF_ENABLE_IME_SWITCH:
             case PREF_DELETE_SWIPE:
@@ -236,6 +238,10 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     public static boolean readShowLanguageSwitchKey(final SharedPreferences prefs) {
         return prefs.getBoolean(PREF_SHOW_LANGUAGE_SWITCH_KEY, true);
+    }
+
+    public static boolean readShowLanguageOnSpacebar(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_SHOW_LANGUAGE_ON_SPACEBAR, true);
     }
 
     public static boolean readUseOnScreenKeyboard(final SharedPreferences prefs) {

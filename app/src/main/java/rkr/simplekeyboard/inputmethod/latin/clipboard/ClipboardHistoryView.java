@@ -28,6 +28,7 @@ public class ClipboardHistoryView extends LinearLayout {
 
     public interface ClipboardHistoryListener {
         void onPasteText(CharSequence text);
+        void onPasteImage(String imageUri);
         void onCloseClipboard();
     }
 
@@ -284,15 +285,39 @@ public class ClipboardHistoryView extends LinearLayout {
 
     private View createCardTextContainer(Context context, final ClipboardHistoryEntry entry) {
         LinearLayout textContainer = new LinearLayout(context);
-        textContainer.setOrientation(VERTICAL);
+        textContainer.setOrientation(HORIZONTAL);
         textContainer.setGravity(Gravity.CENTER_VERTICAL);
         textContainer.setClickable(true);
         textContainer.setFocusable(false);
-        textContainer.setPadding(dpToPx(12), dpToPx(10), dpToPx(8), dpToPx(10));
+        textContainer.setPadding(dpToPx(12), dpToPx(8), dpToPx(8), dpToPx(8));
         textContainer.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1.0f));
 
+        if (entry.uri != null && !entry.uri.isEmpty()) {
+            ImageView imageView = new ImageView(context);
+            int imgSize = dpToPx(48);
+            LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams(imgSize, imgSize);
+            imgLp.setMargins(0, 0, dpToPx(10), 0);
+            imageView.setLayoutParams(imgLp);
+            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+
+            java.io.File imgFile = new java.io.File(entry.uri);
+            if (imgFile.exists()) {
+                android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
+                options.inSampleSize = 4;
+                android.graphics.Bitmap bm = android.graphics.BitmapFactory.decodeFile(imgFile.getAbsolutePath(), options);
+                if (bm != null) {
+                    imageView.setImageBitmap(bm);
+                } else {
+                    imageView.setImageResource(R.drawable.sym_keyboard_paste);
+                }
+            } else {
+                imageView.setImageResource(R.drawable.sym_keyboard_paste);
+            }
+            textContainer.addView(imageView);
+        }
+
         TextView textView = new TextView(context);
-        textView.setText(entry.text);
+        textView.setText(entry.text != null ? entry.text : "[Screenshot]");
         textView.setTextColor(mTextColor);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         textView.setMaxLines(4);
@@ -301,7 +326,11 @@ public class ClipboardHistoryView extends LinearLayout {
 
         textContainer.setOnClickListener(v -> {
             if (mListener != null) {
-                mListener.onPasteText(entry.text);
+                if (entry.uri != null && !entry.uri.isEmpty()) {
+                    mListener.onPasteImage(entry.uri);
+                } else {
+                    mListener.onPasteText(entry.text);
+                }
             }
         });
         return textContainer;
@@ -352,6 +381,11 @@ public class ClipboardHistoryView extends LinearLayout {
         if (mDatabase == null) return;
         mAsyncExecutor.execute(() -> {
             mDatabase.deleteClip(entry.id);
+            if (entry.uri != null) {
+                try {
+                    new java.io.File(entry.uri).delete();
+                } catch (Exception ignored) {}
+            }
             clearSystemClipboardIfMatches(entry.text);
             final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips();
             post(() -> displayClips(updatedClips));

@@ -13,12 +13,13 @@ import java.util.List;
 public class ClipboardDatabase extends SQLiteOpenHelper {
     private static final String TAG = "ClipboardDatabase";
     private static final String DATABASE_NAME = "clipboard_history.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
     private static final String TABLE_NAME = "clips";
     private static final String COL_ID = "id";
     private static final String COL_TEXT = "text";
     private static final String COL_TIMESTAMP = "timestamp";
     private static final String COL_PINNED = "is_pinned";
+    private static final String COL_URI = "uri";
     private static final int MAX_CLIPS = 50;
     private static final int MAX_TEXT_LENGTH = 50000;
 
@@ -32,30 +33,40 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
                 COL_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 COL_TEXT + " TEXT UNIQUE, " +
                 COL_TIMESTAMP + " INTEGER, " +
-                COL_PINNED + " INTEGER DEFAULT 0)";
+                COL_PINNED + " INTEGER DEFAULT 0, " +
+                COL_URI + " TEXT)";
         db.execSQL(createTable);
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_pinned_time ON " + TABLE_NAME + " (" + COL_PINNED + ", " + COL_TIMESTAMP + ")");
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_NAME);
-        onCreate(db);
+        if (oldVersion < 2) {
+            try {
+                db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COL_URI + " TEXT");
+            } catch (Exception e) {
+                Log.e(TAG, "Error adding uri column on upgrade", e);
+            }
+        }
     }
 
     public synchronized void insertClip(String text) {
-        insertClip(text, false, System.currentTimeMillis());
+        insertClip(text, false, System.currentTimeMillis(), null);
     }
 
     public synchronized void insertClip(String text, boolean pinned) {
-        insertClip(text, pinned, System.currentTimeMillis());
+        insertClip(text, pinned, System.currentTimeMillis(), null);
     }
 
     public synchronized void insertClip(String text, boolean pinned, long timestamp) {
-        if (text == null || text.trim().isEmpty()) {
+        insertClip(text, pinned, timestamp, null);
+    }
+
+    public synchronized void insertClip(String text, boolean pinned, long timestamp, String uri) {
+        if ((text == null || text.trim().isEmpty()) && (uri == null || uri.trim().isEmpty())) {
             return;
         }
-        if (text.length() > MAX_TEXT_LENGTH) {
+        if (text != null && text.length() > MAX_TEXT_LENGTH) {
             text = text.substring(0, MAX_TEXT_LENGTH);
         }
         if (timestamp <= 0) {
@@ -66,8 +77,10 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         try {
             // Check if exists and whether it was pinned
             boolean isPinned = pinned;
-            Cursor cursor = db.query(TABLE_NAME, new String[]{COL_PINNED}, COL_TEXT + "=?",
-                    new String[]{text}, null, null, null);
+            String queryKey = (uri != null && !uri.isEmpty()) ? uri : text;
+            String whereClause = (uri != null && !uri.isEmpty()) ? (COL_URI + "=?") : (COL_TEXT + "=?");
+            Cursor cursor = db.query(TABLE_NAME, new String[]{COL_PINNED}, whereClause,
+                    new String[]{queryKey}, null, null, null);
             if (cursor != null) {
                 if (cursor.moveToFirst()) {
                     isPinned = isPinned || (cursor.getInt(0) == 1);
@@ -76,12 +89,15 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
             }
 
             // Remove existing row to refresh timestamp and position
-            db.delete(TABLE_NAME, COL_TEXT + "=?", new String[]{text});
+            db.delete(TABLE_NAME, whereClause, new String[]{queryKey});
 
             ContentValues values = new ContentValues();
-            values.put(COL_TEXT, text);
+            values.put(COL_TEXT, text != null ? text : "[Screenshot]");
             values.put(COL_TIMESTAMP, timestamp);
             values.put(COL_PINNED, isPinned ? 1 : 0);
+            if (uri != null) {
+                values.put(COL_URI, uri);
+            }
             db.insert(TABLE_NAME, null, values);
 
             cleanupOldClips(db);
@@ -163,12 +179,14 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
                 int textCol = cursor.getColumnIndexOrThrow(COL_TEXT);
                 int timeCol = cursor.getColumnIndexOrThrow(COL_TIMESTAMP);
                 int pinCol = cursor.getColumnIndexOrThrow(COL_PINNED);
+                int uriCol = cursor.getColumnIndex(COL_URI);
                 do {
                     long id = cursor.getLong(idCol);
                     String text = cursor.getString(textCol);
                     long timestamp = cursor.getLong(timeCol);
                     boolean isPinned = cursor.getInt(pinCol) == 1;
-                    clips.add(new ClipboardHistoryEntry(id, text, timestamp, isPinned));
+                    String uri = (uriCol != -1 && !cursor.isNull(uriCol)) ? cursor.getString(uriCol) : null;
+                    clips.add(new ClipboardHistoryEntry(id, text, timestamp, isPinned, uri));
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {

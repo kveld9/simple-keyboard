@@ -511,6 +511,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         // Switch to the null consumer to handle cases leading to early exit below, for which we
         // also wouldn't be consuming gesture data.
+        if (mTopBarView != null) {
+            mTopBarView.closeToolTray();
+        }
         final KeyboardSwitcher switcher = mKeyboardSwitcher;
         switcher.updateKeyboardTheme();
         final MainKeyboardView mainKeyboardView = switcher.getMainKeyboardView();
@@ -1034,6 +1037,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // This method is public for testability of LatinIME, but also in the future it should
     // completely replace #onCodeInput.
     public void onEvent(final Event event) {
+        if (mTopBarView != null && mTopBarView.isToolTrayOpen()) {
+            mTopBarView.closeToolTray();
+        }
         if (!event.isFunctionalKeyEvent() && event.mCodePoint == Constants.CODE_SPACE) {
             final SettingsValues settingsValues = mSettings.getCurrent();
             if (settingsValues.mAutoCorrectionEnabled) {

@@ -67,6 +67,8 @@
     <string name="clipboard_delete">Eliminar</string>
     <string name="clipboard_pin">Fijar</string>
     <string name="clipboard_unpin">Desfijar</string>
+    <string name="clipboard_suggestions">Mostrar sugerencias del portapapeles</string>
+    <string name="clipboard_suggestions_summary">Mostrar elementos copiados recientemente en la barra de sugerencias</string>
     <string name="clipboard_history_retention_time">Tiempo de retención del portapapeles</string>
     <string-array name="clipboard_retention_entries">
         <item>10 minutos</item>

@@ -65,6 +65,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_SPACE_SWIPE = "pref_space_swipe";
     public static final String PREF_DELETE_SWIPE = "pref_delete_swipe";
     public static final String PREF_CLIPBOARD_RETENTION_TIME = "pref_clipboard_retention_time";
+    public static final String PREF_CLIPBOARD_SUGGESTIONS = "pref_clipboard_suggestions";
     public static final String PREF_KEY_SHAPE = "pref_key_shape";
     public static final String KEY_SHAPE_ROUNDED = "rounded";
     public static final String KEY_SHAPE_RECTANGULAR = "rectangular";
@@ -273,6 +274,10 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     public static boolean readDeleteSwipeEnabled(final SharedPreferences prefs) {
         return prefs.getBoolean(PREF_DELETE_SWIPE, false);
+    }
+
+    public static boolean readClipboardSuggestionsEnabled(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_CLIPBOARD_SUGGESTIONS, false);
     }
 
     public static String readKeyShape(final SharedPreferences prefs) {

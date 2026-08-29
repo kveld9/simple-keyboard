@@ -919,7 +919,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private boolean displayClipboardChipIfAvailable() {
-        if (mClipboardHistoryManager == null) {
+        if (mClipboardHistoryManager == null || !mSettings.getCurrent().mClipboardSuggestionsEnabled) {
             return false;
         }
         final String recentClip = mClipboardHistoryManager.getRecentClipForSuggestion();

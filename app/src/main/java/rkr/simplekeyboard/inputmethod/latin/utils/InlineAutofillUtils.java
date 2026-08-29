@@ -113,6 +113,7 @@ public final class InlineAutofillUtils {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         inlineSuggestionView.setHorizontalScrollBarEnabled(false);
         inlineSuggestionView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        inlineSuggestionView.setFillViewport(true);
         inlineSuggestionView.addView(container);
 
         return inlineSuggestionView;

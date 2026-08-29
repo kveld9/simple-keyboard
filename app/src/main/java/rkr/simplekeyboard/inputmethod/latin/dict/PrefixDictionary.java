@@ -18,9 +18,85 @@ import java.util.Set;
  */
 public final class PrefixDictionary {
 
+    private static final char[] EMPTY_CHARS = new char[0];
+    private static final TrieNode[] EMPTY_CHILDREN = new TrieNode[0];
+    private static final String[] EMPTY_WORDS = new String[0];
+    private static final short[] EMPTY_FREQS = new short[0];
+
     private static final class TrieNode {
-        final Map<Character, TrieNode> children = new HashMap<>();
-        final List<ScoredWord> words = new ArrayList<>();
+        char[] keys = EMPTY_CHARS;
+        TrieNode[] children = EMPTY_CHILDREN;
+        String[] words = EMPTY_WORDS;
+        short[] freqs = EMPTY_FREQS;
+
+        TrieNode getChild(final char c) {
+            final char[] k = keys;
+            for (int i = 0; i < k.length; i++) {
+                if (k[i] == c) {
+                    return children[i];
+                }
+            }
+            return null;
+        }
+
+        TrieNode getOrCreateChild(final char c) {
+            final char[] k = keys;
+            for (int i = 0; i < k.length; i++) {
+                if (k[i] == c) {
+                    return children[i];
+                }
+            }
+            final int len = k.length;
+            final char[] newK = new char[len + 1];
+            final TrieNode[] newC = new TrieNode[len + 1];
+            System.arraycopy(k, 0, newK, 0, len);
+            System.arraycopy(children, 0, newC, 0, len);
+            newK[len] = c;
+            final TrieNode child = new TrieNode();
+            newC[len] = child;
+            this.keys = newK;
+            this.children = newC;
+            return child;
+        }
+
+        boolean addWord(final String word, final int freq) {
+            final short sFreq = (short) Math.min(Short.MAX_VALUE, Math.max(1, freq));
+            for (int i = 0; i < words.length; i++) {
+                if (words[i].equalsIgnoreCase(word)) {
+                    if (sFreq > freqs[i]) {
+                        freqs[i] = sFreq;
+                        sortWords();
+                    }
+                    return false;
+                }
+            }
+            final int len = words.length;
+            final String[] newW = new String[len + 1];
+            final short[] newF = new short[len + 1];
+            System.arraycopy(words, 0, newW, 0, len);
+            System.arraycopy(freqs, 0, newF, 0, len);
+            newW[len] = word;
+            newF[len] = sFreq;
+            this.words = newW;
+            this.freqs = newF;
+            sortWords();
+            return true;
+        }
+
+        private void sortWords() {
+            for (int i = 1; i < words.length; i++) {
+                final String w = words[i];
+                final short f = freqs[i];
+                int j = i - 1;
+                while (j >= 0 && freqs[j] < f) {
+                    words[j + 1] = words[j];
+                    freqs[j + 1] = freqs[j];
+                    j--;
+                }
+                words[j + 1] = w;
+                freqs[j + 1] = f;
+            }
+        }
     }
 
     private static final class ScoredWord implements Comparable<ScoredWord> {
@@ -34,7 +110,6 @@ public final class PrefixDictionary {
 
         @Override
         public int compareTo(ScoredWord other) {
-            // Higher frequency first
             return Integer.compare(other.frequency, this.frequency);
         }
     }
@@ -84,27 +159,9 @@ public final class PrefixDictionary {
         TrieNode current = mRoot;
         for (int i = 0; i < normalized.length(); i++) {
             final char ch = normalized.charAt(i);
-            TrieNode child = current.children.get(ch);
-            if (child == null) {
-                child = new TrieNode();
-                current.children.put(ch, child);
-            }
-            current = child;
+            current = current.getOrCreateChild(ch);
         }
-
-        boolean found = false;
-        for (int i = 0; i < current.words.size(); i++) {
-            if (current.words.get(i).word.equalsIgnoreCase(word)) {
-                if (frequency > current.words.get(i).frequency) {
-                    current.words.set(i, new ScoredWord(word, frequency));
-                }
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            current.words.add(new ScoredWord(word, frequency));
-            Collections.sort(current.words);
+        if (current.addWord(word, frequency)) {
             mWordCount++;
         }
     }
@@ -144,7 +201,7 @@ public final class PrefixDictionary {
 
         for (int i = 0; i < normPrefix.length(); i++) {
             final char ch = normPrefix.charAt(i);
-            current = current.children.get(ch);
+            current = current.getChild(ch);
             if (current == null) {
                 return Collections.emptyList();
             }
@@ -184,13 +241,13 @@ public final class PrefixDictionary {
     }
 
     private void collectWords(final TrieNode node, final List<ScoredWord> accumulator, final int maxLimit) {
-        if (!node.words.isEmpty()) {
-            accumulator.addAll(node.words);
+        for (int i = 0; i < node.words.length; i++) {
+            accumulator.add(new ScoredWord(node.words[i], node.freqs[i]));
             if (accumulator.size() >= maxLimit) {
                 return;
             }
         }
-        for (TrieNode child : node.children.values()) {
+        for (TrieNode child : node.children) {
             collectWords(child, accumulator, maxLimit);
             if (accumulator.size() >= maxLimit) {
                 return;
@@ -218,13 +275,13 @@ public final class PrefixDictionary {
         final String norm = stripAccents(lower);
         TrieNode current = mRoot;
         for (int i = 0; i < norm.length(); i++) {
-            current = current.children.get(norm.charAt(i));
+            current = current.getChild(norm.charAt(i));
             if (current == null) {
                 return false;
             }
         }
-        for (ScoredWord sw : current.words) {
-            if (sw.word.equalsIgnoreCase(word)) {
+        for (String w : current.words) {
+            if (w.equalsIgnoreCase(word)) {
                 return true;
             }
         }
@@ -239,13 +296,13 @@ public final class PrefixDictionary {
         final String norm = stripAccents(lower);
         TrieNode current = mRoot;
         for (int i = 0; i < norm.length(); i++) {
-            current = current.children.get(norm.charAt(i));
+            current = current.getChild(norm.charAt(i));
             if (current == null) {
                 return null;
             }
         }
-        if (!current.words.isEmpty()) {
-            final String best = current.words.get(0).word;
+        if (current.words.length > 0) {
+            final String best = current.words[0];
             if (best.equalsIgnoreCase(word)) {
                 return null;
             }
@@ -321,8 +378,10 @@ public final class PrefixDictionary {
     private void searchFuzzy(final TrieNode node, final StringBuilder currentPath,
                              final String target, final int targetIdx, final int remainingDistance,
                              final List<ScoredWord> candidates) {
-        if (targetIdx == target.length() && !node.words.isEmpty()) {
-            candidates.addAll(node.words);
+        if (targetIdx == target.length() && node.words.length > 0) {
+            for (int i = 0; i < node.words.length; i++) {
+                candidates.add(new ScoredWord(node.words[i], node.freqs[i]));
+            }
         }
 
         if (remainingDistance < 0) {
@@ -334,9 +393,9 @@ public final class PrefixDictionary {
             searchFuzzy(node, currentPath, target, targetIdx + 1, remainingDistance - 1, candidates);
         }
 
-        for (Map.Entry<Character, TrieNode> entry : node.children.entrySet()) {
-            final char ch = entry.getKey();
-            final TrieNode child = entry.getValue();
+        for (int i = 0; i < node.keys.length; i++) {
+            final char ch = node.keys[i];
+            final TrieNode child = node.children[i];
 
             currentPath.append(ch);
 
@@ -351,7 +410,7 @@ public final class PrefixDictionary {
                     // Transposition
                     if (targetIdx + 1 < target.length() && target.charAt(targetIdx + 1) == ch) {
                         final char nextTargetChar = target.charAt(targetIdx);
-                        final TrieNode transChild = child.children.get(nextTargetChar);
+                        final TrieNode transChild = child.getChild(nextTargetChar);
                         if (transChild != null) {
                             currentPath.append(nextTargetChar);
                             searchFuzzy(transChild, currentPath, target, targetIdx + 2, remainingDistance - 1, candidates);
@@ -375,8 +434,7 @@ public final class PrefixDictionary {
     }
 
     public synchronized void clear() {
-        mRoot.children.clear();
-        mRoot.words.clear();
+        mRoot = new TrieNode();
         mWordCount = 0;
     }
 }

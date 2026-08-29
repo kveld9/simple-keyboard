@@ -46,6 +46,7 @@ import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowInsetsController;
+import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InlineSuggestion;
 import android.view.inputmethod.InlineSuggestionsRequest;
@@ -662,6 +663,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         super.onFinishInputView(finishingInput);
     }
 
+    private Context getDisplayContext() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
+            return this;
+        }
+        final WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+        if (wm != null && wm.getDefaultDisplay() != null) {
+            return createDisplayContext(wm.getDefaultDisplay());
+        }
+        return this;
+    }
+
     @Override
     @RequiresApi(api = Build.VERSION_CODES.R)
     public InlineSuggestionsRequest onCreateInlineSuggestionsRequest(@NonNull Bundle uiExtras) {
@@ -669,7 +681,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (!mSettings.getCurrent().mShowSuggestions) {
             return null;
         }
-        return rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createInlineSuggestionRequest(this);
+        return rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createInlineSuggestionRequest(getDisplayContext());
     }
 
     @Override
@@ -689,7 +701,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         Log.i(TAG, "onInlineSuggestionsResponse: received " + inlineSuggestions.size() + " suggestions");
         final View inlineView = rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createView(
-                inlineSuggestions, this);
+                inlineSuggestions, getDisplayContext());
         if (mTopBarView != null) {
             mTopBarView.setExternalView(inlineView);
         }

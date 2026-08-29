@@ -8,6 +8,7 @@ import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -27,7 +28,7 @@ public class TopBarView extends FrameLayout {
     private LinearLayout mNormalModeContainer;
     private ImageView mExpandButton;
     private LinearLayout mSuggestionsContainer;
-    private FrameLayout mExternalViewContainer;
+    private boolean mIsExternalActive;
     private TextView mLeftSlot;
     private View mDivider1;
     private TextView mCenterSlot;
@@ -90,11 +91,6 @@ public class TopBarView extends FrameLayout {
         mSuggestionsContainer.addView(mDivider2);
         mSuggestionsContainer.addView(mRightSlot);
         mNormalModeContainer.addView(mSuggestionsContainer);
-
-        mExternalViewContainer = new FrameLayout(context);
-        mExternalViewContainer.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
-        mExternalViewContainer.setVisibility(View.GONE);
-        mNormalModeContainer.addView(mExternalViewContainer);
 
         View rightSpacer = new View(context);
         int spacerWidth = ViewUtils.dpToPx(context, 18);
@@ -309,20 +305,26 @@ public class TopBarView extends FrameLayout {
     
     public void setExternalView(View view) {
         if (view == null) {
-            mExternalViewContainer.removeAllViews();
-            mExternalViewContainer.setVisibility(View.GONE);
-            mSuggestionsContainer.setVisibility(View.VISIBLE);
+            if (mIsExternalActive) {
+                mIsExternalActive = false;
+                mSuggestionsContainer.removeAllViews();
+                mSuggestionsContainer.addView(mLeftSlot);
+                mSuggestionsContainer.addView(mDivider1);
+                mSuggestionsContainer.addView(mCenterSlot);
+                mSuggestionsContainer.addView(mDivider2);
+                mSuggestionsContainer.addView(mRightSlot);
+                clearSuggestions();
+            }
         } else {
-            mSuggestionsContainer.setVisibility(View.GONE);
-            mExternalViewContainer.removeAllViews();
-            mExternalViewContainer.addView(view, new FrameLayout.LayoutParams(
+            mIsExternalActive = true;
+            mSuggestionsContainer.removeAllViews();
+            mSuggestionsContainer.addView(view, new LinearLayout.LayoutParams(
                     LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-            mExternalViewContainer.setVisibility(View.VISIBLE);
         }
     }
 
     public boolean isExternalViewActive() {
-        return mExternalViewContainer != null && mExternalViewContainer.getVisibility() == View.VISIBLE;
+        return mIsExternalActive;
     }
 
     public void setLanguageButtonVisible(boolean visible) {

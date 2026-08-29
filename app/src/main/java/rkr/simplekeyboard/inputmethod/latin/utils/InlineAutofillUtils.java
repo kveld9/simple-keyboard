@@ -96,16 +96,11 @@ public final class InlineAutofillUtils {
         final LinearLayout container = new LinearLayout(context);
         container.setOrientation(LinearLayout.HORIZONTAL);
         container.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        final int chipMargin = ViewUtils.dpToPx(context, 4);
 
         for (InlineSuggestion inlineSuggestion : inlineSuggestions) {
             inlineSuggestion.inflate(context, new Size(ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT), context.getMainExecutor(), (view) -> {
                 if (view != null) {
-                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                    lp.setMargins(chipMargin, 0, chipMargin, 0);
-                    view.setLayoutParams(lp);
                     container.addView(view);
                 }
             });
@@ -114,12 +109,10 @@ public final class InlineAutofillUtils {
         final HorizontalScrollView inlineSuggestionView = new HorizontalScrollView(context);
         inlineSuggestionView.setHorizontalScrollBarEnabled(false);
         inlineSuggestionView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        inlineSuggestionView.addView(container, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        inlineSuggestionView.addView(container);
 
         final InlineContentClipView scrollableSuggestionsClip = new InlineContentClipView(context);
-        scrollableSuggestionsClip.addView(inlineSuggestionView, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        scrollableSuggestionsClip.addView(inlineSuggestionView);
         return scrollableSuggestionsClip;
     }
 
@@ -142,8 +135,7 @@ public final class InlineAutofillUtils {
             SurfaceView mBackgroundView = new SurfaceView(context);
             mBackgroundView.setZOrderOnTop(true);
             mBackgroundView.getHolder().setFormat(PixelFormat.TRANSPARENT);
-            addView(mBackgroundView, new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            addView(mBackgroundView);
         }
 
         @Override

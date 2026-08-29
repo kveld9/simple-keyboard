@@ -31,6 +31,7 @@ import android.content.res.Configuration;
 import android.inputmethodservice.InputMethodService;
 import android.media.AudioManager;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Debug;
 import android.os.IBinder;
 import android.os.Message;
@@ -46,6 +47,11 @@ import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowInsetsController;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InlineSuggestion;
+import android.view.inputmethod.InlineSuggestionsRequest;
+import android.view.inputmethod.InlineSuggestionsResponse;
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -650,7 +656,36 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     void onFinishInputViewInternal(final boolean finishingInput) {
         hideClipboardHistory();
+        if (mTopBarView != null) {
+            mTopBarView.setExternalView(null);
+        }
         super.onFinishInputView(finishingInput);
+    }
+
+    @Override
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    public InlineSuggestionsRequest onCreateInlineSuggestionsRequest(@NonNull Bundle uiExtras) {
+        if (mTopBarView == null || !mSettings.getCurrent().mShowSuggestions) {
+            return null;
+        }
+        return rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createInlineSuggestionRequest(this);
+    }
+
+    @Override
+    @RequiresApi(api = Build.VERSION_CODES.R)
+    public boolean onInlineSuggestionsResponse(InlineSuggestionsResponse response) {
+        if (mTopBarView == null || !mSettings.getCurrent().mShowSuggestions) {
+            return false;
+        }
+        final java.util.List<InlineSuggestion> inlineSuggestions = response.getInlineSuggestions();
+        if (inlineSuggestions == null || inlineSuggestions.isEmpty()) {
+            mTopBarView.setExternalView(null);
+            return false;
+        }
+        final View inlineView = rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createView(
+                inlineSuggestions, this);
+        mTopBarView.setExternalView(inlineView);
+        return true;
     }
 
     @Override

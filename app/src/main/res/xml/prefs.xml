@@ -25,6 +25,10 @@
         android:title="@string/settings_screen_autocorrect"
         android:key="screen_autocorrect" />
     <PreferenceScreen
+        android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.ClipboardSettingsFragment"
+        android:title="@string/settings_screen_clipboard"
+        android:key="screen_clipboard" />
+    <PreferenceScreen
         android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.KeyPressSettingsFragment"
         android:title="@string/settings_screen_key_press"
         android:key="screen_key_press" />

@@ -166,4 +166,5 @@
         <item>3</item>
     </string-array>
     <string name="settings_screen_autocorrect">Text correction</string>
+    <string name="settings_screen_clipboard">Clipboard</string>
 </resources>

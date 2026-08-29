@@ -137,19 +137,53 @@ public class TopBarView extends FrameLayout {
         mToolTrayContainer.setVisibility(mode == MODE_TOOL_TRAY ? View.VISIBLE : View.GONE);
     }
 
+    public boolean isToolTrayOpen() {
+        return mCurrentMode == MODE_TOOL_TRAY;
+    }
+
+    public void closeToolTray() {
+        if (mCurrentMode != MODE_NORMAL) {
+            setMode(MODE_NORMAL);
+        }
+    }
+
     public void setSuggestions(List<CharSequence> suggestions) {
+        setSuggestions(suggestions, -1);
+    }
+
+    public void setSuggestions(List<CharSequence> suggestions, int boldIndex) {
         mSuggestionsContainer.removeAllViews();
-        if (suggestions == null) return;
-        for (CharSequence suggestion : suggestions) {
+        if (suggestions == null || suggestions.isEmpty()) return;
+        for (int i = 0; i < suggestions.size(); i++) {
+            final CharSequence suggestion = suggestions.get(i);
             TextView tv = new TextView(getContext());
             tv.setText(suggestion);
             tv.setTextColor(mTextColor);
-            tv.setTextSize(16);
+            if (i == boldIndex) {
+                tv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                tv.setTextSize(16);
+            } else {
+                tv.setTypeface(android.graphics.Typeface.DEFAULT);
+                tv.setTextSize(15);
+            }
             tv.setGravity(Gravity.CENTER);
-            int padding = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16, getContext().getResources().getDisplayMetrics());
-            tv.setPadding(padding, padding / 2, padding, padding / 2);
+            int paddingH = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16, getContext().getResources().getDisplayMetrics());
+            int paddingV = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 6, getContext().getResources().getDisplayMetrics());
+            tv.setPadding(paddingH, paddingV, paddingH, paddingV);
+            tv.setClickable(true);
+            tv.setFocusable(false);
+            TypedValue outValue = new TypedValue();
+            if (getContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)) {
+                tv.setBackgroundResource(outValue.resourceId);
+            }
             tv.setOnClickListener(v -> {
-                // Future integration for suggestions
+                if (mListener != null) {
+                    String clean = suggestion.toString();
+                    if (clean.startsWith("\"") && clean.endsWith("\"") && clean.length() > 2) {
+                        clean = clean.substring(1, clean.length() - 1);
+                    }
+                    mListener.onSuggestionClicked(clean);
+                }
             });
             mSuggestionsContainer.addView(tv);
         }
@@ -160,7 +194,7 @@ public class TopBarView extends FrameLayout {
             mLanguageButton.setVisibility(visible ? View.VISIBLE : View.GONE);
         }
     }
-
+    
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int height = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 38, getContext().getResources().getDisplayMetrics());

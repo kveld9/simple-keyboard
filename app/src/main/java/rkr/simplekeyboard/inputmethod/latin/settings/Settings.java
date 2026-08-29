@@ -65,10 +65,15 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_SPACE_SWIPE = "pref_space_swipe";
     public static final String PREF_DELETE_SWIPE = "pref_delete_swipe";
     public static final String PREF_CLIPBOARD_RETENTION_TIME = "pref_clipboard_retention_time";
+<<<<<<< HEAD
     public static final String PREF_KEY_SHAPE = "pref_key_shape";
     public static final String KEY_SHAPE_ROUNDED = "rounded";
     public static final String KEY_SHAPE_RECTANGULAR = "rectangular";
     public static final String KEY_SHAPE_BORDERLESS = "borderless";
+=======
+    public static final String PREF_SHOW_SUGGESTIONS = "pref_show_suggestions";
+    public static final String PREF_AUTO_CORRECTION = "pref_auto_correction";
+>>>>>>> master
 
     private static final float UNDEFINED_PREFERENCE_VALUE_FLOAT = -1.0f;
     private static final int UNDEFINED_PREFERENCE_VALUE_INT = -1;
@@ -262,6 +267,14 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     public static String readKeyShape(final SharedPreferences prefs) {
         return prefs.getString(PREF_KEY_SHAPE, KEY_SHAPE_ROUNDED);
+    }
+
+    public static boolean readShowSuggestions(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_SHOW_SUGGESTIONS, true);
+    }
+
+    public static boolean readAutoCorrectionEnabled(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_AUTO_CORRECTION, false);
     }
 
     public static String readPrefSubtypes(final SharedPreferences prefs) {

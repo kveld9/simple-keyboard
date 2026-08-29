@@ -163,4 +163,7 @@
         <item>rectangular</item>
         <item>borderless</item>
     </string-array>
+    <string name="show_suggestions">Show text suggestions</string>
+    <string name="auto_correction">Auto-correction</string>
+    <string name="auto_correction_summary">Spacebar corrects mistyped words</string>
 </resources>

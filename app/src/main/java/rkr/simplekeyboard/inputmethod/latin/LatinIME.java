@@ -705,11 +705,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         Log.i(TAG, "onInlineSuggestionsResponse called");
         final java.util.List<InlineSuggestion> inlineSuggestions = response.getInlineSuggestions();
         if (inlineSuggestions == null || inlineSuggestions.isEmpty()) {
-            Log.i(TAG, "onInlineSuggestionsResponse: empty suggestions (clearing stale view, retaining inline session)");
-            if (mTopBarView != null && mTopBarView.isExternalViewActive()) {
-                mTopBarView.setExternalView(null);
-            }
-            return true;
+            Log.i(TAG, "onInlineSuggestionsResponse: empty suggestions (returning false)");
+            return false;
         }
         Log.i(TAG, "onInlineSuggestionsResponse: received " + inlineSuggestions.size() + " suggestions");
         final View inlineView = rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createView(

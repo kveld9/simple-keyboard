@@ -79,11 +79,11 @@ public class TopBarView extends FrameLayout {
         mSuggestionsContainer.setGravity(Gravity.CENTER_VERTICAL);
         mSuggestionsContainer.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
 
-        mLeftSlot = createSuggestionSlot(context, 14.0f, false);
+        mLeftSlot = createSuggestionSlot(context, 16.0f, false);
         mDivider1 = createDivider(context);
-        mCenterSlot = createSuggestionSlot(context, 15.5f, true);
+        mCenterSlot = createSuggestionSlot(context, 17.5f, true);
         mDivider2 = createDivider(context);
-        mRightSlot = createSuggestionSlot(context, 14.0f, false);
+        mRightSlot = createSuggestionSlot(context, 16.0f, false);
 
         mSuggestionsContainer.addView(mLeftSlot);
         mSuggestionsContainer.addView(mDivider1);

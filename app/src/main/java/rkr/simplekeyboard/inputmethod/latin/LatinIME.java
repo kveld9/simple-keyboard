@@ -281,8 +281,28 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mKeyboardSwitcher = KeyboardSwitcher.getInstance();
     }
 
+    private Context mDisplayContext;
+
+    private Context createOrGetDisplayContext() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
+            return this;
+        }
+        final WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+        if (wm != null && wm.getDefaultDisplay() != null) {
+            return createDisplayContext(wm.getDefaultDisplay());
+        }
+        return this;
+    }
+
+    @Override
+    public void onInitializeInterface() {
+        super.onInitializeInterface();
+        mDisplayContext = createOrGetDisplayContext();
+    }
+
     @Override
     public void onCreate() {
+        mDisplayContext = createOrGetDisplayContext();
         Settings.init(this);
         DebugFlags.init(PreferenceManagerCompat.getDeviceSharedPreferences(this));
         RichInputMethodManager.init(this);
@@ -347,6 +367,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onConfigurationChanged(final Configuration conf) {
+        mDisplayContext = createOrGetDisplayContext();
         SettingsValues settingsValues = mSettings.getCurrent();
         if (settingsValues.mHasHardwareKeyboard != Settings.readHasHardwareKeyboard(conf)) {
             // If the state of having a hardware keyboard changed, then we want to reload the
@@ -657,28 +678,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     void onFinishInputViewInternal(final boolean finishingInput) {
         hideClipboardHistory();
-        if (mTopBarView != null) {
-            mTopBarView.setExternalView(null);
-        }
         super.onFinishInputView(finishingInput);
-    }
-
-    private Context getDisplayContext() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
-            return this;
-        }
-        final WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
-        if (wm != null && wm.getDefaultDisplay() != null) {
-            return createDisplayContext(wm.getDefaultDisplay());
-        }
-        return this;
     }
 
     @Override
     @RequiresApi(api = Build.VERSION_CODES.R)
     public InlineSuggestionsRequest onCreateInlineSuggestionsRequest(@NonNull Bundle uiExtras) {
         Log.i(TAG, "onCreateInlineSuggestionsRequest called");
-        return rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createInlineSuggestionRequest(getDisplayContext());
+        return rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createInlineSuggestionRequest(
+                mDisplayContext != null ? mDisplayContext : this);
     }
 
     @Override
@@ -695,7 +703,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         Log.i(TAG, "onInlineSuggestionsResponse: received " + inlineSuggestions.size() + " suggestions");
         final View inlineView = rkr.simplekeyboard.inputmethod.latin.utils.InlineAutofillUtils.createView(
-                inlineSuggestions, getDisplayContext());
+                inlineSuggestions, mDisplayContext != null ? mDisplayContext : this);
         if (mTopBarView != null) {
             mTopBarView.setExternalView(inlineView);
         }

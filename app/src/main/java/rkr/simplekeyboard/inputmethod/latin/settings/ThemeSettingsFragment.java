@@ -96,7 +96,6 @@ public final class ThemeSettingsFragment extends SubScreenFragment
     public void onPause() {
         super.onPause();
         KeyboardTheme.saveKeyboardThemeId(mSelectedThemeId, getSharedPreferences());
-        Settings.removeKeyboardColor(getSharedPreferences());
     }
 
     private void updateSelected() {

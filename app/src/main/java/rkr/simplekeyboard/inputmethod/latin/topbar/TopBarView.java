@@ -306,23 +306,18 @@ public class TopBarView extends FrameLayout {
     public void setExternalView(View view) {
         if (view == null) {
             if (mIsExternalActive) {
+                android.util.Log.i("LatinIME", "setExternalView(null) called, clearing external view.");
                 mIsExternalActive = false;
                 mSuggestionsContainer.removeAllViews();
-                mSuggestionsContainer.addView(mLeftSlot);
-                mSuggestionsContainer.addView(mDivider1);
-                mSuggestionsContainer.addView(mCenterSlot);
-                mSuggestionsContainer.addView(mDivider2);
-                mSuggestionsContainer.addView(mRightSlot);
-                clearSuggestions();
+                // Match LeanType: do NOT add the standard slots back immediately,
+                // to avoid changing the layout geometry and breaking the autofill session.
             }
         } else {
+            android.util.Log.i("LatinIME", "setExternalView(View) called, setting external view.");
             mIsExternalActive = true;
             mSuggestionsContainer.removeAllViews();
             mSuggestionsContainer.addView(view, new LinearLayout.LayoutParams(
-                    0, LayoutParams.MATCH_PARENT, 1.0f));
-            if (mSuggestionsContainer.getWidth() == 0) {
-                mSuggestionsContainer.post(mSuggestionsContainer::requestLayout);
-            }
+                    LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         }
     }
 

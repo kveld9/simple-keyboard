@@ -46,9 +46,9 @@ public final class InlineAutofillUtils {
 
     public static InlineSuggestionsRequest createInlineSuggestionRequest(final Context context) {
         final int chipBgDrawableId = androidx.autofill.R.drawable.autofill_inline_suggestion_chip_background;
-        final int textColor = ViewUtils.getThemeColor(context, R.attr.keyTextColor, 0xFFE0E0E0);
-        final int hintTextColor = (textColor & 0x00FFFFFF) | 0x88000000;
-        final int chipBgColor = (textColor & 0x00FFFFFF) | 0x1E000000;
+        final int textColor = 0xFFE0E0E0;
+        final int hintTextColor = 0xFF888888;
+        final int chipBgColor = 0xFF444444;
 
         final StylesBuilder stylesBuilder = UiVersions.newStylesBuilder();
         final Style style = InlineSuggestionUi.newStyleBuilder()

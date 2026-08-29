@@ -68,12 +68,14 @@ jobs:
               PATCH=$((PATCH+1))
             fi
             VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            VERSION_CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
           fi
           {
             echo "version=${VERSION}"
+            echo "version_code=${VERSION_CODE}"
             echo "prev_tag=${PREV_TAG}"
           } >> "$GITHUB_OUTPUT"
-          echo "Computed version: ${VERSION} (previous tag: '${PREV_TAG}')"
+          echo "Computed version: ${VERSION} (versionCode: ${VERSION_CODE}, previous tag: '${PREV_TAG}')"
 
       - name: Generate changelog
         id: changelog
@@ -131,11 +133,21 @@ jobs:
         if: github.event_name == 'pull_request'
         run: ./gradlew testDebugUnitTest
 
-      # On Master: Run unit tests AND assemble APKs in a SINGLE Gradle invocation
-      # (Shares compiled classes across tasks, eliminates duplicate javac compilation)
+      # On Master: Burn computed semantic version into app/build.gradle
+      - name: Burn Version into Build Files (Master)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare-version.outputs.version }}"
+          VERSION_CODE="${{ needs.prepare-version.outputs.version_code }}"
+          echo "Burning version ${VERSION} (${VERSION_CODE}) into app/build.gradle"
+          sed -i "s/def appVersionName = .*/def appVersionName = \"${VERSION}\"/" app/build.gradle
+          sed -i "s/def appVersionCode = .*/def appVersionCode = ${VERSION_CODE}/" app/build.gradle
+
+      # On Master: Run unit tests AND assemble APKs in a SINGLE Gradle invocation with explicit version properties
       - name: Test & Build Release & Debug APKs (Master)
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        run: ./gradlew testDebugUnitTest assembleRelease assembleDebug
+        run: ./gradlew testDebugUnitTest assembleRelease assembleDebug -PversionName="${{ needs.prepare-version.outputs.version }}" -PversionCode="${{ needs.prepare-version.outputs.version_code }}"
 
       # Package artifacts with semantic versioning
       - name: Package APK Assets & Checksums

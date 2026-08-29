@@ -57,6 +57,11 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
                 return true;
             }
         });
+
+        final Preference versionPref = findPreference("version_info");
+        if (versionPref != null) {
+            versionPref.setSummary(rkr.simplekeyboard.inputmethod.BuildConfig.VERSION_NAME);
+        }
     }
 
     private void openUrl(String uri) {

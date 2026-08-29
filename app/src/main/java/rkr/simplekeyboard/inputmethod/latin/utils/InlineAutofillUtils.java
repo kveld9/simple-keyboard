@@ -77,9 +77,9 @@ public final class InlineAutofillUtils {
         stylesBuilder.addStyle(style);
         final Bundle stylesBundle = stylesBuilder.build();
 
-        final int height = ViewUtils.dpToPx(context, 40);
-        final Size min = new Size(ViewUtils.dpToPx(context, 80), height);
-        final Size max = new Size(ViewUtils.dpToPx(context, 400), height);
+        final int height = ViewUtils.dpToPx(context, 38);
+        final Size min = new Size(100, height);
+        final Size max = new Size(740, height);
 
         final ArrayList<InlinePresentationSpec> presentationSpecs = new ArrayList<>();
         presentationSpecs.add(new InlinePresentationSpec.Builder(min, max).setStyle(stylesBundle).build());

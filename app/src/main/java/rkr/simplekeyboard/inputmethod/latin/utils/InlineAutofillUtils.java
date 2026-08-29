@@ -156,8 +156,12 @@ public final class InlineAutofillUtils {
         }
 
         private void clipDescendantInlineContentViews() {
-            mParentBounds.right = getWidth();
-            mParentBounds.bottom = getHeight();
+            final int width = getWidth();
+            final int height = getHeight();
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+            mParentBounds.set(0, 0, width, height);
             clipDescendantInlineContentViews(this);
         }
 

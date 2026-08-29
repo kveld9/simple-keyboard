@@ -259,8 +259,8 @@ public final class PrefixDictionary {
             return null;
         }
 
-        // 2. Fuzzy search for typo corrections (d=1, minimum length 3)
-        if (word.length() <= 2) {
+        // 2. Fuzzy search for typo corrections (d=1, minimum length 2)
+        if (word.length() <= 1) {
             return null;
         }
         final String lower = word.toLowerCase();
@@ -274,6 +274,30 @@ public final class PrefixDictionary {
         Collections.sort(candidates);
         final String best = candidates.get(0).word;
         return formatCasing(best, word);
+    }
+
+    public synchronized List<CharSequence> getFuzzySuggestions(final String word, final int maxCount) {
+        if (word == null || word.length() <= 1 || maxCount <= 0) {
+            return Collections.emptyList();
+        }
+        final String lower = word.toLowerCase();
+        final String norm = stripAccents(lower);
+        final List<ScoredWord> candidates = new ArrayList<>();
+        searchFuzzy(mRoot, new StringBuilder(), norm, 0, 1, candidates);
+        if (candidates.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Collections.sort(candidates);
+        final List<CharSequence> results = new ArrayList<>();
+        final Set<String> added = new HashSet<>();
+        for (int i = 0; i < candidates.size() && results.size() < maxCount; i++) {
+            final String w = candidates.get(i).word;
+            final CharSequence formatted = formatCasing(w, word);
+            if (added.add(w.toLowerCase())) {
+                results.add(formatted);
+            }
+        }
+        return results;
     }
 
     private static CharSequence formatCasing(final String target, final String original) {

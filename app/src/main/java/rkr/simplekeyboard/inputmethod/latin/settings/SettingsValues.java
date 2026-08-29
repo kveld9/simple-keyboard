@@ -43,6 +43,7 @@ public class SettingsValues {
     public final boolean mKeyPreviewPopupOn;
     public final boolean mUseOnScreen;
     public final boolean mShowsLanguageSwitchKey;
+    public final boolean mShowLanguageOnSpacebar;
     public final boolean mImeSwitchEnabled;
     public final int mKeyLongpressTimeout;
     public final boolean mShowSpecialChars;
@@ -84,6 +85,7 @@ public class SettingsValues {
         mKeyPreviewPopupOn = Settings.readKeyPreviewPopupEnabled(prefs, res);
         mUseOnScreen = Settings.readUseOnScreenKeyboard(prefs);
         mShowsLanguageSwitchKey = Settings.readShowLanguageSwitchKey(prefs);
+        mShowLanguageOnSpacebar = Settings.readShowLanguageOnSpacebar(prefs);
         mImeSwitchEnabled = Settings.readEnableImeSwitch(prefs);
         mHasHardwareKeyboard = Settings.readHasHardwareKeyboard(res.getConfiguration());
 

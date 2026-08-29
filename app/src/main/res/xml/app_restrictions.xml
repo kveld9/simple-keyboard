@@ -30,6 +30,11 @@
         android:restrictionType="bool"
         android:defaultValue="true" />
     <restriction
+        android:key="pref_show_language_on_spacebar"
+        android:title="@string/show_language_on_spacebar"
+        android:restrictionType="bool"
+        android:defaultValue="true" />
+    <restriction
         android:key="pref_use_on_screen"
         android:title="@string/pref_use_on_screen"
         android:restrictionType="bool"

@@ -57,6 +57,7 @@
     <string name="privacy_policy">Política de privacidad</string>
     <string name="license">Licencia</string>
     <string name="show_language_switch_key">Mostrar tecla de cambio de idioma</string>
+    <string name="show_language_on_spacebar">Mostrar idioma en la barra espaciadora</string>
     <string name="pref_use_on_screen">Mostrar el teclado en pantalla</string>
     <string name="show_special_chars">Mostrar caracteres especiales</string>
     <string name="clipboard">Portapapeles</string>

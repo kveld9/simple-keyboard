@@ -704,6 +704,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 inlineSuggestions, getDisplayContext());
         if (mTopBarView != null) {
             mTopBarView.setExternalView(inlineView);
+            mTopBarView.requestLayout();
+            mTopBarView.invalidate();
+        }
+        if (mInputView != null) {
+            mInputView.requestLayout();
+            mInputView.invalidate();
         }
         return true;
     }

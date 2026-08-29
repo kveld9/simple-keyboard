@@ -113,10 +113,13 @@ public final class InlineAutofillUtils {
                     ViewGroup.LayoutParams.WRAP_CONTENT), context.getMainExecutor(), (view) -> {
                 if (view != null) {
                     container.addView(view);
-                    container.requestLayout();
-                    container.invalidate();
                     scrollableSuggestionsClip.requestLayout();
                     scrollableSuggestionsClip.invalidate();
+                    final View root = scrollableSuggestionsClip.getRootView();
+                    if (root != null) {
+                        root.requestLayout();
+                        root.invalidate();
+                    }
                 }
             });
         }

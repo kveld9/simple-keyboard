@@ -273,17 +273,19 @@ public class EmojiPalettesView extends LinearLayout {
 
     private void loadRecentEmojis(Context context) {
         if (context == null) return;
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        String raw = prefs.getString(PREF_RECENT_EMOJIS, "");
         mRecentEmojis.clear();
-        if (!TextUtils.isEmpty(raw)) {
-            String[] split = raw.split(",");
-            for (String s : split) {
-                if (!s.trim().isEmpty()) {
-                    mRecentEmojis.add(s.trim());
+        try {
+            SharedPreferences prefs = rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat.getDeviceSharedPreferences(context);
+            String raw = prefs.getString(PREF_RECENT_EMOJIS, "");
+            if (!TextUtils.isEmpty(raw)) {
+                String[] split = raw.split(",");
+                for (String s : split) {
+                    if (!s.trim().isEmpty()) {
+                        mRecentEmojis.add(s.trim());
+                    }
                 }
             }
-        }
+        } catch (Throwable ignored) {}
     }
 
     private void recordRecentEmoji(String emoji) {
@@ -299,10 +301,12 @@ public class EmojiPalettesView extends LinearLayout {
             if (i > 0) sb.append(",");
             sb.append(mRecentEmojis.get(i));
         }
-        PreferenceManager.getDefaultSharedPreferences(getContext())
-                .edit()
-                .putString(PREF_RECENT_EMOJIS, sb.toString())
-                .apply();
+        try {
+            rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat.getDeviceSharedPreferences(getContext())
+                    .edit()
+                    .putString(PREF_RECENT_EMOJIS, sb.toString())
+                    .apply();
+        } catch (Throwable ignored) {}
 
         if (mCurrentCategoryIndex == 0) {
             mGridAdapter.setItems(mRecentEmojis);

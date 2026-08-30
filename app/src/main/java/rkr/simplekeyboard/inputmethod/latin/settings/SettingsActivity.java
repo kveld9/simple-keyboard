@@ -18,127 +18,160 @@
 
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
-import android.app.ActionBar;
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.os.Build;
 import android.os.Bundle;
-import android.preference.PreferenceActivity;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.WindowInsets;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceScreen;
+
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.color.DynamicColors;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.utils.FragmentUtils;
 
-public class SettingsActivity extends PreferenceActivity {
+public class SettingsActivity extends AppCompatActivity implements
+        PreferenceFragmentCompat.OnPreferenceStartFragmentCallback,
+        PreferenceFragmentCompat.OnPreferenceStartScreenCallback {
     private static final String DEFAULT_FRAGMENT = SettingsFragment.class.getName();
+    public static final String EXTRA_SHOW_FRAGMENT = ":android:show_fragment";
+    public static final String EXTRA_SHOW_FRAGMENT_ARGUMENTS = ":android:show_fragment_args";
+    public static final String EXTRA_NO_HEADERS = ":android:no_headers";
     private static final String TAG = SettingsActivity.class.getSimpleName();
 
+    private MaterialToolbar mToolbar;
+
     @Override
-    protected void onStart() {
-        super.onStart();
+    protected void onCreate(@Nullable final Bundle savedInstanceState) {
 
-        boolean enabled = false;
-        try {
-            enabled = isInputMethodOfThisImeEnabled();
-        } catch (Exception e) {
-            Log.e(TAG, "Exception in check if input method is enabled", e);
+        DynamicColors.applyToActivityIfAvailable(this);
+        super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+
+        setContentView(R.layout.activity_settings);
+
+        mToolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(mToolbar);
+
+        View rootView = findViewById(R.id.settings_coordinator);
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (view, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            return WindowInsetsCompat.CONSUMED;
+        });
+
+        mToolbar.setNavigationOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
+
+        getSupportFragmentManager().addOnBackStackChangedListener(this::updateToolbar);
+
+        if (savedInstanceState == null) {
+            String initialFragment = getIntent().getStringExtra(EXTRA_SHOW_FRAGMENT);
+            if (initialFragment == null || !FragmentUtils.isValidFragment(initialFragment)) {
+                initialFragment = DEFAULT_FRAGMENT;
+            }
+            Bundle initialArgs = getIntent().getBundleExtra(EXTRA_SHOW_FRAGMENT_ARGUMENTS);
+            Fragment fragment = getSupportFragmentManager().getFragmentFactory().instantiate(
+                    getClassLoader(), initialFragment);
+            if (initialArgs != null) {
+                fragment.setArguments(initialArgs);
+            }
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.settings_container, fragment)
+                    .commit();
         }
 
-        if (!enabled) {
-            final Context context = this;
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setMessage(R.string.setup_message);
-            builder.setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int id) {
-                    Intent intent = new Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(intent);
-                    dialog.dismiss();
-                }
-            });
-            builder.setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int id) {
-                    finish();
-                }
-            });
-            builder.setCancelable(false);
-
-            builder.create().show();
-        }
+        updateToolbar();
     }
 
-    /**
-     * Check if this IME is enabled in the system.
-     * @return whether this IME is enabled in the system.
-     */
-    private boolean isInputMethodOfThisImeEnabled() {
-        final InputMethodManager imm =
-                (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        final String imePackageName = getPackageName();
-        for (final InputMethodInfo imi : imm.getEnabledInputMethodList()) {
-            if (imi.getPackageName().equals(imePackageName)) {
-                return true;
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            final Fragment fragment = getSupportFragmentManager().findFragmentById(R.id.settings_container);
+            if (fragment instanceof SettingsFragment) {
+                ((SettingsFragment) fragment).updateImeBanner();
             }
         }
-        return false;
     }
 
-    @Override
-    protected void onCreate(final Bundle savedState) {
-        super.onCreate(savedState);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            final View container = (View) getListView().getParent().getParent();
-            // com.android.internal.R.id.prefs_container in
-            // https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/res/res/layout/preference_list_content.xml
-            container.setOnApplyWindowInsetsListener((view, windowInsets) -> {
-                android.graphics.Insets insets = windowInsets.getInsets(WindowInsets.Type.systemBars());
-                ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
-                mlp.topMargin = insets.top;
-                mlp.leftMargin = insets.left;
-                mlp.bottomMargin = insets.bottom;
-                mlp.rightMargin = insets.right;
-                view.setLayoutParams(mlp);
-                return WindowInsets.CONSUMED;
-            });
-        }
-
-        final ActionBar actionBar = getActionBar();
-        if (actionBar != null) {
-            actionBar.setDisplayHomeAsUpEnabled(true);
-            actionBar.setHomeButtonEnabled(true);
+    private void updateToolbar() {
+        int backStackCount = getSupportFragmentManager().getBackStackEntryCount();
+        if (backStackCount > 0) {
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+                getSupportActionBar().setDisplayShowHomeEnabled(true);
+            }
+            FragmentManager.BackStackEntry entry =
+                    getSupportFragmentManager().getBackStackEntryAt(backStackCount - 1);
+            if (entry.getName() != null) {
+                setTitle(entry.getName());
+            }
+        } else {
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+                getSupportActionBar().setDisplayShowHomeEnabled(false);
+            }
+            setTitle(getString(R.string.english_ime_name));
         }
     }
 
     @Override
-    public boolean onOptionsItemSelected(final MenuItem item) {
+    public boolean onOptionsItemSelected(@NonNull final MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            super.onBackPressed();
+            getOnBackPressedDispatcher().onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
     @Override
-    public Intent getIntent() {
-        final Intent intent = super.getIntent();
-        final String fragment = intent.getStringExtra(EXTRA_SHOW_FRAGMENT);
-        if (fragment == null) {
-            intent.putExtra(EXTRA_SHOW_FRAGMENT, DEFAULT_FRAGMENT);
+    public boolean onPreferenceStartFragment(@NonNull final PreferenceFragmentCompat caller,
+                                            @NonNull final Preference pref) {
+        final Bundle args = pref.getExtras();
+        final Fragment fragment = getSupportFragmentManager().getFragmentFactory().instantiate(
+                getClassLoader(), pref.getFragment());
+        fragment.setArguments(args);
+        fragment.setTargetFragment(caller, 0);
+
+        CharSequence title = pref.getTitle();
+        if (title == null) {
+            title = getString(R.string.english_ime_name);
         }
-        intent.putExtra(EXTRA_NO_HEADERS, true);
-        return intent;
+
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.settings_container, fragment)
+                .addToBackStack(title.toString())
+                .commit();
+
+        setTitle(title);
+        return true;
     }
 
     @Override
+    public boolean onPreferenceStartScreen(@NonNull final PreferenceFragmentCompat caller,
+                                          @NonNull final PreferenceScreen pref) {
+        return false;
+    }
+
     public boolean isValidFragment(final String fragmentName) {
         return FragmentUtils.isValidFragment(fragmentName);
     }

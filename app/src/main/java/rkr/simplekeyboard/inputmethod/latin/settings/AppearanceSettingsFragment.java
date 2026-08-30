@@ -22,6 +22,8 @@ import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Bundle;
 
+import androidx.annotation.Nullable;
+
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardTheme;
 
@@ -30,9 +32,9 @@ import rkr.simplekeyboard.inputmethod.keyboard.KeyboardTheme;
  */
 public final class AppearanceSettingsFragment extends SubScreenFragment {
     @Override
-    public void onCreate(final Bundle icicle) {
-        super.onCreate(icicle);
-        addPreferencesFromResource(R.xml.prefs_screen_appearance);
+    public void onCreatePreferences(@Nullable final Bundle savedInstanceState, @Nullable final String rootKey) {
+        super.onCreatePreferences(savedInstanceState, rootKey);
+        setPreferencesFromResource(R.xml.prefs_screen_appearance, rootKey);
 
         setupKeyboardHeightSettings();
         setupBottomOffsetPortraitSettings();
@@ -53,8 +55,7 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
     }
 
     private void setupKeyboardHeightSettings() {
-        final SeekBarDialogPreference pref = (SeekBarDialogPreference)findPreference(
-                Settings.PREF_KEYBOARD_HEIGHT);
+        final SeekBarDialogPreference pref = findPreference(Settings.PREF_KEYBOARD_HEIGHT);
         if (pref == null) {
             return;
         }
@@ -105,8 +106,7 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
     }
 
     private void setupBottomOffsetPortraitSettings() {
-        final SeekBarDialogPreference pref = (SeekBarDialogPreference)findPreference(
-                Settings.PREF_BOTTOM_OFFSET_PORTRAIT);
+        final SeekBarDialogPreference pref = findPreference(Settings.PREF_BOTTOM_OFFSET_PORTRAIT);
         if (pref == null) {
             return;
         }

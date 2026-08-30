@@ -24,6 +24,8 @@ import android.content.res.Resources;
 import android.media.AudioManager;
 import android.os.Bundle;
 
+import androidx.annotation.Nullable;
+
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.AudioAndHapticFeedbackManager;
 
@@ -40,15 +42,12 @@ import rkr.simplekeyboard.inputmethod.latin.AudioAndHapticFeedbackManager;
  */
 public final class KeyPressSettingsFragment extends SubScreenFragment {
     @Override
-    public void onCreate(final Bundle icicle) {
-        super.onCreate(icicle);
-        addPreferencesFromResource(R.xml.prefs_screen_key_press);
+    public void onCreatePreferences(@Nullable final Bundle savedInstanceState, @Nullable final String rootKey) {
+        super.onCreatePreferences(savedInstanceState, rootKey);
+        setPreferencesFromResource(R.xml.prefs_screen_key_press, rootKey);
 
-        final Context context = getActivity();
+        final Context context = requireContext();
 
-        // When we are called from the Settings application but we are not already running, some
-        // singleton and utility classes may not have been initialized.  We have to call
-        // initialization method of these classes here. See {@link LatinIME#onCreate()}.
         AudioAndHapticFeedbackManager.init(context);
 
         if (!AudioAndHapticFeedbackManager.getInstance().hasVibrator()) {
@@ -60,8 +59,7 @@ public final class KeyPressSettingsFragment extends SubScreenFragment {
     }
 
     private void setupKeypressSoundVolumeSettings() {
-        final SeekBarDialogPreference pref = (SeekBarDialogPreference)findPreference(
-                Settings.PREF_KEYPRESS_SOUND_VOLUME);
+        final SeekBarDialogPreference pref = findPreference(Settings.PREF_KEYPRESS_SOUND_VOLUME);
         if (pref == null) {
             return;
         }
@@ -117,8 +115,7 @@ public final class KeyPressSettingsFragment extends SubScreenFragment {
     private void setupKeyLongpressTimeoutSettings() {
         final SharedPreferences prefs = getSharedPreferences();
         final Resources res = getResources();
-        final SeekBarDialogPreference pref = (SeekBarDialogPreference)findPreference(
-                Settings.PREF_KEY_LONGPRESS_TIMEOUT);
+        final SeekBarDialogPreference pref = findPreference(Settings.PREF_KEY_LONGPRESS_TIMEOUT);
         if (pref == null) {
             return;
         }

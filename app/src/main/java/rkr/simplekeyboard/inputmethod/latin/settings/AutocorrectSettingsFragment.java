@@ -20,12 +20,14 @@ package rkr.simplekeyboard.inputmethod.latin.settings;
 
 import android.os.Bundle;
 
+import androidx.annotation.Nullable;
+
 import rkr.simplekeyboard.inputmethod.R;
 
 public final class AutocorrectSettingsFragment extends SubScreenFragment {
     @Override
-    public void onCreate(final Bundle icicle) {
-        super.onCreate(icicle);
-        addPreferencesFromResource(R.xml.prefs_screen_autocorrect);
+    public void onCreatePreferences(@Nullable final Bundle savedInstanceState, @Nullable final String rootKey) {
+        super.onCreatePreferences(savedInstanceState, rootKey);
+        setPreferencesFromResource(R.xml.prefs_screen_autocorrect, rootKey);
     }
 }

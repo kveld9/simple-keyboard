@@ -1,55 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="platformSettingsTheme" parent="@android:style/Theme.DeviceDefault.Settings">
-        <item name="android:colorPrimary">@android:color/system_accent1_600</item>
-        <item name="android:colorPrimaryDark">@android:color/system_neutral1_10</item>
-        <item name="android:colorAccent">@android:color/system_accent1_600</item>
-        <item name="android:windowBackground">@android:color/system_neutral1_10</item>
-        <item name="android:colorBackground">@android:color/system_neutral1_10</item>
-        <item name="android:statusBarColor">@android:color/system_neutral1_10</item>
-        <item name="android:navigationBarColor">@android:color/system_neutral1_10</item>
-        <item name="android:textColorPrimary">@android:color/system_neutral1_900</item>
-        <item name="android:textColorSecondary">@android:color/system_neutral2_700</item>
-        <item name="android:colorControlActivated">@android:color/system_accent1_600</item>
-        <item name="android:colorControlHighlight">@android:color/system_accent1_100</item>
-        <item name="android:listDivider">@null</item>
-        <item name="android:dividerHeight">0dp</item>
-        <item name="android:switchStyle">@style/Widget.Material3.Switch</item>
-        <item name="android:actionBarStyle">@style/platformSettingsActionBar</item>
-        <item name="android:actionBarTheme">@style/platformSettingsActionBarTheme</item>
-        <item name="android:alertDialogTheme">@style/platformDialogTheme</item>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="platformSettingsTheme" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="preferenceTheme">@style/M3PreferenceThemeOverlay</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <item name="materialAlertDialogTheme">@style/platformDialogTheme</item>
+        <item name="alertDialogTheme">@style/platformDialogTheme</item>
     </style>
 
-    <style name="platformDialogTheme" parent="@android:style/Theme.DeviceDefault.Light.Dialog.Alert">
-        <item name="android:colorPrimary">@android:color/system_accent1_600</item>
-        <item name="android:colorAccent">@android:color/system_accent1_600</item>
-        <item name="android:colorControlActivated">@android:color/system_accent1_600</item>
-        <item name="android:colorControlHighlight">@android:color/system_accent1_100</item>
-        <item name="android:backgroundDimAmount">0.6</item>
-        <item name="android:backgroundDimEnabled">true</item>
+    <style name="platformDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:listPreferredItemHeight">48dp</item>
+        <item name="android:listPreferredItemHeightSmall">48dp</item>
+        <item name="listPreferredItemHeight">48dp</item>
+        <item name="listPreferredItemHeightSmall">48dp</item>
     </style>
 
-    <style name="Widget.Material3.Switch" parent="@android:style/Widget.Material.CompoundButton.Switch">
-        <item name="android:track">@drawable/switch_m3_track</item>
-        <item name="android:thumb">@drawable/switch_m3_thumb</item>
-        <item name="android:switchMinWidth">44dp</item>
-        <item name="android:switchPadding">8dp</item>
-        <item name="android:showText">false</item>
+    <style name="M3PreferenceThemeOverlay" parent="PreferenceThemeOverlay">
+        <item name="preferenceCategoryStyle">@style/M3PreferenceCategory</item>
+        <item name="preferenceStyle">@style/M3Preference</item>
+        <item name="switchPreferenceCompatStyle">@style/M3SwitchPreferenceCompat</item>
+        <item name="dialogPreferenceStyle">@style/M3DialogPreference</item>
     </style>
 
-    <style name="platformSettingsActionBar" parent="@android:style/Widget.DeviceDefault.ActionBar.Solid">
-        <item name="android:background">@android:color/system_neutral1_10</item>
-        <item name="android:elevation">0dp</item>
-        <item name="android:titleTextStyle">@style/platformSettingsTitleText</item>
+    <style name="M3PreferenceCategory" parent="Preference.Category.Material">
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+        <item name="android:layout">@layout/m3_preference_category</item>
     </style>
 
-    <style name="platformSettingsActionBarTheme" parent="@android:style/ThemeOverlay.Material.Light">
-        <item name="android:textColorPrimary">@android:color/system_neutral1_900</item>
-        <item name="android:colorControlNormal">@android:color/system_neutral1_900</item>
+    <style name="M3Preference" parent="Preference.Material">
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+        <item name="singleLineTitle">false</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:layout">@layout/m3_preference</item>
     </style>
 
-    <style name="platformSettingsTitleText" parent="@android:style/TextAppearance.DeviceDefault.Widget.ActionBar.Title">
-        <item name="android:textColor">@android:color/system_neutral1_900</item>
-        <item name="android:textSize">20sp</item>
+    <style name="M3SwitchPreferenceCompat" parent="Preference.SwitchPreferenceCompat.Material">
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+        <item name="singleLineTitle">false</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:layout">@layout/m3_preference</item>
+        <item name="android:widgetLayout">@layout/m3_preference_widget_switch</item>
+        <item name="widgetLayout">@layout/m3_preference_widget_switch</item>
+    </style>
+
+    <style name="M3DialogPreference" parent="Preference.DialogPreference.Material">
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+        <item name="singleLineTitle">false</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:layout">@layout/m3_preference</item>
     </style>
 </resources>

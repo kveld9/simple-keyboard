@@ -10,7 +10,34 @@
         <item name="alertDialogTheme">@style/platformDialogTheme</item>
     </style>
 
-    <style name="platformDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+    <style name="platformDialogTheme" parent="Theme.Material3.DayNight.Dialog.Alert">
+        <item name="android:listPreferredItemHeight">48dp</item>
+        <item name="android:listPreferredItemHeightSmall">48dp</item>
+        <item name="listPreferredItemHeight">48dp</item>
+        <item name="listPreferredItemHeightSmall">48dp</item>
+    </style>
+
+    <style name="platformDialogTheme_Light" parent="Theme.Material3.Light.Dialog.Alert">
+        <item name="android:listPreferredItemHeight">48dp</item>
+        <item name="android:listPreferredItemHeightSmall">48dp</item>
+        <item name="listPreferredItemHeight">48dp</item>
+        <item name="listPreferredItemHeightSmall">48dp</item>
+    </style>
+
+    <style name="platformDialogTheme_Dark" parent="Theme.Material3.Dark.Dialog.Alert">
+        <item name="colorSurface">@color/background_lxx_dark</item>
+        <item name="colorSurfaceContainerHigh">@color/background_secondary_lxx_dark</item>
+        <item name="colorOnSurface">@color/key_text_color_lxx_dark</item>
+        <item name="android:listPreferredItemHeight">48dp</item>
+        <item name="android:listPreferredItemHeightSmall">48dp</item>
+        <item name="listPreferredItemHeight">48dp</item>
+        <item name="listPreferredItemHeightSmall">48dp</item>
+    </style>
+
+    <style name="platformDialogTheme_Black" parent="Theme.Material3.Dark.Dialog.Alert">
+        <item name="colorSurface">#121212</item>
+        <item name="colorSurfaceContainerHigh">#1E1E1E</item>
+        <item name="colorOnSurface">#FFFFFF</item>
         <item name="android:listPreferredItemHeight">48dp</item>
         <item name="android:listPreferredItemHeightSmall">48dp</item>
         <item name="listPreferredItemHeight">48dp</item>

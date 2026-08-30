@@ -140,12 +140,12 @@ public class BeamSearchDecoder {
         if (typedWord == null || typedWord.isEmpty() || states.size() <= 1 || dictionary == null) {
             return Collections.emptyList();
         }
-        List<BeamHypothesis> current = states.peek();
-        if (current == null || current.isEmpty() || current.get(0).word.isEmpty()) {
+        // If the number of recorded touches does not match the typed word length, touch decoder is out of sync
+        if ((states.size() - 1) != typedWord.length()) {
             return Collections.emptyList();
         }
-        // If the decoder hypothesis length diverges significantly from the typed word, don't supply stale decoder suggestions
-        if (Math.abs(current.get(0).word.length() - typedWord.length()) > 1) {
+        List<BeamHypothesis> current = states.peek();
+        if (current == null || current.isEmpty() || current.get(0).word.isEmpty()) {
             return Collections.emptyList();
         }
         List<CharSequence> res = new ArrayList<>();
@@ -187,6 +187,7 @@ public class BeamSearchDecoder {
 
     public String getBestCorrection(String typedWord, float threshold, String prevWord) {
         if (typedWord == null || typedWord.isEmpty() || states.size() <= 1 || dictionary == null) return null;
+        if ((states.size() - 1) != typedWord.length()) return null;
         List<BeamHypothesis> current = states.peek();
         if (current == null || current.isEmpty() || current.get(0).word.isEmpty()) return null;
         

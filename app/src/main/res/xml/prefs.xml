@@ -22,36 +22,48 @@
         <Preference
             android:key="select_language"
             android:title="@string/select_language"
+            android:icon="@drawable/ic_language"
+            app:iconTint="?attr/colorOnSurfaceVariant"
             android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.LanguagesSettingsFragment"
             app:widgetLayout="@layout/preference_chevron" />
 
         <Preference
             android:key="screen_preferences"
             android:title="@string/settings_screen_preferences"
+            android:icon="@drawable/ic_tune"
+            app:iconTint="?attr/colorOnSurfaceVariant"
             android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.PreferencesSettingsFragment"
             app:widgetLayout="@layout/preference_chevron" />
 
         <Preference
             android:key="screen_autocorrect"
             android:title="@string/settings_screen_autocorrect"
+            android:icon="@drawable/ic_spellcheck"
+            app:iconTint="?attr/colorOnSurfaceVariant"
             android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.AutocorrectSettingsFragment"
             app:widgetLayout="@layout/preference_chevron" />
 
         <Preference
             android:key="screen_clipboard"
             android:title="@string/settings_screen_clipboard"
+            android:icon="@drawable/ic_content_paste"
+            app:iconTint="?attr/colorOnSurfaceVariant"
             android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.ClipboardSettingsFragment"
             app:widgetLayout="@layout/preference_chevron" />
 
         <Preference
             android:key="screen_key_press"
             android:title="@string/settings_screen_key_press"
+            android:icon="@drawable/ic_keyboard"
+            app:iconTint="?attr/colorOnSurfaceVariant"
             android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.KeyPressSettingsFragment"
             app:widgetLayout="@layout/preference_chevron" />
 
         <Preference
             android:key="screen_appearance"
             android:title="@string/settings_screen_appearance"
+            android:icon="@drawable/ic_palette"
+            app:iconTint="?attr/colorOnSurfaceVariant"
             android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.AppearanceSettingsFragment"
             app:widgetLayout="@layout/preference_chevron" />
 

@@ -37,6 +37,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     outputs:
       version: ${{ steps.version.outputs.version }}
+      version_code: ${{ steps.version.outputs.version_code }}
       prev_tag: ${{ steps.version.outputs.prev_tag }}
       changelog: ${{ steps.changelog.outputs.changelog }}
     steps:

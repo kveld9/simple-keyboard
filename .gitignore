@@ -47,3 +47,5 @@ captures/
 RELEASE_SIGNING.md
 
 .idea
+.reports/
+

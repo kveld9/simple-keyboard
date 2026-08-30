@@ -166,6 +166,4 @@
     </string-array>
     <string name="settings_screen_autocorrect">Text correction</string>
     <string name="settings_screen_clipboard">Clipboard</string>
-    <string name="use_contacts_dict">Suggest contact names</string>
-    <string name="use_contacts_dict_summary">Show names from your contact list in suggestions</string>
 </resources>

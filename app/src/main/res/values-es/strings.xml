@@ -98,6 +98,4 @@
     </string-array>
     <string name="settings_screen_autocorrect">Corrección de texto</string>
     <string name="settings_screen_clipboard">Portapapeles</string>
-    <string name="use_contacts_dict">Sugerir nombres de contactos</string>
-    <string name="use_contacts_dict_summary">Mostrar nombres de tu lista de contactos en las sugerencias</string>
 </resources>

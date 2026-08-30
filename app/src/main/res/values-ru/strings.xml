@@ -31,6 +31,8 @@
     <string name="settings_system_default">По умолчанию</string>
     <string name="auto_cap">Автоматические заглавные</string>
     <string name="auto_cap_summary">Писать первое слово каждого предложения с заглавной буквы</string>
+    <string name="auto_period">Точка по двойному пробелу</string>
+    <string name="auto_period_summary">Двойное нажатие пробела вставляет точку с пробелом</string>
     <string name="select_language">Языки</string>
     <string name="locale_name_en_GB">Английский (Великобритания)</string>
     <string name="locale_name_en_US">Английский (США)</string>
@@ -53,9 +55,17 @@
     <string name="pref_use_on_screen">Показывать экранную клавиатуру</string>
     <string name="pref_use_on_screen_summary">Показывать экранную клавиатуру при использовании физической клавиатуры</string>
     <string name="pref_enable_ime_switch">Переключение на другие клавиатуры</string>
+    <string name="disable_landscape_fullscreen">Отключить полноэкранный режим в ландшафтной ориентации</string>
+    <string name="disable_landscape_fullscreen_summary">Не разворачивать клавиатуру на весь экран в горизонтальном режиме</string>
     <string name="show_number_row">Отдельный цифровой ряд</string>
     <string name="space_swipe">Свайп по пробелу для перемещения курсора</string>
     <string name="delete_swipe">Свайп для удаления</string>
+    <string name="swipe_sensitivity">Чувствительность свайпа</string>
+    <string-array name="swipe_sensitivity_entries">
+        <item>Высокая</item>
+        <item>Обычная</item>
+        <item>Низкая</item>
+    </string-array>
     <string name="user_languages">Включённые языки клавиатуры</string>
     <string name="change_keyboard">Сменить клавиатуру</string>
     <string name="privacy_policy">Политика конфиденциальности</string>

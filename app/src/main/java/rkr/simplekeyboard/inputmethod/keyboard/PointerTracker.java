@@ -424,7 +424,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     }
 
     private static int getDistance(final int x1, final int y1, final int x2, final int y2) {
-        return (int)Math.hypot(x1 - x2, y1 - y2);
+        final int dx = x1 - x2;
+        final int dy = y1 - y2;
+        return (int) Math.sqrt(dx * dx + dy * dy);
     }
 
     private Key onMoveKeyInternal(final int x, final int y) {
@@ -691,9 +693,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         if (!isSwipeEligible(oldKey, targetCode, enabled)) {
             return false;
         }
-        final int steps = (x - mStartX) / sPointerStep;
+        final int effectiveStep = Math.max(1, (int)(sPointerStep * Settings.getInstance().getCurrent().mSwipeSensitivity));
+        final int steps = (x - mStartX) / effectiveStep;
         if (steps != 0) {
-            applySwipeSteps(steps, checkTimeout, listener);
+            applySwipeSteps(steps, effectiveStep, checkTimeout, listener);
         }
         return true;
     }
@@ -702,12 +705,12 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         return enabled && oldKey != null && oldKey.getCode() == targetCode;
     }
 
-    private void applySwipeSteps(final int steps, final boolean checkTimeout, final SwipeListener listener) {
+    private void applySwipeSteps(final int steps, final int effectiveStep, final boolean checkTimeout, final SwipeListener listener) {
         if (checkTimeout && isSwipeTimeoutActive()) {
             return;
         }
         mCursorMoved = true;
-        mStartX += steps * sPointerStep;
+        mStartX += steps * effectiveStep;
         listener.onSwipe(steps);
     }
 

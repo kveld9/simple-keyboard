@@ -36,6 +36,7 @@ public class SettingsValues {
     public final boolean mHasHardwareKeyboard;
     // From preferences, in the same order as xml/prefs.xml:
     public final boolean mAutoCap;
+    public final boolean mAutoPeriodEnabled;
     public final boolean mVibrateOn;
     public final boolean mSoundOn;
     public final boolean mKeyPreviewPopupOn;
@@ -48,6 +49,8 @@ public class SettingsValues {
     public final boolean mShowNumberRow;
     public final boolean mSpaceSwipeEnabled;
     public final boolean mDeleteSwipeEnabled;
+    public final float mSwipeSensitivity;
+    public final boolean mDisableLandscapeFullscreen;
     public final boolean mShowSuggestions;
     public final boolean mClipboardEnabled;
     public final boolean mClipboardSuggestionsEnabled;
@@ -77,6 +80,7 @@ public class SettingsValues {
 
         // Get the settings preferences
         mAutoCap = prefs.getBoolean(Settings.PREF_AUTO_CAP, true);
+        mAutoPeriodEnabled = prefs.getBoolean(Settings.PREF_AUTO_PERIOD, false);
         mVibrateOn = Settings.readVibrationEnabled(prefs, res);
         mSoundOn = prefs.getBoolean(Settings.PREF_SOUND_ON, res.getBoolean(R.bool.config_default_sound_enabled));
         mKeyPreviewPopupOn = prefs.getBoolean(Settings.PREF_POPUP_ON, res.getBoolean(R.bool.config_default_key_preview_popup));
@@ -96,6 +100,8 @@ public class SettingsValues {
         mShowNumberRow = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, false);
         mSpaceSwipeEnabled = prefs.getBoolean(Settings.PREF_SPACE_SWIPE, false);
         mDeleteSwipeEnabled = prefs.getBoolean(Settings.PREF_DELETE_SWIPE, false);
+        mSwipeSensitivity = Settings.readSwipeSensitivity(prefs);
+        mDisableLandscapeFullscreen = prefs.getBoolean(Settings.PREF_DISABLE_LANDSCAPE_FULLSCREEN, false);
         mShowSuggestions = prefs.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, true);
         mClipboardEnabled = prefs.getBoolean(Settings.PREF_CLIPBOARD_ENABLED, true);
         mClipboardSuggestionsEnabled = prefs.getBoolean(Settings.PREF_CLIPBOARD_SUGGESTIONS, false);

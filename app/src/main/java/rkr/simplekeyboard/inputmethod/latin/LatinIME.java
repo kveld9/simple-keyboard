@@ -405,17 +405,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onConfigurationChanged(final Configuration conf) {
         mDisplayContext = createOrGetDisplayContext();
-        SettingsValues settingsValues = mSettings.getCurrent();
-        if (settingsValues.mHasHardwareKeyboard != Settings.readHasHardwareKeyboard(conf)) {
-            // If the state of having a hardware keyboard changed, then we want to reload the
-            // settings to adjust for that.
-            // TODO: we should probably do this unconditionally here, rather than only when we
-            // have a change in hardware keyboard configuration.
-            loadSettings();
-        }
-
+        loadSettings();
         mKeyboardSwitcher.onConfigurationChanged();
-
         super.onConfigurationChanged(conf);
     }
 
@@ -1484,6 +1475,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public boolean onEvaluateFullscreenMode() {
+        if (mSettings != null && mSettings.getCurrent() != null && mSettings.getCurrent().mDisableLandscapeFullscreen) {
+            return false;
+        }
         if (isImeSuppressedByHardwareKeyboard()) {
             // If there is a hardware keyboard, disable full screen mode.
             return false;

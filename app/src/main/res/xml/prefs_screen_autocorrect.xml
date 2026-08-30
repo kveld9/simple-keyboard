@@ -18,6 +18,12 @@
             android:defaultValue="true" />
 
         <SwitchPreferenceCompat
+            android:key="auto_period"
+            android:title="@string/auto_period"
+            android:summary="@string/auto_period_summary"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
             android:key="pref_show_suggestions"
             android:title="@string/show_suggestions"
             android:defaultValue="true" />

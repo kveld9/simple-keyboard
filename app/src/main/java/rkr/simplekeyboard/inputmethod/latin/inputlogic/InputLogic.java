@@ -48,6 +48,8 @@ public final class InputLogic {
     // This has package visibility so it can be accessed from InputLogicHandler.
     public final RichInputConnection mConnection;
     private final RecapitalizeStatus mRecapitalizeStatus = new RecapitalizeStatus();
+    private static final long DOUBLE_SPACE_PERIOD_TIMEOUT = 800;
+    private long mLastSpaceTimestamp = 0;
 
     /**
      * Create a new instance of the input logic.
@@ -65,10 +67,12 @@ public final class InputLogic {
      * Call this when input starts or restarts in some editor (typically, in onStartInputView).
      */
     public void startInput() {
+        mLastSpaceTimestamp = 0;
         mRecapitalizeStatus.disable(); // Do not perform recapitalize until the cursor is moved once
     }
 
     public void clearCaches() {
+        mLastSpaceTimestamp = 0;
         mConnection.clearCaches();
     }
 
@@ -90,6 +94,7 @@ public final class InputLogic {
      * @return the complete transaction object
      */
     public InputTransaction onTextInput(final SettingsValues settingsValues, final Event event) {
+        mLastSpaceTimestamp = 0;
         final String text = event.getTextToCommit().toString();
         final InputTransaction inputTransaction = new InputTransaction(settingsValues);
         mConnection.commitText(text, 1);
@@ -195,7 +200,11 @@ public final class InputLogic {
     private void handleNonFunctionalEvent(final Event event,
             final InputTransaction inputTransaction) {
         switch (event.mCodePoint) {
+            case Constants.CODE_SPACE:
+                handleSpaceEvent(event, inputTransaction);
+                break;
             case Constants.CODE_ENTER:
+                mLastSpaceTimestamp = 0;
                 final EditorInfo editorInfo = getCurrentInputEditorInfo();
                 final int imeOptionsActionId =
                         InputTypeUtils.getImeOptionsActionIdFromEditorInfo(editorInfo);
@@ -219,9 +228,30 @@ public final class InputLogic {
                 }
                 break;
             default:
+                mLastSpaceTimestamp = 0;
                 handleNonSpecialCharacterEvent(event, inputTransaction);
                 break;
         }
+    }
+
+    private void handleSpaceEvent(final Event event, final InputTransaction inputTransaction) {
+        final long now = SystemClock.uptimeMillis();
+        if (inputTransaction.mSettingsValues.mAutoPeriodEnabled) {
+            if (now - mLastSpaceTimestamp < DOUBLE_SPACE_PERIOD_TIMEOUT) {
+                final String textBefore = mConnection.getTextBeforeCursor(2, 0);
+                if (textBefore.length() >= 2
+                        && textBefore.charAt(textBefore.length() - 1) == ' '
+                        && Character.isLetterOrDigit(textBefore.charAt(textBefore.length() - 2))) {
+                    mConnection.deleteTextBeforeCursor(1);
+                    mConnection.commitText(". ", 1);
+                    inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+                    mLastSpaceTimestamp = 0;
+                    return;
+                }
+            }
+        }
+        mLastSpaceTimestamp = now;
+        handleSeparatorEvent(event, inputTransaction);
     }
 
     /**
@@ -288,6 +318,7 @@ public final class InputLogic {
      * @param inputTransaction The transaction in progress.
      */
     private void handleBackspaceEvent(final Event event, final InputTransaction inputTransaction) {
+        mLastSpaceTimestamp = 0;
         inputTransaction.requireShiftUpdate(resolveBackspaceShiftUpdateKind(event));
 
         if (mConnection.hasSelection()) {
@@ -452,10 +483,14 @@ public final class InputLogic {
      */
     // TODO: replace these two parameters with an InputTransaction
     private void sendKeyCodePoint(final int codePoint) {
-        // TODO: Remove this special handling of digit letters.
-        // For backward compatibility. See {@link InputMethodService#sendKeyChar(char)}.
         if (codePoint >= '0' && codePoint <= '9') {
             sendDownUpKeyEvent(codePoint - '0' + KeyEvent.KEYCODE_0);
+            return;
+        }
+
+        final EditorInfo editorInfo = getCurrentInputEditorInfo();
+        if (editorInfo == null || editorInfo.inputType == android.text.InputType.TYPE_NULL) {
+            mLatinIME.sendKeyChar((char) codePoint);
             return;
         }
 

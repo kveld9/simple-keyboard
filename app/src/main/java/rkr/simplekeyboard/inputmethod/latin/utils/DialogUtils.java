@@ -31,34 +31,37 @@ public final class DialogUtils {
         // This utility class is not publicly instantiable.
     }
 
-    public static int getPlatformDialogThemeId(final Context context) {
+    public static Context getPlatformDialogThemeContext(final Context context) {
         final KeyboardTheme keyboardTheme = KeyboardTheme.getKeyboardTheme(context);
+        final int baseThemeResId;
         if (keyboardTheme != null) {
             switch (keyboardTheme.mThemeId) {
                 case KeyboardTheme.THEME_ID_BLACK:
-                    return R.style.platformDialogTheme_Black;
+                    baseThemeResId = R.style.platformDialogBaseTheme_Black;
+                    break;
                 case KeyboardTheme.THEME_ID_DARK:
                 case KeyboardTheme.THEME_ID_DARK_BORDER:
-                    return R.style.platformDialogTheme_Dark;
+                    baseThemeResId = R.style.platformDialogBaseTheme_Dark;
+                    break;
                 case KeyboardTheme.THEME_ID_LIGHT:
                 case KeyboardTheme.THEME_ID_LIGHT_BORDER:
-                    return R.style.platformDialogTheme_Light;
+                    baseThemeResId = R.style.platformDialogBaseTheme_Light;
+                    break;
                 case KeyboardTheme.THEME_ID_SYSTEM:
                 case KeyboardTheme.THEME_ID_SYSTEM_BORDER:
                 default:
                     final boolean isNight = (context.getResources().getConfiguration().uiMode
                             & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-                    return isNight ? R.style.platformDialogTheme_Dark : R.style.platformDialogTheme_Light;
+                    baseThemeResId = isNight ? R.style.platformDialogBaseTheme_Dark : R.style.platformDialogBaseTheme_Light;
+                    break;
             }
+        } else {
+            baseThemeResId = R.style.platformDialogBaseTheme_System;
         }
-        return R.style.platformDialogTheme;
+        return new ContextThemeWrapper(context, baseThemeResId);
     }
 
     public static MaterialAlertDialogBuilder createMaterialDialogBuilder(final Context context) {
-        return new MaterialAlertDialogBuilder(context, getPlatformDialogThemeId(context));
-    }
-
-    public static Context getPlatformDialogThemeContext(final Context context) {
-        return new ContextThemeWrapper(context, getPlatformDialogThemeId(context));
+        return new MaterialAlertDialogBuilder(getPlatformDialogThemeContext(context));
     }
 }

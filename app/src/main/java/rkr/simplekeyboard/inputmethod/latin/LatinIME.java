@@ -1115,6 +1115,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (displayClipboardChipIfAvailable()) {
             return;
         }
+        if (w2 == null || w2.trim().isEmpty()) {
+            if (mTopBarView != null) {
+                mTopBarView.setSuggestions(null, -1);
+            }
+            return;
+        }
         final long seq = mSuggestionSeq.incrementAndGet();
         mDictExecutor.execute(() -> {
             if (seq != mSuggestionSeq.get()) {

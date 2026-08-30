@@ -20,28 +20,49 @@ package rkr.simplekeyboard.inputmethod.latin.settings;
 
 import android.content.Context;
 import android.os.Bundle;
-import android.preference.PreferenceFragment;
+import android.view.View;
 
-import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.recyclerview.widget.RecyclerView;
 
 /**
  * This is a helper class for an IME's settings preference fragment. It's recommended for every
  * IME to have its own settings preference fragment which inherits this class.
  */
-public abstract class InputMethodSettingsFragment extends PreferenceFragment {
+public abstract class InputMethodSettingsFragment extends PreferenceFragmentCompat {
     private final InputMethodSettingsImpl mSettings = new InputMethodSettingsImpl();
+
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        final Context context = getActivity();
-        setPreferenceScreen(getPreferenceManager().createPreferenceScreen(
-                PreferenceManagerCompat.getDeviceContext(context)));
+    public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
+        getPreferenceManager().setStorageDeviceProtected();
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        setDivider(null);
+        setDividerHeight(0);
+
+        RecyclerView recyclerView = getListView();
+        if (recyclerView != null) {
+            recyclerView.setItemAnimator(null);
+            recyclerView.addItemDecoration(new SettingsCardItemDecoration(requireContext()));
+            recyclerView.setClipToPadding(false);
+            recyclerView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
+            float density = getResources().getDisplayMetrics().density;
+            int paddingHorizontal = (int) (16 * density);
+            int paddingBottom = (int) (24 * density);
+            int paddingTop = (int) (8 * density);
+            recyclerView.setPadding(paddingHorizontal, paddingTop, paddingHorizontal, paddingBottom);
+        }
+    }
+
+    public void initSettings(Context context) {
         mSettings.init(context, getPreferenceScreen());
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void onResume() {
         super.onResume();

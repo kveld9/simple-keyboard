@@ -102,4 +102,30 @@
     </string-array>
     <string name="settings_screen_autocorrect">Corrección de texto</string>
     <string name="settings_screen_clipboard">Portapapeles</string>
+    <string name="settings_category_general">General</string>
+    <string name="settings_category_about_legal">Acerca de y legal</string>
+    <string name="settings_category_keys_layout">Teclas y diseño</string>
+    <string name="settings_category_gestures">Gestos</string>
+    <string name="settings_category_typing">Escritura</string>
+    <string name="settings_category_correction">Corrección</string>
+    <string name="settings_category_theme_style">Tema y estilo</string>
+    <string name="settings_category_dimensions">Dimensiones</string>
+    <string name="settings_category_feedback">Respuesta táctil y sonido</string>
+    <string name="settings_category_visual_timing">Visual y tiempos</string>
+    <string name="settings_category_suggestions">Sugerencias</string>
+    <string name="settings_category_history">Historial</string>
+    <string name="ime_not_enabled_title">Simple Keyboard no está habilitado</string>
+    <string name="ime_not_enabled_summary">Toca para activarlo en los ajustes del sistema</string>
+    <string name="ime_not_active_title">Simple Keyboard no está seleccionado</string>
+    <string name="ime_not_active_summary">Toca para elegirlo como teclado activo</string>
+    <string name="version_summary_format">Versión %s</string>
+    <string name="check_for_updates_summary">Buscar nuevas versiones en GitHub</string>
+    <string name="clipboard_enabled">Habilitar portapapeles</string>
+    <string name="clipboard_enabled_summary">Mantener un historial de elementos copiados y sugerencias</string>
 </resources>
+
+
+
+
+
+

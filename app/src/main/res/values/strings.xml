@@ -156,4 +156,31 @@
     </string-array>
     <string name="settings_screen_autocorrect">Text correction</string>
     <string name="settings_screen_clipboard">Clipboard</string>
+    <string name="settings_category_general">General</string>
+    <string name="settings_category_about_legal">About &amp; Legal</string>
+    <string name="settings_category_keys_layout">Keys &amp; Layout</string>
+    <string name="settings_category_gestures">Gestures</string>
+    <string name="settings_category_typing">Typing</string>
+    <string name="settings_category_correction">Correction</string>
+    <string name="settings_category_theme_style">Theme &amp; Style</string>
+    <string name="settings_category_dimensions">Dimensions</string>
+    <string name="settings_category_feedback">Haptic &amp; Sound</string>
+    <string name="settings_category_visual_timing">Visual &amp; Timing</string>
+    <string name="settings_category_suggestions">Suggestions</string>
+    <string name="settings_category_history">History</string>
+    <string name="ime_not_enabled_title">Simple Keyboard is not enabled</string>
+    <string name="ime_not_enabled_summary">Tap to enable it in system settings</string>
+    <string name="ime_not_active_title">Simple Keyboard is not selected</string>
+    <string name="ime_not_active_summary">Tap to choose it as your active keyboard</string>
+    <string name="version_summary_format">Version %s</string>
+    <string name="check_for_updates_summary">Check for new versions on GitHub</string>
+    <string name="clipboard_enabled">Enable clipboard</string>
+    <string name="clipboard_enabled_summary">Keep a history of copied items and suggestions</string>
 </resources>
+
+
+
+
+
+
+

@@ -22,6 +22,8 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 
+import androidx.annotation.Nullable;
+
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet;
 
@@ -30,9 +32,9 @@ import rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet;
  */
 public final class PreferencesSettingsFragment extends SubScreenFragment {
     @Override
-    public void onCreate(final Bundle icicle) {
-        super.onCreate(icicle);
-        addPreferencesFromResource(R.xml.prefs_screen_preferences);
+    public void onCreatePreferences(@Nullable final Bundle savedInstanceState, @Nullable final String rootKey) {
+        super.onCreatePreferences(savedInstanceState, rootKey);
+        setPreferencesFromResource(R.xml.prefs_screen_preferences, rootKey);
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
             removePreference(Settings.PREF_USE_ON_SCREEN);

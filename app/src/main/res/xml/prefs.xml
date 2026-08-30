@@ -1,49 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Copyright (C) 2008 The Android Open Source Project
-
      Licensed under the Apache License, Version 2.0 (the "License");
-     you may not use this file except in compliance with the License.
-     You may obtain a copy of the License at
-
-          http://www.apache.org/licenses/LICENSE-2.0
-
-     Unless required by applicable law or agreed to in writing, software
-     distributed under the License is distributed on an "AS IS" BASIS,
-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-     See the License for the specific language governing permissions and
-     limitations under the License.
 -->
 
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+<PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:key="english_ime_settings">
-    <PreferenceScreen
-        android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.PreferencesSettingsFragment"
-        android:title="@string/settings_screen_preferences"
-        android:key="screen_preferences" />
-    <PreferenceScreen
-        android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.AutocorrectSettingsFragment"
-        android:title="@string/settings_screen_autocorrect"
-        android:key="screen_autocorrect" />
-    <PreferenceScreen
-        android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.ClipboardSettingsFragment"
-        android:title="@string/settings_screen_clipboard"
-        android:key="screen_clipboard" />
-    <PreferenceScreen
-        android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.KeyPressSettingsFragment"
-        android:title="@string/settings_screen_key_press"
-        android:key="screen_key_press" />
-    <PreferenceScreen
-        android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.AppearanceSettingsFragment"
-        android:title="@string/settings_screen_appearance"
-        android:key="screen_appearance" />
-    <Preference
-        android:title="@string/privacy_policy"
-        android:key="privacy_policy" />
-    <Preference
-        android:title="@string/license"
-        android:key="license" />
-    <Preference
-        android:title="@string/version"
-        android:key="version_info"
-        android:widgetLayout="@layout/preference_widget_check_update" />
+
+    <rkr.simplekeyboard.inputmethod.latin.settings.ImeBannerPreference
+        android:key="ime_not_active_banner"
+        android:title="@string/ime_not_active_title"
+        android:summary="@string/ime_not_active_summary" />
+
+
+
+    <PreferenceCategory
+        android:title="@string/settings_category_general">
+
+
+        <Preference
+            android:key="select_language"
+            android:title="@string/select_language"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.LanguagesSettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+        <Preference
+            android:key="screen_preferences"
+            android:title="@string/settings_screen_preferences"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.PreferencesSettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+        <Preference
+            android:key="screen_autocorrect"
+            android:title="@string/settings_screen_autocorrect"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.AutocorrectSettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+        <Preference
+            android:key="screen_clipboard"
+            android:title="@string/settings_screen_clipboard"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.ClipboardSettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+        <Preference
+            android:key="screen_key_press"
+            android:title="@string/settings_screen_key_press"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.KeyPressSettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+        <Preference
+            android:key="screen_appearance"
+            android:title="@string/settings_screen_appearance"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.AppearanceSettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_category_about_legal">
+
+        <Preference
+            android:key="privacy_policy"
+            android:title="@string/privacy_policy"
+            app:widgetLayout="@layout/preference_external_link" />
+
+        <Preference
+            android:key="license"
+            android:title="@string/license"
+            app:widgetLayout="@layout/preference_external_link" />
+
+
+        <Preference
+            android:key="version_info"
+            android:title="@string/version"
+            app:widgetLayout="@layout/preference_external_link" />
+
+    </PreferenceCategory>
+
+
+
 </PreferenceScreen>

@@ -21,6 +21,7 @@ import android.content.Context;
 import android.view.ContextThemeWrapper;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.keyboard.KeyboardTheme;
 
 public final class DialogUtils {
     private DialogUtils() {
@@ -28,8 +29,28 @@ public final class DialogUtils {
     }
 
     public static Context getPlatformDialogThemeContext(final Context context) {
-        // Because {@link AlertDialog.Builder.create()} doesn't honor the specified theme with
-        // createThemeContextWrapper=false, the result dialog box has unneeded paddings around it.
-        return new ContextThemeWrapper(context, R.style.platformDialogTheme);
+        final KeyboardTheme keyboardTheme = KeyboardTheme.getKeyboardTheme(context);
+        final int dialogThemeResId;
+        if (keyboardTheme != null) {
+            switch (keyboardTheme.mThemeId) {
+                case KeyboardTheme.THEME_ID_BLACK:
+                    dialogThemeResId = R.style.platformDialogTheme_Black;
+                    break;
+                case KeyboardTheme.THEME_ID_DARK:
+                case KeyboardTheme.THEME_ID_DARK_BORDER:
+                    dialogThemeResId = R.style.platformDialogTheme_Dark;
+                    break;
+                case KeyboardTheme.THEME_ID_LIGHT:
+                case KeyboardTheme.THEME_ID_LIGHT_BORDER:
+                    dialogThemeResId = R.style.platformDialogTheme_Light;
+                    break;
+                default:
+                    dialogThemeResId = R.style.platformDialogTheme;
+                    break;
+            }
+        } else {
+            dialogThemeResId = R.style.platformDialogTheme;
+        }
+        return new ContextThemeWrapper(context, dialogThemeResId);
     }
 }

@@ -54,7 +54,7 @@ public class BinaryTrieDictionary {
         if (targetIndex == target.length()) {
             return isTerminal(node) ? node : -1;
         }
-        char targetChar = Character.toLowerCase(target.charAt(targetIndex));
+        final char targetChar = StringUtils.foldChar(target.charAt(targetIndex));
         
         int bestNode = -1;
         int maxFreq = -1;
@@ -65,9 +65,8 @@ public class BinaryTrieDictionary {
         for (int i = 0; i < childCount; i++) {
             int childNode = childrenOffset + i * 16;
             char c = (char) (buffer.getShort(childNode) & 0xFFFF);
-            char lowerChildChar = Character.toLowerCase(c);
             
-            if (StringUtils.removeAccents(lowerChildChar) == StringUtils.removeAccents(targetChar)) {
+            if (StringUtils.foldChar(c) == targetChar) {
                 int result = dfsUnaccentedMatch(childNode, target, targetIndex + 1);
                 if (result > 0) {
                     int freq = getNodeFrequency(result);

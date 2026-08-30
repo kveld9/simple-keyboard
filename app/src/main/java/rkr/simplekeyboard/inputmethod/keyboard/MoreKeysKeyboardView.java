@@ -62,14 +62,7 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
 
     @Override
     protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
-        final Keyboard keyboard = getKeyboard();
-        if (keyboard != null) {
-            final int width = keyboard.mOccupiedWidth + getPaddingLeft() + getPaddingRight();
-            final int height = keyboard.mOccupiedHeight + getPaddingTop() + getPaddingBottom();
-            setMeasuredDimension(width, height);
-        } else {
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 
     @Override
@@ -93,17 +86,8 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
     private void updatePopupBackground() {
         final Context context = getContext();
         final float cornerRadius = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getCornerRadius(context, mKeyShape);
-        final Drawable bg = getBackground();
-        if (bg instanceof GradientDrawable) {
-            ((GradientDrawable) bg.mutate()).setCornerRadius(cornerRadius);
-        }
-        final View container = getContainerView();
-        if (container != null) {
-            final Drawable containerBg = container.getBackground();
-            if (containerBg instanceof GradientDrawable) {
-                ((GradientDrawable) containerBg.mutate()).setCornerRadius(cornerRadius);
-            }
-        }
+        rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.setGradientCornerRadius(this, cornerRadius);
+        rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.setGradientCornerRadius(getContainerView(), cornerRadius);
         mActiveKeyDrawable = null; // Recreate lazily with updated theme/shape
     }
 

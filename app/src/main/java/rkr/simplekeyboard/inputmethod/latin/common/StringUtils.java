@@ -120,16 +120,27 @@ public final class StringUtils {
     }
 
     public static boolean isIdenticalAfterUpcase(final String text) {
+        return checkUpperCase(text, false /* requireLetter */);
+    }
+
+    private static boolean checkUpperCase(final String text, final boolean requireLetter) {
+        if (text == null) {
+            return false;
+        }
+        boolean hasLetter = false;
         final int length = text.length();
         int i = 0;
         while (i < length) {
             final int codePoint = text.codePointAt(i);
-            if (Character.isLetter(codePoint) && !Character.isUpperCase(codePoint)) {
-                return false;
+            if (Character.isLetter(codePoint)) {
+                if (!Character.isUpperCase(codePoint)) {
+                    return false;
+                }
+                hasLetter = true;
             }
             i += Character.charCount(codePoint);
         }
-        return true;
+        return !requireLetter || hasLetter;
     }
 
     public static boolean isIdenticalAfterDowncase(final String text) {
@@ -306,6 +317,11 @@ public final class StringUtils {
         ACCENT_MAP['Ç'] = 'C';
     }
 
+    public static char foldChar(final char c) {
+        final char lower = Character.toLowerCase(c);
+        return (lower < ACCENT_MAP.length) ? ACCENT_MAP[lower] : lower;
+    }
+
     public static char removeAccents(final char c) {
         return (c < ACCENT_MAP.length) ? ACCENT_MAP[c] : c;
     }
@@ -321,21 +337,31 @@ public final class StringUtils {
         return sb.toString();
     }
 
+    public static String toNormalizedLower(final String s) {
+        if (s == null) {
+            return "";
+        }
+        final int len = s.length();
+        final StringBuilder sb = new StringBuilder(len);
+        for (int i = 0; i < len; i++) {
+            sb.append(foldChar(s.charAt(i)));
+        }
+        return sb.toString();
+    }
+
     public static boolean isAllUpperCase(final String s) {
         if (s == null || s.length() <= 1) {
             return false;
         }
-        boolean hasLetter = false;
-        for (int i = 0; i < s.length(); i++) {
-            final char c = s.charAt(i);
-            if (Character.isLowerCase(c)) {
-                return false;
-            }
-            if (Character.isLetter(c)) {
-                hasLetter = true;
-            }
-        }
-        return hasLetter;
+        return checkUpperCase(s, true /* requireLetter */);
+    }
+
+    public static boolean isPunctuationOrSymbol(final int codePoint) {
+        return !Character.isLetterOrDigit(codePoint) && codePoint > 32;
+    }
+
+    public static boolean isWordCharacter(final int codePoint) {
+        return Character.isLetter(codePoint) || codePoint == '\'' || codePoint == '-';
     }
 
     public static String applyCasing(final String typed, final String suggestion) {

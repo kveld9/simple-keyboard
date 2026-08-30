@@ -21,6 +21,7 @@ import android.widget.TextView;
 import java.util.List;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.compat.BuildCompatUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils;
 
@@ -82,10 +83,7 @@ public class ClipboardHistoryView extends LinearLayout {
     private void init(Context context) {
         setOrientation(VERTICAL);
 
-        Drawable bg = ViewUtils.getThemeDrawable(context, R.attr.keyboardViewStyle, R.style.KeyboardView, android.R.attr.background);
-        if (bg != null) {
-            setBackground(bg);
-        }
+        ViewUtils.applyKeyboardBackground(this);
 
         loadThemeColors(context);
         buildHeader(context);
@@ -94,8 +92,8 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     private void loadThemeColors(Context context) {
-        mTextColor = ViewUtils.getThemeColor(context, R.attr.keyTextColor, Color.WHITE);
-        mFunctionalTextColor = ViewUtils.getThemeColor(context, R.attr.functionalTextColor, mTextColor);
+        mTextColor = ViewUtils.getKeyTextColor(context);
+        mFunctionalTextColor = ViewUtils.getFunctionalTextColor(context, mTextColor);
         mCardBackgroundColor = ViewUtils.getThemeColor(context, R.attr.keyNormalBackgroundColor, 0);
         mCardPressedColor = ViewUtils.getThemeColor(context, R.attr.keyPressedBackgroundColor, 0);
     }
@@ -145,11 +143,8 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     private void buildDivider(Context context) {
-        View divider = new View(context);
         int dividerColor = ResourceUtils.isBrightColor(mTextColor) ? 0x22FFFFFF : 0x18000000;
-        divider.setBackgroundColor(dividerColor);
-        divider.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(1)));
-        addView(divider);
+        addView(ViewUtils.createHorizontalDivider(context, dividerColor, 1.0f));
     }
 
     private void buildContentArea(Context context) {
@@ -421,7 +416,7 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     private void clearPrimaryClip(final android.content.ClipboardManager cm) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+        if (BuildCompatUtils.isAtLeastP()) {
             cm.clearPrimaryClip();
         } else {
             cm.setPrimaryClip(android.content.ClipData.newPlainText("", ""));

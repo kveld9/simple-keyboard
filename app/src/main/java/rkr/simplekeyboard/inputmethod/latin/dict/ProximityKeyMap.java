@@ -1,5 +1,7 @@
 package rkr.simplekeyboard.inputmethod.latin.dict;
 
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
+
 /**
  * Ultra-lightweight and efficient key adjacency and physical proximity map
  * for QWERTY and Spanish (QWERTY with 'ñ') layouts.
@@ -59,20 +61,14 @@ public final class ProximityKeyMap {
 
     private static int getIndex(final char c) {
         final char lower = Character.toLowerCase(c);
-        if (lower >= 'a' && lower <= 'z') {
-            return lower - 'a';
-        }
         if (lower == 'ñ') {
             return 26;
         }
-        switch (lower) {
-            case 'á': case 'à': case 'ä': case 'â': case 'ã': return 0;  // a
-            case 'é': case 'è': case 'ë': case 'ê': return 4;           // e
-            case 'í': case 'ì': case 'ï': case 'î': return 8;           // i
-            case 'ó': case 'ò': case 'ö': case 'ô': case 'õ': return 14; // o
-            case 'ú': case 'ù': case 'ü': case 'û': return 20;          // u
-            default: return -1;
+        final char unaccented = StringUtils.removeAccents(lower);
+        if (unaccented >= 'a' && unaccented <= 'z') {
+            return unaccented - 'a';
         }
+        return -1;
     }
 
     /**

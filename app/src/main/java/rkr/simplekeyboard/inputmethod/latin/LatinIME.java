@@ -68,6 +68,7 @@ import java.io.PrintWriter;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
+import rkr.simplekeyboard.inputmethod.compat.BuildCompatUtils;
 import rkr.simplekeyboard.inputmethod.compat.EditorInfoCompatUtils;
 import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
 import rkr.simplekeyboard.inputmethod.event.Event;
@@ -87,6 +88,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.inputlogic.InputLogic;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
@@ -126,6 +128,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private final java.util.concurrent.ExecutorService mDictExecutor =
             java.util.concurrent.Executors.newSingleThreadExecutor();
     private Locale mLoadedLocale;
+    private java.util.Set<String> mLoadedLanguages = null;
     private int mDictLoadGeneration = 0;
 
     public final rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel mSpatialTouchModel = new rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel();
@@ -298,7 +301,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private Context mDisplayContext;
 
     private Context createOrGetDisplayContext() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
+        if (BuildCompatUtils.isAtLeastSV2()) {
             return this;
         }
         final WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
@@ -378,7 +381,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public boolean onEvaluateInputViewShown() {
         final boolean useOnScreen = super.onEvaluateInputViewShown();
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+        if (!BuildCompatUtils.isAtLeastBaklava()) {
             return useOnScreen;
         } else {
             return useOnScreen || mSettings.getCurrent().mUseOnScreen;
@@ -906,13 +909,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void loadDictionaryForLocale(final Locale currentLocale) {
-        if (currentLocale != null && currentLocale.equals(mLoadedLocale) && mPrefixDictionary.getWordCount() > 0) {
+        final SettingsValues settingsValues = mSettings.getCurrent();
+        if (settingsValues != null && !settingsValues.mShowSuggestions) {
+            if (mLoadedLocale != null || mLoadedLanguages != null) {
+                mLoadedLocale = null;
+                mLoadedLanguages = null;
+                mBinaryTrieDictionary = null;
+                mBeamSearchDecoder = null;
+                mPrefixDictionary.clear();
+            }
             return;
         }
-        mLoadedLocale = currentLocale;
-        final String currentLang = (currentLocale != null) ? currentLocale.getLanguage() : "es";
-        final int loadGeneration = ++mDictLoadGeneration;
 
+        final String currentLang = (currentLocale != null) ? currentLocale.getLanguage() : "es";
         final java.util.Set<String> enabledLangs = new java.util.LinkedHashSet<>();
         if (mRichImm != null) {
             final java.util.Set<rkr.simplekeyboard.inputmethod.latin.Subtype> subtypes =
@@ -929,6 +938,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (enabledLangs.isEmpty()) {
             enabledLangs.add(currentLang);
         }
+
+        if (currentLocale != null && currentLocale.equals(mLoadedLocale)
+                && enabledLangs.equals(mLoadedLanguages)
+                && mPrefixDictionary.getWordCount() > 0) {
+            return;
+        }
+
+        mLoadedLocale = currentLocale;
+        mLoadedLanguages = new java.util.HashSet<>(enabledLangs);
+        final int loadGeneration = ++mDictLoadGeneration;
 
         mDictExecutor.execute(() -> {
             // 1. Construct binary trie dictionary and beam search decoder in background
@@ -947,9 +966,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
             // 2. Populate PrefixDictionary in background
             final PrefixDictionary newDict = new PrefixDictionary();
-            final SettingsValues settingsValues = mSettings.getCurrent();
-            if (settingsValues != null) {
-                newDict.setAutoCorrectionThreshold(settingsValues.mAutoCorrectionThreshold);
+            final SettingsValues currentSettings = mSettings.getCurrent();
+            if (currentSettings != null) {
+                newDict.setAutoCorrectionThreshold(currentSettings.mAutoCorrectionThreshold);
             }
             // Load secondary enabled languages first (with 85% relative frequency)
             for (String lang : enabledLangs) {
@@ -1138,7 +1157,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             }
 
             int flags = 0;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+            if (BuildCompatUtils.isAtLeastNMR1()) {
                 flags = InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION;
             }
 
@@ -1545,7 +1564,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private static boolean isDecoderResetKey(final int codePoint) {
-        return codePoint == Constants.CODE_SPACE || (!Character.isLetterOrDigit(codePoint) && codePoint > 32);
+        return codePoint == Constants.CODE_SPACE || StringUtils.isPunctuationOrSymbol(codePoint);
     }
 
     // This method is public for testability of LatinIME, but also in the future it should
@@ -1641,7 +1660,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return codePoint == Constants.CODE_SPACE
                 || codePoint == '\n'
                 || mSettings.getCurrent().isWordSeparator(codePoint)
-                || (!Character.isLetterOrDigit(codePoint) && codePoint > 32);
+                || StringUtils.isPunctuationOrSymbol(codePoint);
     }
 
     private boolean shouldPerformAutoCorrection(final String word) {
@@ -1913,7 +1932,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void setNavigationBarColor() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (BuildCompatUtils.isAtLeastR()) {
             final Window window = getWindow().getWindow();
             if (window == null) {
                 return;

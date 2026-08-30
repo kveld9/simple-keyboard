@@ -85,4 +85,78 @@ public class StringUtilsTest {
         // ẞ (U+1E9E) -> lowercase ß (U+00DF)
         assertEquals("\u00DF", StringUtils.toLowerCaseOfKeyLabel("\u1E9E", Locale.GERMAN));
     }
+
+    @Test
+    public void testFoldChar() {
+        assertEquals('a', StringUtils.foldChar('a'));
+        assertEquals('a', StringUtils.foldChar('A'));
+        assertEquals('a', StringUtils.foldChar('á'));
+        assertEquals('a', StringUtils.foldChar('Á'));
+        assertEquals('e', StringUtils.foldChar('é'));
+        assertEquals('e', StringUtils.foldChar('É'));
+        assertEquals('i', StringUtils.foldChar('í'));
+        assertEquals('i', StringUtils.foldChar('Í'));
+        assertEquals('o', StringUtils.foldChar('ó'));
+        assertEquals('o', StringUtils.foldChar('Ó'));
+        assertEquals('u', StringUtils.foldChar('ú'));
+        assertEquals('u', StringUtils.foldChar('Ú'));
+        assertEquals('n', StringUtils.foldChar('ñ'));
+        assertEquals('n', StringUtils.foldChar('Ñ'));
+        assertEquals('c', StringUtils.foldChar('ç'));
+        assertEquals('c', StringUtils.foldChar('Ç'));
+        assertEquals('z', StringUtils.foldChar('Z'));
+        assertEquals('1', StringUtils.foldChar('1'));
+    }
+
+    @Test
+    public void testToNormalizedLower() {
+        assertEquals("", StringUtils.toNormalizedLower(null));
+        assertEquals("", StringUtils.toNormalizedLower(""));
+        assertEquals("arbol", StringUtils.toNormalizedLower("ÁRBOL"));
+        assertEquals("cancion", StringUtils.toNormalizedLower("Canción"));
+        assertEquals("nino", StringUtils.toNormalizedLower("Niño"));
+        assertEquals("facil", StringUtils.toNormalizedLower("FÁCIL"));
+        assertEquals("hello world", StringUtils.toNormalizedLower("Hello World"));
+    }
+
+    @Test
+    public void testIsAllUpperCase() {
+        assertFalse(StringUtils.isAllUpperCase(null));
+        assertFalse(StringUtils.isAllUpperCase(""));
+        assertFalse(StringUtils.isAllUpperCase("A")); // length <= 1 returns false
+        assertFalse(StringUtils.isAllUpperCase("123")); // no letter
+        assertTrue(StringUtils.isAllUpperCase("HELLO"));
+        assertTrue(StringUtils.isAllUpperCase("HELLO WORLD"));
+        assertTrue(StringUtils.isAllUpperCase("HELLO 123"));
+        assertFalse(StringUtils.isAllUpperCase("Hello"));
+        assertFalse(StringUtils.isAllUpperCase("hello"));
+    }
+
+    @Test
+    public void testIsPunctuationOrSymbol() {
+        assertTrue(StringUtils.isPunctuationOrSymbol('.'));
+        assertTrue(StringUtils.isPunctuationOrSymbol(','));
+        assertTrue(StringUtils.isPunctuationOrSymbol('!'));
+        assertTrue(StringUtils.isPunctuationOrSymbol('?'));
+        assertTrue(StringUtils.isPunctuationOrSymbol('@'));
+        assertFalse(StringUtils.isPunctuationOrSymbol('a'));
+        assertFalse(StringUtils.isPunctuationOrSymbol('Z'));
+        assertFalse(StringUtils.isPunctuationOrSymbol('5'));
+        assertFalse(StringUtils.isPunctuationOrSymbol(' ')); // codePoint 32
+        assertFalse(StringUtils.isPunctuationOrSymbol('\n')); // codePoint 10
+    }
+
+    @Test
+    public void testIsWordCharacter() {
+        assertTrue(StringUtils.isWordCharacter('a'));
+        assertTrue(StringUtils.isWordCharacter('Z'));
+        assertTrue(StringUtils.isWordCharacter('á'));
+        assertTrue(StringUtils.isWordCharacter('ñ'));
+        assertTrue(StringUtils.isWordCharacter('\''));
+        assertTrue(StringUtils.isWordCharacter('-'));
+        assertFalse(StringUtils.isWordCharacter(' '));
+        assertFalse(StringUtils.isWordCharacter('.'));
+        assertFalse(StringUtils.isWordCharacter(','));
+        assertFalse(StringUtils.isWordCharacter('1'));
+    }
 }

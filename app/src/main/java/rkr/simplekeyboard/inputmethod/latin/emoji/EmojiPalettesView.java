@@ -111,10 +111,7 @@ public class EmojiPalettesView extends LinearLayout {
     private void init(Context context) {
         setOrientation(VERTICAL);
 
-        Drawable bg = ViewUtils.getThemeDrawable(context, R.attr.keyboardViewStyle, R.style.KeyboardView, android.R.attr.background);
-        if (bg != null) {
-            setBackground(bg);
-        }
+        ViewUtils.applyKeyboardBackground(this);
 
         loadThemeColors(context);
         loadRecentEmojis(context);
@@ -127,8 +124,8 @@ public class EmojiPalettesView extends LinearLayout {
     }
 
     private void loadThemeColors(Context context) {
-        mTextColor = ViewUtils.getThemeColor(context, R.attr.keyTextColor, Color.WHITE);
-        mFunctionalTextColor = ViewUtils.getThemeColor(context, R.attr.functionalTextColor, mTextColor);
+        mTextColor = ViewUtils.getKeyTextColor(context);
+        mFunctionalTextColor = ViewUtils.getFunctionalTextColor(context, mTextColor);
     }
 
     private void buildHeader(Context context) {
@@ -192,12 +189,7 @@ public class EmojiPalettesView extends LinearLayout {
     }
 
     private void buildDivider(Context context) {
-        View divider = new View(context);
-        int dividerHeight = ViewUtils.dpToPx(context, 1);
-        divider.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, dividerHeight));
-        divider.setBackgroundColor(mTextColor);
-        divider.setAlpha(0.12f);
-        addView(divider);
+        addView(ViewUtils.createHorizontalDivider(context, mTextColor, 0.12f));
     }
 
     private void buildContentArea(Context context) {
@@ -320,10 +312,7 @@ public class EmojiPalettesView extends LinearLayout {
     public void reloadThemeColors() {
         Context context = getContext();
         loadThemeColors(context);
-        Drawable bg = ViewUtils.getThemeDrawable(context, R.attr.keyboardViewStyle, R.style.KeyboardView, android.R.attr.background);
-        if (bg != null) {
-            setBackground(bg);
-        }
+        ViewUtils.applyKeyboardBackground(this);
         if (mGridAdapter != null) {
             mGridAdapter.notifyDataSetChanged();
         }

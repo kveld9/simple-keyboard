@@ -28,6 +28,7 @@ import android.view.View;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import rkr.simplekeyboard.inputmethod.compat.BuildCompatUtils;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 
@@ -122,7 +123,7 @@ public final class AudioAndHapticFeedbackManager {
             return;
         }
         mBackgroundThread.execute(() -> {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (BuildCompatUtils.isAtLeastQ()) {
                 mVibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK));
             } else if (viewToPerformHapticFeedbackOn != null) {
                 viewToPerformHapticFeedbackOn.performHapticFeedback(
@@ -139,7 +140,7 @@ public final class AudioAndHapticFeedbackManager {
             return;
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (BuildCompatUtils.isAtLeastQ()) {
             mLastTickTime = System.currentTimeMillis();
             mBackgroundThread.execute(() -> {
                 mVibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK));

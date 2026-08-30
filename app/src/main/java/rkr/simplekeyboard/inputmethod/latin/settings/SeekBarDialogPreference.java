@@ -18,6 +18,7 @@
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
@@ -42,6 +43,65 @@ public final class SeekBarDialogPreference extends DialogPreference
         void writeDefaultValue(final String key);
         String getValueText(final int value);
         void feedbackValue(final int value);
+    }
+
+    public static abstract class SimpleIntProxy implements ValueProxy {
+        private final SharedPreferences mPrefs;
+
+        public SimpleIntProxy(final SharedPreferences prefs) {
+            mPrefs = prefs;
+        }
+
+        protected SharedPreferences getSharedPreferences() {
+            return mPrefs;
+        }
+
+        @Override
+        public void writeValue(final int value, final String key) {
+            mPrefs.edit().putInt(key, value).apply();
+        }
+
+        @Override
+        public void writeDefaultValue(final String key) {
+            mPrefs.edit().remove(key).apply();
+        }
+
+        @Override
+        public void feedbackValue(final int value) {}
+    }
+
+    public static abstract class PercentageFloatProxy implements ValueProxy {
+        public static final float PERCENTAGE_FLOAT = 100.0f;
+        private final SharedPreferences mPrefs;
+
+        public PercentageFloatProxy(final SharedPreferences prefs) {
+            mPrefs = prefs;
+        }
+
+        protected SharedPreferences getSharedPreferences() {
+            return mPrefs;
+        }
+
+        public static float getValueFromPercentage(final int percentage) {
+            return percentage / PERCENTAGE_FLOAT;
+        }
+
+        public static int getPercentageFromValue(final float floatValue) {
+            return Math.round(floatValue * PERCENTAGE_FLOAT);
+        }
+
+        @Override
+        public void writeValue(final int value, final String key) {
+            mPrefs.edit().putFloat(key, getValueFromPercentage(value)).apply();
+        }
+
+        @Override
+        public void writeDefaultValue(final String key) {
+            mPrefs.edit().remove(key).apply();
+        }
+
+        @Override
+        public void feedbackValue(final int value) {}
     }
 
     private final int mMaxValue;

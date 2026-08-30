@@ -19,15 +19,68 @@ package rkr.simplekeyboard.inputmethod.latin.utils;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
+import rkr.simplekeyboard.inputmethod.R;
+
 public final class ViewUtils {
     private ViewUtils() {
         // Utility class
+    }
+
+    public static void applyKeyboardBackground(final View view) {
+        if (view == null) return;
+        final Drawable bg = getThemeDrawable(view.getContext(), R.attr.keyboardViewStyle, R.style.KeyboardView, android.R.attr.background);
+        if (bg != null) {
+            view.setBackground(bg);
+        }
+    }
+
+    public static int getKeyTextColor(final Context context) {
+        return getThemeColor(context, R.attr.keyTextColor, 0xFFCCCCCC);
+    }
+
+    public static int getFunctionalTextColor(final Context context, final int fallbackColor) {
+        return getThemeColor(context, R.attr.functionalTextColor, fallbackColor);
+    }
+
+    public static View createHorizontalDivider(final Context context, final int color, final float alpha) {
+        final View divider = new View(context);
+        final int dividerHeight = dpToPx(context, 1);
+        divider.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dividerHeight));
+        divider.setBackgroundColor(color);
+        if (alpha < 1.0f) {
+            divider.setAlpha(alpha);
+        }
+        return divider;
+    }
+
+    public static View createVerticalDivider(final Context context, final int heightDp, final int color, final float alpha) {
+        final View divider = new View(context);
+        final int dividerWidth = dpToPx(context, 1);
+        final int dividerHeight = dpToPx(context, heightDp);
+        final LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dividerWidth, dividerHeight);
+        lp.gravity = Gravity.CENTER_VERTICAL;
+        divider.setLayoutParams(lp);
+        divider.setBackgroundColor(color);
+        if (alpha < 1.0f) {
+            divider.setAlpha(alpha);
+        }
+        return divider;
+    }
+
+    public static void setGradientCornerRadius(final View view, final float cornerRadius) {
+        if (view == null) return;
+        final Drawable bg = view.getBackground();
+        if (bg instanceof GradientDrawable) {
+            ((GradientDrawable) bg.mutate()).setCornerRadius(cornerRadius);
+        }
     }
 
     public static int dpToPx(final Context context, final float dp) {

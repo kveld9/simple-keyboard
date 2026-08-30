@@ -18,11 +18,9 @@
 
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
-import android.Manifest;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
-import android.os.Build;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -33,6 +31,8 @@ import androidx.preference.PreferenceCategory;
 import androidx.preference.SwitchPreferenceCompat;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.compat.BuildCompatUtils;
+import rkr.simplekeyboard.inputmethod.compat.PermissionCompatUtils;
 
 public final class ClipboardSettingsFragment extends SubScreenFragment {
     private static final int PERMISSION_REQUEST_SCREENSHOTS = 101;
@@ -69,10 +69,8 @@ public final class ClipboardSettingsFragment extends SubScreenFragment {
         if (mScreenshotsPref != null) {
             mScreenshotsPref.setOnPreferenceChangeListener((preference, newValue) -> {
                 if (Boolean.TRUE.equals(newValue)) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        final String permission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                                ? Manifest.permission.READ_MEDIA_IMAGES
-                                : Manifest.permission.READ_EXTERNAL_STORAGE;
+                    if (BuildCompatUtils.isAtLeastM()) {
+                        final String permission = PermissionCompatUtils.getMediaImagesPermission();
                         if (getActivity() != null && ContextCompat.checkSelfPermission(requireContext(), permission) != PackageManager.PERMISSION_GRANTED) {
                             requestPermissions(new String[]{permission}, PERMISSION_REQUEST_SCREENSHOTS);
                             return false;
@@ -90,17 +88,7 @@ public final class ClipboardSettingsFragment extends SubScreenFragment {
         }
         final SharedPreferences prefs = getSharedPreferences();
         final Resources res = getResources();
-        pref.setInterface(new SeekBarDialogPreference.ValueProxy() {
-            @Override
-            public void writeValue(final int value, final String key) {
-                prefs.edit().putInt(key, value).apply();
-            }
-
-            @Override
-            public void writeDefaultValue(final String key) {
-                prefs.edit().remove(key).apply();
-            }
-
+        pref.setInterface(new SeekBarDialogPreference.SimpleIntProxy(prefs) {
             @Override
             public int readValue(final String key) {
                 return Settings.readClipboardRetentionMinutes(prefs);
@@ -114,10 +102,6 @@ public final class ClipboardSettingsFragment extends SubScreenFragment {
             @Override
             public String getValueText(final int value) {
                 return formatRetentionMinutes(res, value);
-            }
-
-            @Override
-            public void feedbackValue(final int value) {
             }
         });
     }

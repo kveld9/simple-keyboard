@@ -137,11 +137,18 @@ public class BeamSearchDecoder {
     }
 
     public List<CharSequence> getSuggestions(String typedWord, int limit, String prevWord) {
-        if (states.isEmpty() || dictionary == null) {
+        if (typedWord == null || typedWord.isEmpty() || states.size() <= 1 || dictionary == null) {
+            return Collections.emptyList();
+        }
+        List<BeamHypothesis> current = states.peek();
+        if (current == null || current.isEmpty() || current.get(0).word.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // If the decoder hypothesis length diverges significantly from the typed word, don't supply stale decoder suggestions
+        if (Math.abs(current.get(0).word.length() - typedWord.length()) > 1) {
             return Collections.emptyList();
         }
         List<CharSequence> res = new ArrayList<>();
-        List<BeamHypothesis> current = states.peek();
         collectTerminalSuggestions(current, typedWord, res);
         collectPrefixSuggestions(current, typedWord, limit, res);
         return res;
@@ -169,7 +176,7 @@ public class BeamSearchDecoder {
     }
 
     private boolean shouldQueryPrefixSuggestions(List<BeamHypothesis> current, int limit, int currentSize) {
-        return currentSize < limit && !current.isEmpty() && current.get(0).nodeOffset > 0;
+        return currentSize < limit && !current.isEmpty() && current.get(0).nodeOffset > 0 && !current.get(0).word.isEmpty();
     }
 
     private void addSuggestionIfAbsent(List<CharSequence> res, String word, String typedWord) {
@@ -186,9 +193,9 @@ public class BeamSearchDecoder {
     }
 
     public String getBestCorrection(String typedWord, float threshold, String prevWord) {
-        if (states.isEmpty() || dictionary == null) return null;
+        if (typedWord == null || typedWord.isEmpty() || states.size() <= 1 || dictionary == null) return null;
         List<BeamHypothesis> current = states.peek();
-        if (current.isEmpty()) return null;
+        if (current == null || current.isEmpty() || current.get(0).word.isEmpty()) return null;
         
         BeamHypothesis best = current.get(0);
         if (best.nodeOffset > 0 && dictionary.isTerminal(best.nodeOffset)) {

@@ -173,9 +173,9 @@ public class PrefixDictionaryTest {
 
     @Test
     public void testCalcNormalizedScore() {
-        // Exact match gets huge priority
+        // Exact match gets candidate frequency
         float exactScore = PrefixDictionary.calcNormalizedScore("hola", "hola", 100);
-        assertTrue(exactScore >= 1100.0f);
+        assertEquals(100.0f, exactScore, 0.001f);
 
         // Adjacent typo scores higher than non-adjacent typo
         // 'w' adjacent to 'q', 'p' not adjacent to 'q'
@@ -254,6 +254,25 @@ public class PrefixDictionaryTest {
         PrefixDictionary target = new PrefixDictionary();
         target.copyFrom(mDict);
         assertEquals(3.0f, target.getAutoCorrectionThreshold(), 0.001f);
+    }
+
+    @Test
+    public void testOptomizadoCorrection() {
+        mDict.insert("optimizado", 130);
+        CharSequence corr = mDict.getBestCorrection("optomizado");
+        assertEquals("optimizado", corr);
+
+        mDict.insert("optimización", 130);
+        CharSequence corr2 = mDict.getBestCorrection("Optomizaciln");
+        assertEquals("Optimización", corr2);
+
+        mDict.insert("esta", 235);
+        mDict.insert("esra", 25);
+        assertEquals("esta", mDict.getBestCorrection("esra"));
+
+        mDict.insert("mierda", 210);
+        mDict.insert("mierd", 40);
+        assertEquals("mierda", mDict.getBestCorrection("mierdsa"));
     }
 
     @Test

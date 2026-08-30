@@ -180,16 +180,9 @@ public class BeamSearchDecoder {
     }
 
     private void addSuggestionIfAbsent(List<CharSequence> res, String word, String typedWord) {
-        if (word != null && !containsIgnoreCase(res, word)) {
+        if (word != null && !StringUtils.containsIgnoreCase(res, word)) {
             res.add(StringUtils.applyCasing(typedWord, word));
         }
-    }
-    
-    private boolean containsIgnoreCase(List<CharSequence> list, String word) {
-        for (CharSequence seq : list) {
-            if (seq.toString().equalsIgnoreCase(word)) return true;
-        }
-        return false;
     }
 
     public String getBestCorrection(String typedWord, float threshold, String prevWord) {

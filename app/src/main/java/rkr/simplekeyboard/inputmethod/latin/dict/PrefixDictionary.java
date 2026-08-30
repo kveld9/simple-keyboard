@@ -159,9 +159,11 @@ public final class PrefixDictionary {
         }
     }
 
+    private static final ThreadLocal<float[][]> DIST_BUFFERS = ThreadLocal.withInitial(() -> new float[3][64]);
+
     /**
      * Calculates the weighted Damerau-Levenshtein distance between two strings,
-     * incorporating physical keyboard key proximity.
+     * incorporating physical keyboard key proximity without memory allocations.
      */
     public static float computeWeightedDistance(final String s1, final String s2) {
         if (s1 == null && s2 == null) return 0.0f;
@@ -170,31 +172,44 @@ public final class PrefixDictionary {
 
         final int n = s1.length();
         final int m = s2.length();
-        final float[][] d = new float[n + 1][m + 1];
 
-        for (int i = 0; i <= n; i++) {
-            d[i][0] = i;
+        float[][] buffers = DIST_BUFFERS.get();
+        if (m + 1 > buffers[0].length) {
+            buffers = new float[3][Math.max(m + 1, 64)];
+            DIST_BUFFERS.set(buffers);
         }
+
+        float[] dPrevPrev = buffers[0];
+        float[] dPrev = buffers[1];
+        float[] dCurr = buffers[2];
+
         for (int j = 0; j <= m; j++) {
-            d[0][j] = j;
+            dPrev[j] = j;
         }
 
         for (int i = 1; i <= n; i++) {
             final char c1 = s1.charAt(i - 1);
+            dCurr[0] = i;
+
             for (int j = 1; j <= m; j++) {
                 final char c2 = s2.charAt(j - 1);
                 final float cost = (c1 == c2) ? 0.0f : ProximityKeyMap.getDistanceWeight(c1, c2);
 
-                float min = Math.min(d[i - 1][j] + 1.0f, d[i][j - 1] + 1.0f);
-                min = Math.min(min, d[i - 1][j - 1] + cost);
+                float min = Math.min(dPrev[j] + 1.0f, dCurr[j - 1] + 1.0f);
+                min = Math.min(min, dPrev[j - 1] + cost);
 
                 if (i > 1 && j > 1 && c1 == s2.charAt(j - 2) && s1.charAt(i - 2) == c2) {
-                    min = Math.min(min, d[i - 2][j - 2] + 0.5f);
+                    min = Math.min(min, dPrevPrev[j - 2] + 0.5f);
                 }
-                d[i][j] = min;
+                dCurr[j] = min;
             }
+
+            final float[] temp = dPrevPrev;
+            dPrevPrev = dPrev;
+            dPrev = dCurr;
+            dCurr = temp;
         }
-        return d[n][m];
+        return dPrev[m];
     }
 
     /**
@@ -224,7 +239,7 @@ public final class PrefixDictionary {
         final String normCandidate = StringUtils.toNormalizedLower(candidate);
 
         if (normTyped.equals(normCandidate)) {
-            return candidateFreq + 1000.0f;
+            return (float) candidateFreq;
         }
 
         final float dist = computeWeightedDistance(normTyped, normCandidate);
@@ -232,7 +247,7 @@ public final class PrefixDictionary {
         final float relativeDist = dist / Math.max(1, maxLen);
         final float lengthBonus = getLongWordCorrectionBonus(normTyped, normCandidate);
 
-        return (candidateFreq * (1.0f - (relativeDist * 0.5f))) - (dist * 25.0f) + lengthBonus;
+        return (candidateFreq * (1.0f - (relativeDist * 0.3f))) - (dist * 20.0f) + lengthBonus;
     }
 
     public synchronized void insert(final String word, final int frequency) {
@@ -509,22 +524,38 @@ public final class PrefixDictionary {
     }
 
     public synchronized CharSequence getExactNormalizedCorrection(final String word) {
-        if (word == null || word.isEmpty() || shouldSkipAutoCorrection(word)) {
+        if (word == null || word.length() <= 1 || shouldSkipAutoCorrection(word)) {
             return null;
         }
         final String norm = StringUtils.toNormalizedLower(word);
         final TrieNode current = findPrefixNode(norm);
-        if (current == null) {
+        if (current == null || current.words.length == 0) {
             return null;
         }
-        if (current.words.length > 0) {
-            final String best = current.words[0];
-            if (best.equalsIgnoreCase(word)) {
-                return null;
+
+        // Find the canonical word with the highest frequency for this normalized form
+        String bestWord = current.words[0];
+        int bestFreq = current.freqs.length > 0 ? current.freqs[0] : 0;
+        for (int i = 1; i < current.words.length; i++) {
+            if (current.freqs[i] > bestFreq) {
+                bestFreq = current.freqs[i];
+                bestWord = current.words[i];
             }
-            return StringUtils.applyCasing(word, best);
         }
-        return null;
+
+        // If the user explicitly typed an accented word (e.g. "él", "está", "más"), never strip the accent
+        if (StringUtils.hasAccents(word) && !StringUtils.hasAccents(bestWord)) {
+            return null;
+        }
+
+        // If typed word exists verbatim in dictionary, only correct if bestWord has higher frequency
+        // (e.g. "más" (255) vs "mas" (30), "está" vs "esta") or if bestWord is capitalized (e.g. "España")
+        final int typedFreq = getWordFrequency(word);
+        if (typedFreq > 0 && bestFreq < (typedFreq * 1.5f) && !Character.isUpperCase(bestWord.charAt(0))) {
+            return null;
+        }
+
+        return StringUtils.applyCasing(word, bestWord);
     }
 
     public synchronized CharSequence getBestCorrection(final String word) {
@@ -540,35 +571,49 @@ public final class PrefixDictionary {
             return null;
         }
 
-        // 1. Instant O(L) exact normalized match (e.g. "autocorreccion" -> "autocorrección")
+        // 1. Instant O(L) exact normalized match (e.g. "mas" -> "más", "autocorreccion" -> "autocorrección", "mexico" -> "México")
         final CharSequence exactNorm = getExactNormalizedCorrection(word);
         if (exactNorm != null) {
             return exactNorm;
         }
 
-        final boolean isWordValid = containsWord(word);
-        if (shouldSkipValidWord(isWordValid, w2)) {
-            return null;
+        final int typedFreq = getWordFrequency(word);
+        final boolean isHighFreqValidWord = typedFreq >= 70;
+        final String norm = StringUtils.toNormalizedLower(word);
+
+        // 2. Search fuzzy corrections (Levenshtein + keyboard proximity)
+        final ScoredWord bestFuzzy = findBestFuzzyCandidate(norm, w1, w2);
+
+        if (bestFuzzy != null) {
+            final float dist = computeWeightedDistance(norm, StringUtils.toNormalizedLower(bestFuzzy.word));
+
+            // If the typed word is not in dictionary, or if typed word is a low-frequency obscure word (e.g. "esra" freq 25, "mierd" freq 40)
+            // and the fuzzy candidate is a high-frequency common word (e.g. "esta" freq 235, "mierda" freq 210) with adjacent key distance:
+            if (typedFreq == 0) {
+                if (bestFuzzy.score >= getMinCandidateScore()) {
+                    return StringUtils.applyCasing(word, bestFuzzy.word);
+                }
+            } else if (!isHighFreqValidWord && bestFuzzy.frequency >= (typedFreq * 2) && dist <= 1.0f) {
+                return StringUtils.applyCasing(word, bestFuzzy.word);
+            } else if (isValidCorrection(bestFuzzy, word, norm, w1, w2, true)) {
+                return StringUtils.applyCasing(word, bestFuzzy.word);
+            }
         }
 
-        return getBestFuzzyCorrection(word, w1, w2, isWordValid);
+        // 3. Multi-word space segmentation (only if no close fuzzy match was found!)
+        // e.g. "notengo" -> "no tengo", "delos" -> "de los", "comoteva" -> "cómo te va"
+        if (typedFreq == 0) {
+            final MultiWordSplitter.SplitResult split = MultiWordSplitter.findBestSplit(this, word, w2);
+            if (split != null && split.score >= 80.0f) {
+                return split.combined;
+            }
+        }
+
+        return null;
     }
 
     private boolean isSkipCorrection(final String word) {
         return mAutoCorrectionThreshold <= 0.0f || word == null || word.length() <= 1 || shouldSkipAutoCorrection(word);
-    }
-
-    private boolean shouldSkipValidWord(final boolean isWordValid, final String prevWord) {
-        return isWordValid && (prevWord == null || prevWord.isEmpty());
-    }
-
-    private CharSequence getBestFuzzyCorrection(final String word, final String w1, final String w2, final boolean isWordValid) {
-        final String norm = StringUtils.toNormalizedLower(word);
-        final ScoredWord best = findBestFuzzyCandidate(norm, w1, w2);
-        if (best == null || !isValidCorrection(best, word, norm, w1, w2, isWordValid)) {
-            return null;
-        }
-        return StringUtils.applyCasing(word, best.word);
     }
 
     private ScoredWord findBestFuzzyCandidate(final String norm, final String w1, final String w2) {
@@ -587,7 +632,9 @@ public final class PrefixDictionary {
     }
 
     private int getMaxFuzzyDistance(final int normLen) {
-        return (mAutoCorrectionThreshold >= 3.0f && normLen >= 5) ? 2 : 1;
+        if (normLen >= 8) return 3;
+        if (normLen >= 4) return 2;
+        return 1;
     }
 
     private List<ScoredWord> scoreFuzzyCandidates(final List<ScoredWord> rawCandidates, final String norm, final String w1, final String w2) {
@@ -665,7 +712,7 @@ public final class PrefixDictionary {
     private void searchFuzzy(final TrieNode node, final StringBuilder currentPath,
                              final String target, final int targetIdx, final int remainingDistance,
                              final List<ScoredWord> candidates) {
-        if (remainingDistance < 0) {
+        if (remainingDistance < 0 || candidates.size() >= 40) {
             return;
         }
         recordExactLengthMatches(node, target, targetIdx, candidates);

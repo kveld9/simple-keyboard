@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="clipboard_images" path="clipboard_images/" />
+    <cache-path name="cache" path="." />
+    <files-path name="files" path="." />
+    <device-protected-cache-path name="device_cache" path="." />
+    <device-protected-files-path name="device_files" path="." />
+    <external-path name="external" path="." />
+    <external-cache-path name="external_cache" path="." />
+    <external-files-path name="external_files" path="." />
 </paths>

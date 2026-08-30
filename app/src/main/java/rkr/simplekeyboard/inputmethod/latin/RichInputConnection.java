@@ -284,37 +284,37 @@ public final class RichInputConnection {
     }
 
     private String getCachedOrFetchTextBefore(final int maxChars) {
-        if (mTextBeforeCursor != null && !mTextBeforeCursor.isEmpty()) {
-            final int len = Math.min(maxChars, mTextBeforeCursor.length());
-            return mTextBeforeCursor.substring(mTextBeforeCursor.length() - len);
-        }
         if (isConnected()) {
             try {
                 final CharSequence cs = mIC.getTextBeforeCursor(maxChars, 0);
                 if (cs != null) {
-                    return cs.toString();
+                    final String str = cs.toString();
+                    mTextBeforeCursor = str;
+                    return str;
                 }
-            } catch (Exception e) {
-                // Ignore fallback
-            }
+            } catch (Exception ignored) {}
+        }
+        if (mTextBeforeCursor != null && !mTextBeforeCursor.isEmpty()) {
+            final int len = Math.min(maxChars, mTextBeforeCursor.length());
+            return mTextBeforeCursor.substring(mTextBeforeCursor.length() - len);
         }
         return "";
     }
 
     private String getCachedOrFetchTextAfter(final int maxChars) {
-        if (mTextAfterCursor != null && !mTextAfterCursor.isEmpty()) {
-            final int len = Math.min(maxChars, mTextAfterCursor.length());
-            return mTextAfterCursor.substring(0, len);
-        }
         if (isConnected()) {
             try {
                 final CharSequence cs = mIC.getTextAfterCursor(maxChars, 0);
                 if (cs != null) {
-                    return cs.toString();
+                    final String str = cs.toString();
+                    mTextAfterCursor = str;
+                    return str;
                 }
-            } catch (Exception e) {
-                // Ignore fallback
-            }
+            } catch (Exception ignored) {}
+        }
+        if (mTextAfterCursor != null && !mTextAfterCursor.isEmpty()) {
+            final int len = Math.min(maxChars, mTextAfterCursor.length());
+            return mTextAfterCursor.substring(0, len);
         }
         return "";
     }
@@ -540,6 +540,10 @@ public final class RichInputConnection {
                 }
                 break;
             case KeyEvent.KEYCODE_DEL:
+                if (mTextBeforeCursor != null && !mTextBeforeCursor.isEmpty()) {
+                    mTextBeforeCursor = mTextBeforeCursor.substring(0, mTextBeforeCursor.length() - 1);
+                    advanceExpectedSelection(-1);
+                }
                 break;
             default:
                 final String text = StringUtils.newSingleCodePointString(keyEvent.getUnicodeChar());

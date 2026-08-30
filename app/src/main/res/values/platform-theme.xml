@@ -47,6 +47,26 @@
         <item name="listPreferredItemHeightSmall">48dp</item>
     </style>
 
+    <style name="platformDialogBaseTheme_System" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="materialAlertDialogTheme">@style/platformDialogTheme</item>
+        <item name="alertDialogTheme">@style/platformDialogTheme</item>
+    </style>
+
+    <style name="platformDialogBaseTheme_Light" parent="Theme.Material3.Light.NoActionBar">
+        <item name="materialAlertDialogTheme">@style/platformDialogTheme_Light</item>
+        <item name="alertDialogTheme">@style/platformDialogTheme_Light</item>
+    </style>
+
+    <style name="platformDialogBaseTheme_Dark" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="materialAlertDialogTheme">@style/platformDialogTheme_Dark</item>
+        <item name="alertDialogTheme">@style/platformDialogTheme_Dark</item>
+    </style>
+
+    <style name="platformDialogBaseTheme_Black" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="materialAlertDialogTheme">@style/platformDialogTheme_Black</item>
+        <item name="alertDialogTheme">@style/platformDialogTheme_Black</item>
+    </style>
+
     <style name="M3PreferenceThemeOverlay" parent="PreferenceThemeOverlay">
         <item name="preferenceCategoryStyle">@style/M3PreferenceCategory</item>
         <item name="preferenceStyle">@style/M3Preference</item>

@@ -132,7 +132,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private String mOriginalTypedWordBeforeAutocorrect = null;
     private String mAutocorrectedWord = null;
-    private rkr.simplekeyboard.inputmethod.latin.dict.ContactsDictionary mContactsDictionary;
     private boolean mCanRevertAutocorrect = false;
     private int mLastInlineFieldId = 0;
 
@@ -328,23 +327,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mClipboardHistoryManager.setOnScreenshotChangeListener(this::updateSuggestions);
         mClipboardHistoryManager.start();
 
-        mContactsDictionary = new rkr.simplekeyboard.inputmethod.latin.dict.ContactsDictionary(this);
-
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
         loadSettings();
-        loadContactsIfEnabled();
 
         // Register to receive ringer mode change.
         final IntentFilter filter = new IntentFilter();
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         registerReceiver(mRingerModeChangeReceiver, filter);
-    }
-
-    private void loadContactsIfEnabled() {
-        if (mContactsDictionary != null && mSettings.getCurrent() != null && mSettings.getCurrent().mUseContacts) {
-            mContactsDictionary.loadAsync(mDictExecutor, this::updateSuggestions);
-        }
     }
 
     private void loadSettings() {
@@ -1126,17 +1116,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final java.util.List<CharSequence> predictions = new java.util.ArrayList<>(3);
         final java.util.Set<String> added = new java.util.HashSet<>();
 
-        if (mContactsDictionary != null && mSettings.getCurrent().mUseContacts) {
-            final java.util.List<CharSequence> contactPreds = mContactsDictionary.getNextWordPredictions(w1, w2, 1);
-            if (contactPreds != null) {
-                for (CharSequence cp : contactPreds) {
-                    if (added.add(cp.toString().toLowerCase())) {
-                        predictions.add(cp);
-                    }
-                }
-            }
-        }
-
         final java.util.List<CharSequence> nextWordPredictions = mPrefixDictionary.getNextWordPredictions(w1, w2, 3);
         if (nextWordPredictions != null) {
             for (CharSequence np : nextWordPredictions) {
@@ -1157,17 +1136,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private java.util.List<CharSequence> getSuggestionsForWord(final String word, final String w1, final String w2) {
         final java.util.List<CharSequence> merged = new java.util.ArrayList<>(3);
         final java.util.Set<String> added = new java.util.HashSet<>();
-
-        if (mContactsDictionary != null && mSettings.getCurrent().mUseContacts) {
-            final java.util.List<CharSequence> contactMatches = mContactsDictionary.getSuggestions(word, 2, w1, w2);
-            if (contactMatches != null) {
-                for (CharSequence c : contactMatches) {
-                    if (added.add(c.toString().toLowerCase())) {
-                        merged.add(c);
-                    }
-                }
-            }
-        }
 
         if (mBeamSearchDecoder != null) {
             final java.util.List<CharSequence> matches = mBeamSearchDecoder.getSuggestions(word, 3, w2);

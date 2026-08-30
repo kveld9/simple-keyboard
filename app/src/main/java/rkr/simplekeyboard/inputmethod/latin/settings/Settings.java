@@ -72,7 +72,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String KEY_SHAPE_RECTANGULAR = "rectangular";
     public static final String KEY_SHAPE_BORDERLESS = "borderless";
     public static final String PREF_SHOW_SUGGESTIONS = "pref_show_suggestions";
-    public static final String PREF_USE_CONTACTS = "pref_use_contacts";
     public static final String PREF_AUTO_CORRECTION = "pref_auto_correction";
     public static final String PREF_AUTO_CORRECTION_THRESHOLD = "auto_correction_threshold";
     public static final String AUTO_CORRECTION_THRESHOLD_DEFAULT = "1";
@@ -282,10 +281,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
     public static boolean readShowSuggestions(final SharedPreferences prefs) {
         return prefs.getBoolean(PREF_SHOW_SUGGESTIONS, true);
-    }
-
-    public static boolean readUseContactsEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_USE_CONTACTS, false);
     }
 
     public static float readAutoCorrectionThreshold(final SharedPreferences prefs) {

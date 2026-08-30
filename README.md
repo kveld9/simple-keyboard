@@ -9,29 +9,26 @@
 ## About
 
 Features:
-- Small size (<1MB)
 - Adjustable keyboard height for more screen space
 - Number row
 - Swipe space to move pointer
 - Delete swipe
 - Custom theme colors
-- Minimal permissions (only Vibrate)
+- Emoji picker
+- Clipboard history and smart suggestions
 - Ads-free
 
-Feature it doesn't have and probably will never have:
-- Emojis
+Permissions:
+- `VIBRATE`: For keypress haptic feedback.
+- `READ_MEDIA_IMAGES` / `READ_EXTERNAL_STORAGE`: Optional, for clipboard recent image & screenshot suggestions.
+
+Features it doesn't have and probably will never have:
 - GIFs
-- Spell checker
 - Swipe typing
 
 ## Downloads
 
-[<img src="https://f-droid.org/badge/get-it-on.png"
-      alt="Get it on F-Droid"
-      height="80">](https://f-droid.org/packages/rkr.simplekeyboard.inputmethod/)
-[<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
-      alt="Get it on Google Play"
-      height="80">](https://play.google.com/store/apps/details?id=rkr.simplekeyboard.inputmethod)
+Download the latest APK release from [GitHub Releases](https://github.com/soyelmismo/simple-keyboard/releases/latest).
 
 ## Credits
 

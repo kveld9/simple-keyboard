@@ -27,12 +27,6 @@
         android:title="@string/show_suggestions"
         android:defaultValue="true"
         android:persistent="true" />
-    <SwitchPreference
-        android:key="pref_use_contacts"
-        android:title="@string/use_contacts_dict"
-        android:summary="@string/use_contacts_dict_summary"
-        android:defaultValue="false"
-        android:persistent="true" />
     <ListPreference
         android:key="auto_correction_threshold"
         android:title="@string/auto_correction_threshold"

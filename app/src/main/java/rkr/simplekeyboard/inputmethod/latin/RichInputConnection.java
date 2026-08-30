@@ -194,9 +194,6 @@ public final class RichInputConnection {
                     mTextBeforeCursor = textBeforeCursor.toString();
                 }
 
-                // All callbacks that need text before cursor are here
-                mLatinIME.mHandler.postUpdateShiftState();
-
                 final CharSequence textAfterCursor = mIC.getTextAfterCursor(Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
                 if (expectedSelEnd != mExpectedSelEnd) {
                     Log.w(TAG, "Selection end modified before thread completion.");
@@ -208,6 +205,9 @@ public final class RichInputConnection {
                 } else {
                     mTextAfterCursor = textAfterCursor.toString();
                 }
+
+                // All callbacks that need text around cursor are here
+                mLatinIME.mHandler.postUpdateShiftState();
                 if (hasSelection()) {
                     final CharSequence textSelection = mIC.getSelectedText(0);
                     if (expectedSelStart != mExpectedSelStart || expectedSelEnd != mExpectedSelEnd) {
@@ -419,10 +419,54 @@ public final class RichInputConnection {
         return "";
     }
 
+    public String getWordAfterCursor() {
+        String text = mTextAfterCursor;
+        if ((text == null || text.isEmpty()) && isConnected()) {
+            try {
+                final CharSequence icText = mIC.getTextAfterCursor(40, 0);
+                if (icText != null && icText.length() > 0) {
+                    text = icText.toString();
+                }
+            } catch (Exception e) {
+                // Ignore fallback
+            }
+        }
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
+                break;
+            }
+            i++;
+        }
+        return text.substring(0, i);
+    }
+
+    public String getWordAtCursor() {
+        final String before = getWordBeforeCursor();
+        final String after = getWordAfterCursor();
+        if (before.isEmpty() && after.isEmpty()) {
+            return "";
+        }
+        if (before.isEmpty()) {
+            return after;
+        }
+        return before + after;
+    }
+
     public void commitSuggestion(final CharSequence suggestion) {
-        final String currentWord = getWordBeforeCursor();
-        if (!currentWord.isEmpty()) {
-            deleteTextBeforeCursor(currentWord.length());
+        final String before = getWordBeforeCursor();
+        final String after = getWordAfterCursor();
+        if (!before.isEmpty()) {
+            deleteTextBeforeCursor(before.length());
+        }
+        if (!after.isEmpty() && isConnected()) {
+            try {
+                mIC.deleteSurroundingText(0, after.length());
+            } catch (Exception ignored) {}
         }
         commitText(suggestion.toString() + " ", 1);
     }

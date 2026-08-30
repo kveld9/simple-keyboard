@@ -38,8 +38,7 @@
         latin:keyWidth="9.0%p"
     >
         <include
-            latin:keyboardLayout="@xml/rowkeys_symbols2"
-            latin:keyXPos="4.5%p" />
+            latin:keyboardLayout="@xml/rowkeys_symbols2" />
         <Key
             latin:keyStyle="enterKeyStyle"
             latin:keyWidth="fillRight" />

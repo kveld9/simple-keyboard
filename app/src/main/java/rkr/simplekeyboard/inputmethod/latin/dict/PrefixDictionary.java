@@ -126,6 +126,8 @@ public final class PrefixDictionary {
     private final Map<String, Map<String, Short>> mTrigrams = new HashMap<>();
     private final Map<String, Map<String, Short>> mBigrams = new HashMap<>();
     private final List<ScoredWord> mTopWords = new ArrayList<>();
+    private final List<CharSequence> mScratchPredictions = new ArrayList<>(4);
+    private final Set<String> mScratchPredictionsAdded = new HashSet<>(8);
     private volatile rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary mBinaryDict = null;
 
     public PrefixDictionary() {
@@ -915,7 +917,7 @@ public final class PrefixDictionary {
     }
 
     private boolean predictTrigrams(final String w1, final String w2, final List<CharSequence> results, final Set<String> added, final int limit) {
-        if (isNonEmptyText(w1) && isNonEmptyText(w2)) {
+        if (StringUtils.isNotBlank(w1) && StringUtils.isNotBlank(w2)) {
             final String key = StringUtils.toNormalizedLower(w1.trim()) + " " + StringUtils.toNormalizedLower(w2.trim());
             return collectTopNGramWords(mTrigrams.get(key), results, added, limit);
         }
@@ -923,15 +925,11 @@ public final class PrefixDictionary {
     }
 
     private boolean predictBigrams(final String w2, final List<CharSequence> results, final Set<String> added, final int limit) {
-        if (isNonEmptyText(w2)) {
+        if (StringUtils.isNotBlank(w2)) {
             final String key = StringUtils.toNormalizedLower(w2.trim());
             return collectTopNGramWords(mBigrams.get(key), results, added, limit);
         }
         return false;
-    }
-
-    private boolean isNonEmptyText(final String text) {
-        return text != null && !text.trim().isEmpty();
     }
 
     public synchronized List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
@@ -939,17 +937,18 @@ public final class PrefixDictionary {
     }
 
     public synchronized List<CharSequence> getNextWordPredictions(final String w1, final String w2, final int limit) {
-        if (limit <= 0 || !isNonEmptyText(w2)) {
+        if (limit <= 0 || StringUtils.isBlank(w2)) {
             return Collections.emptyList();
         }
-        final List<CharSequence> results = new ArrayList<>(limit);
-        final Set<String> added = new HashSet<>();
+        mScratchPredictions.clear();
+        mScratchPredictionsAdded.clear();
 
-        if (predictTrigrams(w1, w2, results, added, limit) || predictBigrams(w2, results, added, limit)) {
-            return results;
+        predictTrigrams(w1, w2, mScratchPredictions, mScratchPredictionsAdded, limit);
+        if (mScratchPredictions.size() < limit) {
+            predictBigrams(w2, mScratchPredictions, mScratchPredictionsAdded, limit);
         }
 
-        return results;
+        return mScratchPredictions.isEmpty() ? Collections.emptyList() : new ArrayList<>(mScratchPredictions);
     }
 
     public synchronized int getWordCount() {

@@ -25,6 +25,26 @@ public final class StringUtils {
         // This utility class is not publicly instantiable.
     }
 
+    public static boolean isBlank(final CharSequence cs) {
+        if (cs == null) {
+            return true;
+        }
+        final int strLen = cs.length();
+        if (strLen == 0) {
+            return true;
+        }
+        for (int i = 0; i < strLen; i++) {
+            if (!Character.isWhitespace(cs.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static boolean isNotBlank(final CharSequence cs) {
+        return !isBlank(cs);
+    }
+
     public static int codePointCount(final CharSequence text) {
         if (text == null || text.length() == 0) {
             return 0;

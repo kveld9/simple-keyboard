@@ -23,9 +23,6 @@ import org.junit.runners.JUnit4;
 
 import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;

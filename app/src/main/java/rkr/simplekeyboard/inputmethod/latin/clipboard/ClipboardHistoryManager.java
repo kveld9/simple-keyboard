@@ -132,6 +132,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
     public void close() {
         stop();
+        recycleCachedScreenshotInfo();
         try {
             mExecutor.execute(() -> {
                 try {
@@ -140,6 +141,20 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
             });
         } catch (Throwable ignored) {}
         mExecutor.shutdown();
+    }
+
+    public synchronized void deallocateMemory() {
+        recycleCachedScreenshotInfo();
+    }
+
+    private synchronized void recycleCachedScreenshotInfo() {
+        if (mCachedScreenshotInfo != null) {
+            if (mCachedScreenshotInfo.cachedThumbnail != null && !mCachedScreenshotInfo.cachedThumbnail.isRecycled()) {
+                mCachedScreenshotInfo.cachedThumbnail.recycle();
+                mCachedScreenshotInfo.cachedThumbnail = null;
+            }
+            mCachedScreenshotInfo = null;
+        }
     }
 
     public ClipboardDatabase getDatabase() {
@@ -340,93 +355,126 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         }
     }
 
-    public void updateLatestScreenshotCache() {
-        if (!isClipboardEnabled() || !hasStoragePermission()) {
-            mCachedScreenshotInfo = null;
-            return;
+    private static class ScreenshotColumnIndices {
+        final int idIndex;
+        final int nameIndex;
+        final int dateIndex;
+        final int pathIndex;
+
+        ScreenshotColumnIndices(final Cursor cursor) {
+            idIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID);
+            nameIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME);
+            dateIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED);
+            pathIndex = BuildCompatUtils.isAtLeastQ()
+                    ? cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
+                    : cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
         }
+    }
 
-        mExecutor.execute(() -> {
-            List<String> projectionList = new ArrayList<>();
-            projectionList.add(MediaStore.Images.Media._ID);
-            projectionList.add(MediaStore.Images.Media.DISPLAY_NAME);
-            projectionList.add(MediaStore.Images.Media.DATE_ADDED);
-            if (BuildCompatUtils.isAtLeastQ()) {
-                projectionList.add(MediaStore.Images.Media.RELATIVE_PATH);
-            } else {
-                projectionList.add(MediaStore.Images.Media.DATA);
-            }
+    private String[] getScreenshotProjection() {
+        final String pathColumn = BuildCompatUtils.isAtLeastQ()
+                ? MediaStore.Images.Media.RELATIVE_PATH
+                : MediaStore.Images.Media.DATA;
+        return new String[]{
+                MediaStore.Images.Media._ID,
+                MediaStore.Images.Media.DISPLAY_NAME,
+                MediaStore.Images.Media.DATE_ADDED,
+                pathColumn
+        };
+    }
 
-            final String sortOrder = MediaStore.Images.Media.DATE_ADDED + " DESC";
-            Cursor cursor = null;
-            try {
-                cursor = mContext.getContentResolver().query(
-                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        projectionList.toArray(new String[0]),
-                        null,
-                        null,
-                        sortOrder
-                );
+    private String safeCursorString(final String str) {
+        return str == null ? "" : str;
+    }
 
-                if (cursor != null) {
-                    int count = 0;
-                    final int idIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID);
-                    final int nameIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME);
-                    final int dateIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED);
-                    final int pathIndex = BuildCompatUtils.isAtLeastQ()
-                            ? cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
-                            : cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+    private boolean isNewScreenshot(final Uri contentUri) {
+        return mCachedScreenshotInfo == null || !mCachedScreenshotInfo.uri.equals(contentUri);
+    }
 
-                    while (cursor.moveToNext() && count < 10) {
-                        count++;
-                        long dateAdded = cursor.getLong(dateIndex) * 1000L;
-                        long diff = System.currentTimeMillis() - dateAdded;
-
-                        if (diff < SCREENSHOT_SUGGESTION_TIMEOUT_MS) {
-                            String fileName = cursor.getString(nameIndex);
-                            if (fileName == null) fileName = "";
-
-                            String fullPath = cursor.getString(pathIndex);
-                            if (fullPath == null) fullPath = "";
-
-                            boolean isScreenshot = isScreenshotPath(fileName, fullPath);
-                            if (isScreenshot) {
-                                long id = cursor.getLong(idIndex);
-                                Uri contentUri = ContentUris.withAppendedId(
-                                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
-
-                                String cachedPath = cacheImage(contentUri);
-                                String targetPath = cachedPath != null ? cachedPath : contentUri.toString();
-
-                                if (mCachedScreenshotInfo == null || !mCachedScreenshotInfo.uri.equals(contentUri)) {
-                                    mCachedScreenshotInfo = new ScreenshotInfo(contentUri, fileName, targetPath, dateAdded);
-                                    mLatestScreenshotUsed = false;
-
-                                    final long retentionMinutes = getRetentionMinutes();
-                                    mDatabase.deleteExpiredClips(retentionMinutes);
-                                    mDatabase.insertClip("[Screenshot]", false, dateAdded, targetPath);
-
-                                    mMainHandler.post(() -> {
-                                        if (mOnScreenshotChangeListener != null) {
-                                            mOnScreenshotChangeListener.run();
-                                        }
-                                    });
-                                }
-                                return;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to query recent screenshots", e);
-            } finally {
-                if (cursor != null) {
-                    cursor.close();
-                }
+    private void notifyScreenshotChange() {
+        mMainHandler.post(() -> {
+            if (mOnScreenshotChangeListener != null) {
+                mOnScreenshotChangeListener.run();
             }
         });
+    }
+
+    private void handleScreenshotFound(final long id, final String fileName, final long dateAdded) {
+        final Uri contentUri = ContentUris.withAppendedId(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
+        final String cachedPath = cacheImage(contentUri);
+        final String targetPath = cachedPath != null ? cachedPath : contentUri.toString();
+
+        if (isNewScreenshot(contentUri)) {
+            recycleCachedScreenshotInfo();
+            mCachedScreenshotInfo = new ScreenshotInfo(contentUri, fileName, targetPath, dateAdded);
+            mLatestScreenshotUsed = false;
+
+            final long retentionMinutes = getRetentionMinutes();
+            mDatabase.deleteExpiredClips(retentionMinutes);
+            mDatabase.insertClip("[Screenshot]", false, dateAdded, targetPath);
+
+            notifyScreenshotChange();
+        }
+    }
+
+    private boolean processScreenshotRow(final Cursor cursor, final ScreenshotColumnIndices indices) {
+        final long dateAdded = cursor.getLong(indices.dateIndex) * 1000L;
+        final long diff = System.currentTimeMillis() - dateAdded;
+        if (diff >= SCREENSHOT_SUGGESTION_TIMEOUT_MS) {
+            return false;
+        }
+
+        final String fileName = safeCursorString(cursor.getString(indices.nameIndex));
+        final String fullPath = safeCursorString(cursor.getString(indices.pathIndex));
+
+        if (isScreenshotPath(fileName, fullPath)) {
+            handleScreenshotFound(cursor.getLong(indices.idIndex), fileName, dateAdded);
+            return false;
+        }
+        return true;
+    }
+
+    private void iterateRecentScreenshots(final Cursor cursor) {
+        final ScreenshotColumnIndices indices = new ScreenshotColumnIndices(cursor);
+        int count = 0;
+        while (cursor.moveToNext() && count < 10) {
+            count++;
+            if (!processScreenshotRow(cursor, indices)) {
+                break;
+            }
+        }
+    }
+
+    private void scanRecentScreenshots() {
+        final String sortOrder = MediaStore.Images.Media.DATE_ADDED + " DESC";
+        Cursor cursor = null;
+        try {
+            cursor = mContext.getContentResolver().query(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    getScreenshotProjection(),
+                    null,
+                    null,
+                    sortOrder
+            );
+            if (cursor != null) {
+                iterateRecentScreenshots(cursor);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to query recent screenshots", e);
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    public void updateLatestScreenshotCache() {
+        if (!isClipboardEnabled() || !hasStoragePermission()) {
+            recycleCachedScreenshotInfo();
+            return;
+        }
+        mExecutor.execute(this::scanRecentScreenshots);
     }
 
     private boolean isScreenshotPath(String fileName, String fullPath) {
@@ -480,13 +528,19 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         if (info.fullPath != null && info.fullPath.startsWith("/")) {
             try {
                 BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inSampleSize = 8;
-                bitmap = BitmapFactory.decodeFile(info.fullPath, options);
+                options.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(info.fullPath, options);
+                if (options.outWidth > 0 && options.outHeight > 0) {
+                    options.inSampleSize = Math.max(1, Math.max(options.outWidth / 64, options.outHeight / 64));
+                    options.inJustDecodeBounds = false;
+                    options.inPreferredConfig = Bitmap.Config.RGB_565;
+                    bitmap = BitmapFactory.decodeFile(info.fullPath, options);
+                }
             } catch (Throwable ignored) {}
         }
         if (bitmap == null && BuildCompatUtils.isAtLeastQ() && info.uri != null) {
             try {
-                bitmap = mContext.getContentResolver().loadThumbnail(info.uri, new Size(120, 120), null);
+                bitmap = mContext.getContentResolver().loadThumbnail(info.uri, new Size(64, 64), null);
             } catch (Throwable ignored) {}
         }
         info.cachedThumbnail = bitmap;

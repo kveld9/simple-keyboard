@@ -31,6 +31,9 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -168,44 +171,72 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         return restrictionKeys;
     }
 
+    @FunctionalInterface
+    private interface RestrictionApplier {
+        void apply(String key, Bundle appRestrictions, SharedPreferences.Editor prefsEditor);
+    }
+
+    private static final Map<String, RestrictionApplier> RESTRICTION_APPLIERS = createRestrictionAppliers();
+
+    private static Map<String, RestrictionApplier> createRestrictionAppliers() {
+        final Map<String, RestrictionApplier> map = new HashMap<>();
+        final RestrictionApplier stringApplier = (key, bundle, editor) -> {
+            final String val = bundle.getString(key);
+            Log.i(TAG, "Loading restriction: " + key + "=" + val);
+            editor.putString(key, val);
+        };
+        final RestrictionApplier boolApplier = (key, bundle, editor) -> {
+            final boolean val = bundle.getBoolean(key);
+            Log.i(TAG, "Loading restriction: " + key + "=" + val);
+            editor.putBoolean(key, val);
+        };
+        final RestrictionApplier percentFloatApplier = (key, bundle, editor) -> {
+            final int val = bundle.getInt(key);
+            Log.i(TAG, "Loading restriction: " + key + "=" + val);
+            editor.putFloat(key, val / 100f);
+        };
+        final RestrictionApplier intApplier = (key, bundle, editor) -> {
+            final int val = bundle.getInt(key);
+            Log.i(TAG, "Loading restriction: " + key + "=" + val);
+            editor.putInt(key, val);
+        };
+
+        map.put(PREF_ENABLED_SUBTYPES, stringApplier);
+        map.put(PREF_AUTO_CORRECTION_THRESHOLD, stringApplier);
+        map.put(SCREEN_THEME, (key, bundle, editor) -> {
+            final String val = bundle.getString(key);
+            Log.i(TAG, "Loading restriction: " + key + "=" + val);
+            editor.putString(KeyboardTheme.KEYBOARD_THEME_KEY, val);
+        });
+
+        map.put(PREF_AUTO_CAP, boolApplier);
+        map.put(PREF_SHOW_NUMBER_ROW, boolApplier);
+        map.put(PREF_SHOW_SPECIAL_CHARS, boolApplier);
+        map.put(PREF_SHOW_LANGUAGE_SWITCH_KEY, boolApplier);
+        map.put(PREF_SHOW_LANGUAGE_ON_SPACEBAR, boolApplier);
+        map.put(PREF_USE_ON_SCREEN, boolApplier);
+        map.put(PREF_ENABLE_IME_SWITCH, boolApplier);
+        map.put(PREF_DELETE_SWIPE, boolApplier);
+        map.put(PREF_SPACE_SWIPE, boolApplier);
+        map.put(PREF_VIBRATE_ON, boolApplier);
+        map.put(PREF_SOUND_ON, boolApplier);
+        map.put(PREF_POPUP_ON, boolApplier);
+
+        map.put(PREF_KEYPRESS_SOUND_VOLUME, percentFloatApplier);
+        map.put(PREF_KEYBOARD_HEIGHT, percentFloatApplier);
+
+        map.put(PREF_KEY_LONGPRESS_TIMEOUT, intApplier);
+        map.put(PREF_BOTTOM_OFFSET_PORTRAIT, intApplier);
+
+        return Collections.unmodifiableMap(map);
+    }
+
     private static void applySingleRestriction(final String key, final Bundle appRestrictions, final SharedPreferences.Editor prefsEditor) {
-        switch (key) {
-            case PREF_ENABLED_SUBTYPES:
-            case PREF_AUTO_CORRECTION_THRESHOLD:
-                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
-                prefsEditor.putString(key, appRestrictions.getString(key));
-                break;
-            case SCREEN_THEME:
-                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getString(key));
-                prefsEditor.putString(KeyboardTheme.KEYBOARD_THEME_KEY, appRestrictions.getString(key));
-                break;
-            case PREF_AUTO_CAP:
-            case PREF_SHOW_NUMBER_ROW:
-            case PREF_SHOW_SPECIAL_CHARS:
-            case PREF_SHOW_LANGUAGE_SWITCH_KEY:
-            case PREF_SHOW_LANGUAGE_ON_SPACEBAR:
-            case PREF_USE_ON_SCREEN:
-            case PREF_ENABLE_IME_SWITCH:
-            case PREF_DELETE_SWIPE:
-            case PREF_SPACE_SWIPE:
-            case PREF_VIBRATE_ON:
-            case PREF_SOUND_ON:
-            case PREF_POPUP_ON:
-                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getBoolean(key));
-                prefsEditor.putBoolean(key, appRestrictions.getBoolean(key));
-                break;
-            case PREF_KEYPRESS_SOUND_VOLUME:
-            case PREF_KEYBOARD_HEIGHT:
-                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getInt(key));
-                prefsEditor.putFloat(key, appRestrictions.getInt(key) / 100f);
-                break;
-            case PREF_KEY_LONGPRESS_TIMEOUT:
-            case PREF_BOTTOM_OFFSET_PORTRAIT:
-                Log.i(TAG, "Loading restriction: " + key + "=" + appRestrictions.getInt(key));
-                prefsEditor.putInt(key, appRestrictions.getInt(key));
-                break;
-            default:
-                Log.e(TAG, "Unhandled restriction: " + key);
+        final RestrictionApplier applier = RESTRICTION_APPLIERS.get(key);
+        if (applier != null) {
+            applier.apply(key, appRestrictions, prefsEditor);
+        } else {
+            Log.e(TAG, "Unhandled restriction: " + key);
         }
     }
 

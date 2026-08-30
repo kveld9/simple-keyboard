@@ -22,6 +22,7 @@ import android.media.AudioManager;
 import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.util.SparseIntArray;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 
@@ -40,6 +41,14 @@ import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
  */
 public final class AudioAndHapticFeedbackManager {
     private static final long TICK_FREQUENCY = 100;
+    private static final SparseIntArray sAudioFxMap = new SparseIntArray();
+
+    static {
+        sAudioFxMap.put(Constants.CODE_DELETE, AudioManager.FX_KEYPRESS_DELETE);
+        sAudioFxMap.put(Constants.CODE_ENTER, AudioManager.FX_KEYPRESS_RETURN);
+        sAudioFxMap.put(Constants.CODE_SPACE, AudioManager.FX_KEYPRESS_SPACEBAR);
+    }
+
     private ExecutorService mBackgroundThread;
     private AudioManager mAudioManager;
     private Vibrator mVibrator;
@@ -82,30 +91,15 @@ public final class AudioAndHapticFeedbackManager {
         return mAudioManager.getRingerMode() == AudioManager.RINGER_MODE_NORMAL;
     }
 
+    private static int getSoundEffectForCode(final int code) {
+        return sAudioFxMap.get(code, AudioManager.FX_KEYPRESS_STANDARD);
+    }
+
     public void performAudioFeedback(final int code) {
-        // if mAudioManager is null, we can't play a sound anyway, so return
-        if (mAudioManager == null) {
+        if (mAudioManager == null || !mSoundOn) {
             return;
         }
-        if (!mSoundOn) {
-            return;
-        }
-        final int sound;
-        switch (code) {
-        case Constants.CODE_DELETE:
-            sound = AudioManager.FX_KEYPRESS_DELETE;
-            break;
-        case Constants.CODE_ENTER:
-            sound = AudioManager.FX_KEYPRESS_RETURN;
-            break;
-        case Constants.CODE_SPACE:
-            sound = AudioManager.FX_KEYPRESS_SPACEBAR;
-            break;
-        default:
-            sound = AudioManager.FX_KEYPRESS_STANDARD;
-            break;
-        }
-        playSoundEffect(sound, mSettingsValues.mKeypressSoundVolume);
+        playSoundEffect(getSoundEffectForCode(code), mSettingsValues.mKeypressSoundVolume);
     }
 
     public void playSoundEffect(final int effectType, final float volume) {
@@ -118,30 +112,37 @@ public final class AudioAndHapticFeedbackManager {
         });
     }
 
+    private boolean canHapticVibrate() {
+        return mSettingsValues != null && mSettingsValues.mVibrateOn && mVibrator != null;
+    }
+
+    private void triggerVibrationEffect(final int effectId, final View fallbackView) {
+        if (BuildCompatUtils.isAtLeastQ()) {
+            mVibrator.vibrate(VibrationEffect.createPredefined(effectId));
+        } else if (fallbackView != null) {
+            fallbackView.performHapticFeedback(
+                    HapticFeedbackConstants.KEYBOARD_TAP,
+                    HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+        }
+    }
+
     private void vibratePredefined(final int effectId, final View fallbackView) {
-        if (mSettingsValues == null || !mSettingsValues.mVibrateOn || mVibrator == null) {
+        if (!canHapticVibrate()) {
             return;
         }
-        mBackgroundThread.execute(() -> {
-            if (BuildCompatUtils.isAtLeastQ()) {
-                mVibrator.vibrate(VibrationEffect.createPredefined(effectId));
-            } else if (fallbackView != null) {
-                fallbackView.performHapticFeedback(
-                        HapticFeedbackConstants.KEYBOARD_TAP,
-                        HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
-            }
-        });
+        mBackgroundThread.execute(() -> triggerVibrationEffect(effectId, fallbackView));
     }
 
     public void performHapticFeedback(final View viewToPerformHapticFeedbackOn) {
         vibratePredefined(VibrationEffect.EFFECT_CLICK, viewToPerformHapticFeedbackOn);
     }
 
+    private boolean isTickThrottled() {
+        return System.currentTimeMillis() - mLastTickTime < TICK_FREQUENCY;
+    }
+
     public void performTickFeedback() {
-        if (mSettingsValues == null
-                || !mSettingsValues.mVibrateOn
-                || mVibrator == null
-                || System.currentTimeMillis() - mLastTickTime < TICK_FREQUENCY) {
+        if (!canHapticVibrate() || isTickThrottled()) {
             return;
         }
 

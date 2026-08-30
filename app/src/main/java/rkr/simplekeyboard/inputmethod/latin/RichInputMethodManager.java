@@ -260,6 +260,19 @@ public class RichInputMethodManager {
             return true;
         }
 
+        private boolean adjustIndexForRemovedSubtype(final int index) {
+            if (mCurrentSubtypeIndex == index) {
+                mCurrentSubtypeIndex = 0;
+                return true;
+            }
+            if (mCurrentSubtypeIndex > index) {
+                // make sure the current subtype is still pointed to when the other subtype is
+                // removed
+                mCurrentSubtypeIndex--;
+            }
+            return false;
+        }
+
         /**
          * Remove a subtype from the list.
          * @param subtype the subtype to remove.
@@ -277,19 +290,7 @@ public class RichInputMethodManager {
                 return true;
             }
 
-            final boolean subtypeChanged;
-            if (mCurrentSubtypeIndex == index) {
-                mCurrentSubtypeIndex = 0;
-                subtypeChanged = true;
-            } else {
-                if (mCurrentSubtypeIndex > index) {
-                    // make sure the current subtype is still pointed to when the other subtype is
-                    // removed
-                    mCurrentSubtypeIndex--;
-                }
-                subtypeChanged = false;
-            }
-
+            final boolean subtypeChanged = adjustIndexForRemovedSubtype(index);
             mSubtypes.remove(index);
             saveSubtypeListPref();
             if (subtypeChanged) {
@@ -490,11 +491,12 @@ public class RichInputMethodManager {
      */
     public boolean switchToNextInputMethod(final IBinder token, final boolean onlyCurrentIme) {
         if (onlyCurrentIme) {
-            if (!hasMultipleEnabledSubtypes()) {
-                return false;
-            }
-            return mSubtypeList.switchToNextSubtype(true);
+            return hasMultipleEnabledSubtypes() && mSubtypeList.switchToNextSubtype(true);
         }
+        return switchToNextSubtypeOrOtherIme(token);
+    }
+
+    private boolean switchToNextSubtypeOrOtherIme(final IBinder token) {
         if (mSubtypeList.switchToNextSubtype(false)) {
             return true;
         }
@@ -530,6 +532,55 @@ public class RichInputMethodManager {
         return mImmService.shouldOfferSwitchingToNextInputMethod(binder);
     }
 
+    private static CharSequence formatSubtypeItem(final SubtypeInfo subtypeInfo) {
+        final SpannableString itemTitle;
+        final SpannableString itemSubtitle;
+        if (!TextUtils.isEmpty(subtypeInfo.subtypeName)) {
+            itemTitle = new SpannableString(subtypeInfo.subtypeName);
+            itemSubtitle = new SpannableString("\n" + subtypeInfo.imeName);
+        } else {
+            itemTitle = new SpannableString(subtypeInfo.imeName);
+            itemSubtitle = new SpannableString("");
+        }
+        itemTitle.setSpan(new RelativeSizeSpan(0.9f), 0, itemTitle.length(),
+                Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+        itemSubtitle.setSpan(new RelativeSizeSpan(0.85f), 0, itemSubtitle.length(),
+                Spannable.SPAN_EXCLUSIVE_INCLUSIVE);
+        return new SpannableStringBuilder().append(itemTitle).append(itemSubtitle);
+    }
+
+    private static int populateSubtypeItems(final List<SubtypeInfo> subtypeInfoList,
+            final Subtype currentSubtype, final CharSequence[] items) {
+        int currentSubtypeIndex = 0;
+        for (int i = 0; i < subtypeInfoList.size(); i++) {
+            final SubtypeInfo subtypeInfo = subtypeInfoList.get(i);
+            if (subtypeInfo.virtualSubtype != null && subtypeInfo.virtualSubtype.equals(currentSubtype)) {
+                currentSubtypeIndex = i;
+            }
+            items[i] = formatSubtypeItem(subtypeInfo);
+        }
+        return currentSubtypeIndex;
+    }
+
+    private void onSubtypeSelected(final SubtypeInfo subtypeInfo, final InputMethodService inputMethodService) {
+        if (subtypeInfo.virtualSubtype != null) {
+            setCurrentSubtype(subtypeInfo.virtualSubtype);
+        } else {
+            switchToTargetIme(subtypeInfo.imiId, subtypeInfo.systemSubtype, inputMethodService);
+        }
+    }
+
+    private static void setupDialogWindow(final Window window, final IBinder windowToken) {
+        if (window == null) {
+            return;
+        }
+        final WindowManager.LayoutParams lp = window.getAttributes();
+        lp.token = windowToken;
+        lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
+        window.setAttributes(lp);
+        window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+    }
+
     /**
      * Show a popup to pick the current subtype.
      * @param context the context for this application.
@@ -542,8 +593,6 @@ public class RichInputMethodManager {
         if (windowToken == null) {
             return null;
         }
-        final CharSequence title = context.getString(R.string.change_keyboard);
-
         final List<SubtypeInfo> subtypeInfoList = getEnabledSubtypeInfoOfAllImes(context);
         if (subtypeInfoList.size() < 2) {
             // if there aren't multiple options, there is no reason to show the picker
@@ -551,66 +600,85 @@ public class RichInputMethodManager {
         }
 
         final CharSequence[] items = new CharSequence[subtypeInfoList.size()];
-        final Subtype currentSubtype = getCurrentSubtype();
-        int currentSubtypeIndex = 0;
-        int i = 0;
-        for (final SubtypeInfo subtypeInfo : subtypeInfoList) {
-            if (subtypeInfo.virtualSubtype != null
-                    && subtypeInfo.virtualSubtype.equals(currentSubtype)) {
-                currentSubtypeIndex = i;
-            }
+        final int currentSubtypeIndex = populateSubtypeItems(subtypeInfoList, getCurrentSubtype(), items);
 
-            final SpannableString itemTitle;
-            final SpannableString itemSubtitle;
-            if (!TextUtils.isEmpty(subtypeInfo.subtypeName)) {
-                itemTitle = new SpannableString(subtypeInfo.subtypeName);
-                itemSubtitle = new SpannableString("\n" + subtypeInfo.imeName);
-            } else {
-                itemTitle = new SpannableString(subtypeInfo.imeName);
-                itemSubtitle = new SpannableString("");
-            }
-            itemTitle.setSpan(new RelativeSizeSpan(0.9f), 0,itemTitle.length(),
-                    Spannable.SPAN_INCLUSIVE_INCLUSIVE);
-            itemSubtitle.setSpan(new RelativeSizeSpan(0.85f), 0,itemSubtitle.length(),
-                    Spannable.SPAN_EXCLUSIVE_INCLUSIVE);
-
-            items[i++] = new SpannableStringBuilder().append(itemTitle).append(itemSubtitle);
-        }
-        final DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface di, int position) {
-                di.dismiss();
-                int i = 0;
-                for (final SubtypeInfo subtypeInfo : subtypeInfoList) {
-                    if (i == position) {
-                        if (subtypeInfo.virtualSubtype != null) {
-                            setCurrentSubtype(subtypeInfo.virtualSubtype);
-                        } else {
-                            switchToTargetIme(subtypeInfo.imiId, subtypeInfo.systemSubtype,
-                                    inputMethodService);
-                        }
-                        break;
-                    }
-                    i++;
-                }
+        final DialogInterface.OnClickListener listener = (di, position) -> {
+            di.dismiss();
+            if (position >= 0 && position < subtypeInfoList.size()) {
+                onSubtypeSelected(subtypeInfoList.get(position), inputMethodService);
             }
         };
+
         final AlertDialog.Builder builder = new AlertDialog.Builder(
                 DialogUtils.getPlatformDialogThemeContext(context));
-        builder.setSingleChoiceItems(items, currentSubtypeIndex, listener).setTitle(title);
+        builder.setSingleChoiceItems(items, currentSubtypeIndex, listener)
+                .setTitle(context.getString(R.string.change_keyboard));
         final AlertDialog dialog = builder.create();
         dialog.setCancelable(true);
         dialog.setCanceledOnTouchOutside(true);
 
-        final Window window = dialog.getWindow();
-        final WindowManager.LayoutParams lp = window.getAttributes();
-        lp.token = windowToken;
-        lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
-        window.setAttributes(lp);
-        window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-
+        setupDialogWindow(dialog.getWindow(), windowToken);
         dialog.show();
         return dialog;
+    }
+
+    private static Comparator<InputMethodInfo> createImiComparator(final PackageManager packageManager) {
+        return (a, b) -> {
+            if (a.equals(b)) {
+                // ensure that this is consistent with equals
+                return 0;
+            }
+            final String labelA = a.loadLabel(packageManager).toString();
+            final String labelB = b.loadLabel(packageManager).toString();
+            final int result = labelA.compareToIgnoreCase(labelB);
+            if (result != 0) {
+                return result;
+            }
+            // ensure that non-equal objects are distinguished to be consistent with equals
+            return a.hashCode() > b.hashCode() ? 1 : -1;
+        };
+    }
+
+    private void addCurrentImeSubtypes(final List<SubtypeInfo> subtypeInfoList,
+            final CharSequence imeName, final String imiId) {
+        for (final Subtype subtype : getEnabledSubtypes(true)) {
+            final SubtypeInfo subtypeInfo = new SubtypeInfo();
+            subtypeInfo.virtualSubtype = subtype;
+            subtypeInfo.subtypeName = subtype.getName();
+            subtypeInfo.imeName = imeName;
+            subtypeInfo.imiId = imiId;
+            subtypeInfoList.add(subtypeInfo);
+        }
+    }
+
+    private void addOtherImeSubtypes(final Context context, final List<SubtypeInfo> subtypeInfoList,
+            final InputMethodInfo imi, final CharSequence imeName, final String imiId) {
+        final List<InputMethodSubtype> subtypes =
+                mImmService.getEnabledInputMethodSubtypeList(imi, true);
+        // IMEs that have no subtypes should still be returned
+        if (subtypes.isEmpty()) {
+            final SubtypeInfo subtypeInfo = new SubtypeInfo();
+            subtypeInfo.imeName = imeName;
+            subtypeInfo.imiId = imiId;
+            subtypeInfoList.add(subtypeInfo);
+            return;
+        }
+
+        final ApplicationInfo applicationInfo = imi.getServiceInfo().applicationInfo;
+        final String packageName = imi.getPackageName();
+        for (final InputMethodSubtype subtype : subtypes) {
+            if (subtype.isAuxiliary()) {
+                continue;
+            }
+            final SubtypeInfo subtypeInfo = new SubtypeInfo();
+            subtypeInfo.systemSubtype = subtype;
+            if (!subtype.overridesImplicitlyEnabledSubtype()) {
+                subtypeInfo.subtypeName = subtype.getDisplayName(context, packageName, applicationInfo);
+            }
+            subtypeInfo.imeName = imeName;
+            subtypeInfo.imiId = imiId;
+            subtypeInfoList.add(subtypeInfo);
+        }
     }
 
     /**
@@ -622,24 +690,7 @@ public class RichInputMethodManager {
         final List<SubtypeInfo> subtypeInfoList = new ArrayList<>();
         final PackageManager packageManager = context.getPackageManager();
 
-        final Set<InputMethodInfo> imiList = new TreeSet<>(new Comparator<InputMethodInfo>() {
-            @Override
-            public int compare(InputMethodInfo a, InputMethodInfo b) {
-                if (a.equals(b)) {
-                    // ensure that this is consistent with equals
-                    return 0;
-                }
-                final String labelA = a.loadLabel(packageManager).toString();
-                final String labelB = b.loadLabel(packageManager).toString();
-                final int result = labelA.compareToIgnoreCase(labelB);
-                if (result != 0) {
-                    return result;
-                }
-                // ensure that non-equal objects are distinguished to be consistent with
-                // equals
-                return a.hashCode() > b.hashCode() ? 1 : -1;
-            }
-        });
+        final Set<InputMethodInfo> imiList = new TreeSet<>(createImiComparator(packageManager));
         imiList.addAll(mImmService.getEnabledInputMethodList());
 
         for (final InputMethodInfo imi : imiList) {
@@ -648,42 +699,9 @@ public class RichInputMethodManager {
             final String packageName = imi.getPackageName();
 
             if (packageName.equals(context.getPackageName())) {
-                for (final Subtype subtype : getEnabledSubtypes(true)) {
-                    final SubtypeInfo subtypeInfo = new SubtypeInfo();
-                    subtypeInfo.virtualSubtype = subtype;
-                    subtypeInfo.subtypeName = subtype.getName();
-                    subtypeInfo.imeName = imeName;
-                    subtypeInfo.imiId = imiId;
-                    subtypeInfoList.add(subtypeInfo);
-                }
-                continue;
-            }
-
-            final List<InputMethodSubtype> subtypes =
-                    mImmService.getEnabledInputMethodSubtypeList(imi, true);
-            // IMEs that have no subtypes should still be returned
-            if (subtypes.isEmpty()) {
-                final SubtypeInfo subtypeInfo = new SubtypeInfo();
-                subtypeInfo.imeName = imeName;
-                subtypeInfo.imiId = imiId;
-                subtypeInfoList.add(subtypeInfo);
-                continue;
-            }
-
-            final ApplicationInfo applicationInfo = imi.getServiceInfo().applicationInfo;
-            for (final InputMethodSubtype subtype : subtypes) {
-                if (subtype.isAuxiliary()) {
-                    continue;
-                }
-                final SubtypeInfo subtypeInfo = new SubtypeInfo();
-                subtypeInfo.systemSubtype = subtype;
-                if (!subtype.overridesImplicitlyEnabledSubtype()) {
-                    subtypeInfo.subtypeName = subtype.getDisplayName(context, packageName,
-                            applicationInfo);
-                }
-                subtypeInfo.imeName = imeName;
-                subtypeInfo.imiId = imiId;
-                subtypeInfoList.add(subtypeInfo);
+                addCurrentImeSubtypes(subtypeInfoList, imeName, imiId);
+            } else {
+                addOtherImeSubtypes(context, subtypeInfoList, imi, imeName, imiId);
             }
         }
 

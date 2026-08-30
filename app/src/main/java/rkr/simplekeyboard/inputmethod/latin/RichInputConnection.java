@@ -136,11 +136,7 @@ public final class RichInputConnection {
      */
     public void reloadTextCache(final EditorInfo editorInfo, final boolean restarting) {
         mIC = mLatinIME.getCurrentInputConnection();
-
-        if (mExpectedSelStart != INVALID_CURSOR_POSITION && mExpectedSelEnd != INVALID_CURSOR_POSITION
-            && !restarting) {
-            // Updated by onUpdateSelection, don't override as editorInfo might be invalid
-            // If restarting, onStartInputView was called instead of onUpdateSelection
+        if (shouldSkipReloadFromEditorInfo(restarting)) {
             return;
         }
         updateSelection(editorInfo.initialSelStart, editorInfo.initialSelEnd);
@@ -153,6 +149,12 @@ public final class RichInputConnection {
         } else {
             reloadTextCache();
         }
+    }
+
+    private boolean shouldSkipReloadFromEditorInfo(final boolean restarting) {
+        // Updated by onUpdateSelection, don't override as editorInfo might be invalid
+        // If restarting, onStartInputView was called instead of onUpdateSelection
+        return hasCursorPosition() && !restarting;
     }
 
     /**
@@ -172,61 +174,82 @@ public final class RichInputConnection {
                 return;
             }
             if (BuildCompatUtils.isAtLeastS()) {
-                final SurroundingText textAroundCursor =
-                        mIC.getSurroundingText(Constants.EDITOR_CONTENTS_CACHE_SIZE, Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
-                if (expectedSelStart != mExpectedSelStart || expectedSelEnd != mExpectedSelEnd) {
-                    Log.w(TAG, "Selection range modified before thread completion.");
-                    return;
-                }
-                setTextAroundCursor(textAroundCursor);
-
-                // All callbacks that need text before cursor are here
-                mLatinIME.mHandler.postUpdateShiftState();
+                reloadTextCacheForSAndAbove(expectedSelStart, expectedSelEnd);
             } else {
-                final CharSequence textBeforeCursor = mIC.getTextBeforeCursor(Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
-                if (expectedSelStart != mExpectedSelStart) {
-                    Log.w(TAG, "Selection start modified before thread completion.");
-                    return;
-                }
-                if (null == textBeforeCursor) {
-                    Log.e(TAG, "Unable get text before cursor.");
-                    mTextBeforeCursor = "";
-                    return;
-                } else {
-                    mTextBeforeCursor = textBeforeCursor.toString();
-                }
-
-                final CharSequence textAfterCursor = mIC.getTextAfterCursor(Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
-                if (expectedSelEnd != mExpectedSelEnd) {
-                    Log.w(TAG, "Selection end modified before thread completion.");
-                    return;
-                }
-                if (null == textAfterCursor) {
-                    Log.e(TAG, "Unable get text after cursor.");
-                    mTextAfterCursor = "";
-                } else {
-                    mTextAfterCursor = textAfterCursor.toString();
-                }
-
-                // All callbacks that need text around cursor are here
-                mLatinIME.mHandler.postUpdateShiftState();
-                if (hasSelection()) {
-                    final CharSequence textSelection = mIC.getSelectedText(0);
-                    if (expectedSelStart != mExpectedSelStart || expectedSelEnd != mExpectedSelEnd) {
-                        Log.w(TAG, "Selection range modified before thread completion.");
-                        return;
-                    }
-                    if (null == textSelection) {
-                        Log.e(TAG, "Unable get text selection.");
-                        mTextSelection = "";
-                    } else {
-                        mTextSelection = textSelection.toString();
-                    }
-                } else {
-                    mTextSelection = "";
-                }
+                reloadTextCacheLegacy(expectedSelStart, expectedSelEnd);
             }
         });
+    }
+
+    private boolean isSelectionRangeModified(final int expectedSelStart, final int expectedSelEnd) {
+        return expectedSelStart != mExpectedSelStart || expectedSelEnd != mExpectedSelEnd;
+    }
+
+    private void reloadTextCacheForSAndAbove(final int expectedSelStart, final int expectedSelEnd) {
+        final SurroundingText textAroundCursor =
+                mIC.getSurroundingText(Constants.EDITOR_CONTENTS_CACHE_SIZE, Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
+        if (isSelectionRangeModified(expectedSelStart, expectedSelEnd)) {
+            Log.w(TAG, "Selection range modified before thread completion.");
+            return;
+        }
+        setTextAroundCursor(textAroundCursor);
+        mLatinIME.mHandler.postUpdateShiftState();
+    }
+
+    private void reloadTextCacheLegacy(final int expectedSelStart, final int expectedSelEnd) {
+        if (!fetchTextBeforeCursorLegacy(expectedSelStart) || !fetchTextAfterCursorLegacy(expectedSelEnd)) {
+            return;
+        }
+        mLatinIME.mHandler.postUpdateShiftState();
+        fetchSelectedTextLegacy(expectedSelStart, expectedSelEnd);
+    }
+
+    private boolean fetchTextBeforeCursorLegacy(final int expectedSelStart) {
+        final CharSequence textBeforeCursor = mIC.getTextBeforeCursor(Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
+        if (expectedSelStart != mExpectedSelStart) {
+            Log.w(TAG, "Selection start modified before thread completion.");
+            return false;
+        }
+        if (null == textBeforeCursor) {
+            Log.e(TAG, "Unable get text before cursor.");
+            mTextBeforeCursor = "";
+            return false;
+        }
+        mTextBeforeCursor = textBeforeCursor.toString();
+        return true;
+    }
+
+    private boolean fetchTextAfterCursorLegacy(final int expectedSelEnd) {
+        final CharSequence textAfterCursor = mIC.getTextAfterCursor(Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
+        if (expectedSelEnd != mExpectedSelEnd) {
+            Log.w(TAG, "Selection end modified before thread completion.");
+            return false;
+        }
+        if (null == textAfterCursor) {
+            Log.e(TAG, "Unable get text after cursor.");
+            mTextAfterCursor = "";
+        } else {
+            mTextAfterCursor = textAfterCursor.toString();
+        }
+        return true;
+    }
+
+    private void fetchSelectedTextLegacy(final int expectedSelStart, final int expectedSelEnd) {
+        if (!hasSelection()) {
+            mTextSelection = "";
+            return;
+        }
+        final CharSequence textSelection = mIC.getSelectedText(0);
+        if (isSelectionRangeModified(expectedSelStart, expectedSelEnd)) {
+            Log.w(TAG, "Selection range modified before thread completion.");
+            return;
+        }
+        if (null == textSelection) {
+            Log.e(TAG, "Unable get text selection.");
+            mTextSelection = "";
+        } else {
+            mTextSelection = textSelection.toString();
+        }
     }
 
     public void clearCaches() {
@@ -360,6 +383,10 @@ public final class RichInputConnection {
         return getCachedOrFetchTextBefore(n);
     }
 
+    private static boolean isWordAfterCursorBoundaryChar(final char c) {
+        return Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-');
+    }
+
     public String getWordAfterCursor() {
         final String text = getCachedOrFetchTextAfter(40);
         if (text.isEmpty()) {
@@ -367,8 +394,7 @@ public final class RichInputConnection {
         }
         int i = 0;
         while (i < text.length()) {
-            char c = text.charAt(i);
-            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
+            if (isWordAfterCursorBoundaryChar(text.charAt(i))) {
                 break;
             }
             i++;
@@ -500,23 +526,75 @@ public final class RichInputConnection {
         }
     }
 
+    private static boolean isTextMimeType(final String mimeType) {
+        return MIMETYPE_TEXT_PLAIN.equals(mimeType) || MIMETYPE_TEXT_HTML.equals(mimeType);
+    }
+
+    private CharSequence extractPrimaryClipText(final ClipboardManager clipboard) {
+        if (clipboard == null || !clipboard.hasPrimaryClip()) {
+            return null;
+        }
+        final ClipData clipData = clipboard.getPrimaryClip();
+        if (clipData == null || clipData.getItemCount() != 1) {
+            return null;
+        }
+        if (!isTextMimeType(clipData.getDescription().getMimeType(0))) {
+            return null;
+        }
+        return clipData.getItemAt(0).getText();
+    }
+
     public void pasteClipboard() {
         final ClipboardManager clipboard = (ClipboardManager) mLatinIME.getSystemService(Context.CLIPBOARD_SERVICE);
-        if (clipboard != null && clipboard.hasPrimaryClip()) {
-            final ClipData clipData = clipboard.getPrimaryClip();
-            if (clipData != null && clipData.getItemCount() == 1) {
-                final String mimeType = clipData.getDescription().getMimeType(0);
-                if (MIMETYPE_TEXT_PLAIN.equals(mimeType) || MIMETYPE_TEXT_HTML.equals(mimeType)) {
-                    final CharSequence pasteData = clipData.getItemAt(0).getText();
-                    if (pasteData != null && pasteData.length() > 0) {
-                        mLatinIME.onTextInput(pasteData.toString());
-                        return;
-                    }
-                }
-            }
+        final CharSequence pasteData = extractPrimaryClipText(clipboard);
+        if (pasteData != null && pasteData.length() > 0) {
+            mLatinIME.onTextInput(pasteData.toString());
+            return;
         }
 
         mIC.performContextMenuAction(android.R.id.paste);
+    }
+
+    private void handleEnterKeyDown() {
+        mTextBeforeCursor += "\n";
+        advanceExpectedSelection(1);
+    }
+
+    private void handleUnknownKeyDown(final String characters) {
+        if (characters != null) {
+            mTextBeforeCursor += characters;
+            advanceExpectedSelection(characters.length());
+        }
+    }
+
+    private void handleDeleteKeyDown() {
+        if (mTextBeforeCursor != null && !mTextBeforeCursor.isEmpty()) {
+            mTextBeforeCursor = mTextBeforeCursor.substring(0, mTextBeforeCursor.length() - 1);
+            advanceExpectedSelection(-1);
+        }
+    }
+
+    private void handleDefaultKeyDown(final int unicodeChar) {
+        final String text = StringUtils.newSingleCodePointString(unicodeChar);
+        mTextBeforeCursor += text;
+        advanceExpectedSelection(text.length());
+    }
+
+    private void handleKeyDownEvent(final KeyEvent keyEvent) {
+        switch (keyEvent.getKeyCode()) {
+            case KeyEvent.KEYCODE_ENTER:
+                handleEnterKeyDown();
+                break;
+            case KeyEvent.KEYCODE_UNKNOWN:
+                handleUnknownKeyDown(keyEvent.getCharacters());
+                break;
+            case KeyEvent.KEYCODE_DEL:
+                handleDeleteKeyDown();
+                break;
+            default:
+                handleDefaultKeyDown(keyEvent.getUnicodeChar());
+                break;
+        }
     }
 
     public void sendKeyEvent(final KeyEvent keyEvent) {
@@ -528,32 +606,30 @@ public final class RichInputConnection {
             // racy and has unpredictable results, but for backward compatibility we continue
             // sending the key events for only Enter and Backspace because some applications
             // mistakenly catch them to do some stuff.
-            switch (keyEvent.getKeyCode()) {
-            case KeyEvent.KEYCODE_ENTER:
-                mTextBeforeCursor += "\n";
-                advanceExpectedSelection(1);
-                break;
-            case KeyEvent.KEYCODE_UNKNOWN:
-                if (null != keyEvent.getCharacters()) {
-                    mTextBeforeCursor += keyEvent.getCharacters();
-                    advanceExpectedSelection(keyEvent.getCharacters().length());
-                }
-                break;
-            case KeyEvent.KEYCODE_DEL:
-                if (mTextBeforeCursor != null && !mTextBeforeCursor.isEmpty()) {
-                    mTextBeforeCursor = mTextBeforeCursor.substring(0, mTextBeforeCursor.length() - 1);
-                    advanceExpectedSelection(-1);
-                }
-                break;
-            default:
-                final String text = StringUtils.newSingleCodePointString(keyEvent.getUnicodeChar());
-                mTextBeforeCursor += text;
-                advanceExpectedSelection(text.length());
-                break;
-            }
+            handleKeyDownEvent(keyEvent);
         }
         if (isConnected()) {
             mIC.sendKeyEvent(keyEvent);
+        }
+    }
+
+    private static boolean isInvalidSelectionBounds(final int start, final int end) {
+        return start < 0 || end < 0 || start > end;
+    }
+
+    private static boolean canUpdateTextCachesForSelection(final String textRange, final int textStart,
+            final int start, final int end) {
+        return textStart >= 0 && start >= textStart && textRange.length() >= end - textStart;
+    }
+
+    private void updateCachedTextForSelection(final int start, final int end) {
+        final int textStart = mExpectedSelStart - mTextBeforeCursor.length();
+        final String textRange = mTextBeforeCursor + mTextSelection + mTextAfterCursor;
+        if (canUpdateTextCachesForSelection(textRange, textStart, start, end)) {
+            // Parameters might be partially updated by background thread, skip in such case
+            mTextBeforeCursor = textRange.substring(0, start - textStart);
+            mTextSelection = textRange.substring(start - textStart, end - textStart);
+            mTextAfterCursor = textRange.substring(end - textStart);
         }
     }
 
@@ -568,21 +644,14 @@ public final class RichInputConnection {
      * invalid arguments were passed.
      */
     public void setSelection(int start, int end) {
-        if (start < 0 || end < 0 || start > end) {
+        if (isInvalidSelectionBounds(start, end)) {
             return;
         }
         if (mExpectedSelStart == start && mExpectedSelEnd == end) {
             return;
         }
 
-        final int textStart = mExpectedSelStart - mTextBeforeCursor.length();
-        final String textRange = mTextBeforeCursor + mTextSelection + mTextAfterCursor;
-        if (textRange.length() >= end - textStart && start - textStart >= 0 && textStart >= 0) {
-            // Parameters might be partially updated by background thread, skip in such case
-            mTextBeforeCursor = textRange.substring(0, start - textStart);
-            mTextSelection = textRange.substring(start - textStart, end - textStart);
-            mTextAfterCursor = textRange.substring(end - textStart);
-        }
+        updateCachedTextForSelection(start, end);
 
         RichInputMethodManager.getInstance().resetSubtypeCycleOrder();
 
@@ -612,52 +681,71 @@ public final class RichInputConnection {
         return mExpectedSelStart != INVALID_CURSOR_POSITION && mExpectedSelEnd != INVALID_CURSOR_POSITION;
     }
 
+    private static boolean shouldSkipCharLeft(final CharSequence text, final int i) {
+        if (i > 1 && text.charAt(i - 1) == '\u200d') {
+            return true;
+        }
+        if (text.charAt(i) == '\u200d') {
+            return true;
+        }
+        return Character.isSurrogate(text.charAt(i)) && !Character.isHighSurrogate(text.charAt(i));
+    }
+
+    private static boolean shouldSkipCharRight(final CharSequence text, final int i) {
+        if (i < text.length() - 1 && text.charAt(i + 1) == '\u200d') {
+            return true;
+        }
+        if (text.charAt(i) == '\u200d') {
+            return true;
+        }
+        return Character.isHighSurrogate(text.charAt(i));
+    }
+
+    private int getUnicodeStepsLeft(int chars, final boolean rightSidePointer) {
+        final CharSequence charsBeforeCursor = rightSidePointer && hasSelection()
+                ? getSelectedText()
+                : mTextBeforeCursor;
+        if (TextUtils.isEmpty(charsBeforeCursor)) {
+            return chars;
+        }
+        int steps = 0;
+        for (int i = charsBeforeCursor.length() - 1; i >= 0 && chars < 0; i--, steps--) {
+            if (shouldSkipCharLeft(charsBeforeCursor, i)) {
+                continue;
+            }
+            chars++;
+        }
+        return steps;
+    }
+
+    private int getUnicodeStepsRight(int chars, final boolean rightSidePointer) {
+        final CharSequence charsAfterCursor = !rightSidePointer && hasSelection()
+                ? getSelectedText()
+                : mTextAfterCursor;
+        if (TextUtils.isEmpty(charsAfterCursor)) {
+            return chars;
+        }
+        int steps = 0;
+        for (int i = 0; i < charsAfterCursor.length() && chars > 0; i++, steps++) {
+            if (shouldSkipCharRight(charsAfterCursor, i)) {
+                continue;
+            }
+            chars--;
+        }
+        return steps;
+    }
+
     /**
      * Some chars, such as emoji consist of 2 chars (surrogate pairs). We should treat them as one character.
      * Some chars are joined with ZERO WIDTH JOINER (U+200D), pairs need to be counted
      */
     public int getUnicodeSteps(int chars, boolean rightSidePointer) {
-        int steps = 0;
         if (chars < 0) {
-            CharSequence charsBeforeCursor = rightSidePointer && hasSelection() ?
-                    getSelectedText() :
-                    mTextBeforeCursor;
-            if (TextUtils.isEmpty(charsBeforeCursor)) {
-                return chars;
-            }
-            for (int i = charsBeforeCursor.length() - 1; i >= 0 && chars < 0; i--, steps--) {
-                if (i > 1 && charsBeforeCursor.charAt(i - 1) == '\u200d') {
-                    continue;
-                }
-                if (charsBeforeCursor.charAt(i) == '\u200d') {
-                    continue;
-                }
-                if (Character.isSurrogate(charsBeforeCursor.charAt(i)) &&
-                        !Character.isHighSurrogate(charsBeforeCursor.charAt(i))) {
-                    continue;
-                }
-                chars++;
-            }
-        } else if (chars > 0) {
-            CharSequence charsAfterCursor = !rightSidePointer && hasSelection() ?
-                    getSelectedText() :
-                    mTextAfterCursor;
-            if (TextUtils.isEmpty(charsAfterCursor)) {
-                return chars;
-            }
-            for (int i = 0; i < charsAfterCursor.length() && chars > 0; i++, steps++) {
-                if (i < charsAfterCursor.length() - 1 && charsAfterCursor.charAt(i + 1) == '\u200d') {
-                    continue;
-                }
-                if (charsAfterCursor.charAt(i) == '\u200d') {
-                    continue;
-                }
-                if (Character.isHighSurrogate(charsAfterCursor.charAt(i))) {
-                    continue;
-                }
-                chars--;
-            }
+            return getUnicodeStepsLeft(chars, rightSidePointer);
         }
-        return steps;
+        if (chars > 0) {
+            return getUnicodeStepsRight(chars, rightSidePointer);
+        }
+        return 0;
     }
 }

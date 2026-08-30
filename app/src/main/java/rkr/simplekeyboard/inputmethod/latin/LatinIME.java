@@ -145,6 +145,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private boolean mCanRevertAutocorrect = false;
     private int mLastInlineFieldId = 0;
 
+    private final java.util.List<CharSequence> mScratchSuggestions = new java.util.ArrayList<>(4);
+    private final java.util.List<CharSequence> mScratchPredictions = new java.util.ArrayList<>(3);
+    private final java.util.List<CharSequence> mScratchMerged = new java.util.ArrayList<>(3);
+    private final java.util.Set<String> mScratchDeduplicationSet = new java.util.HashSet<>();
+
     private RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
 
@@ -709,11 +714,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         super.onStartInput(editorInfo, restarting);
     }
 
-    void onStartInputViewInternal(final EditorInfo editorInfo, final boolean restarting) {
-        super.onStartInputView(editorInfo, restarting);
-
-        // Switch to the null consumer to handle cases leading to early exit below, for which we
-        // also wouldn't be consuming gesture data.
+    private void resetInputViewUiState() {
         mCanRevertAutocorrect = false;
         mOriginalTypedWordBeforeAutocorrect = null;
         mAutocorrectedWord = null;
@@ -723,20 +724,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 mTopBarView.setExternalView(null);
             }
         }
-        final KeyboardSwitcher switcher = mKeyboardSwitcher;
-        switcher.updateKeyboardTheme();
-        final MainKeyboardView mainKeyboardView = switcher.getMainKeyboardView();
-        // If we are starting input in a different text field from before, we'll have to reload
-        // settings, so currentSettingsValues can't be final.
-        SettingsValues currentSettingsValues = mSettings.getCurrent();
+        mKeyboardSwitcher.updateKeyboardTheme();
+    }
 
-        if (editorInfo == null) {
-            Log.e(TAG, "Null EditorInfo in onStartInputView()");
-            if (DebugFlags.DEBUG_ENABLED) {
-                throw new NullPointerException("Null EditorInfo in onStartInputView()");
-            }
-            return;
-        }
+    private void logEditorInfoDebug(final EditorInfo editorInfo, final boolean restarting) {
         if (DebugFlags.DEBUG_ENABLED) {
             Log.d(TAG, "onStartInputView: editorInfo:"
                     + String.format("inputType=0x%08x imeOptions=0x%08x",
@@ -748,69 +739,86 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     + ", word caps = "
                     + ((editorInfo.inputType & InputType.TYPE_TEXT_FLAG_CAP_WORDS) != 0));
         }
+        final boolean externalActive = mTopBarView != null && mTopBarView.isExternalViewActive();
         Log.i(TAG, "Starting input. Cursor position = "
                 + editorInfo.initialSelStart + "," + editorInfo.initialSelEnd
                 + " Restarting = " + restarting
                 + " fieldId = " + editorInfo.fieldId
                 + " lastInlineFieldId = " + mLastInlineFieldId
-                + " externalActive = " + (mTopBarView != null && mTopBarView.isExternalViewActive()));
+                + " externalActive = " + externalActive);
+    }
 
-        // In landscape mode, this method gets called without the input view being created.
-        if (mainKeyboardView == null) {
-            return;
+    private boolean validateAndLogEditorInfo(final EditorInfo editorInfo, final boolean restarting) {
+        if (editorInfo == null) {
+            Log.e(TAG, "Null EditorInfo in onStartInputView()");
+            if (DebugFlags.DEBUG_ENABLED) {
+                throw new NullPointerException("Null EditorInfo in onStartInputView()");
+            }
+            return false;
         }
+        logEditorInfoDebug(editorInfo, restarting);
+        return true;
+    }
 
-        final boolean inputTypeChanged = !currentSettingsValues.isSameInputType(editorInfo);
-        final boolean isDifferentTextField = !restarting || inputTypeChanged;
-
-        // The EditorInfo might have a flag that affects fullscreen mode.
-        // Note: This call should be done by InputMethodService?
-        updateFullscreenMode();
-
-        // ALERT: settings have not been reloaded and there is a chance they may be stale.
-        // In the practice, if it is, we should have gotten onConfigurationChanged so it should
-        // be fine, but this is horribly confusing and must be fixed AS SOON AS POSSIBLE.
-
-        // In some cases the input connection has not been reset yet and we can't access it. In
-        // this case we will need to call loadKeyboard() later, when it's accessible, so that we
-        // can go into the correct mode, so we need to do some housekeeping here.
+    private void initializeInputLogicForEditor(final EditorInfo editorInfo, final boolean restarting) {
         if (!isImeSuppressedByHardwareKeyboard()) {
-            // The app calling setText() has the effect of clearing the composing
-            // span, so we should reset our state unconditionally, even if restarting is true.
-            // We also tell the input logic about the combining rules for the current subtype, so
-            // it can adjust its combiners if needed.
             mInputLogic.startInput();
-
-            // Some applications call onStartInputView without updating EditorInfo. In these cases
-            // selection will be incorrect.
             mInputLogic.mConnection.reloadTextCache(editorInfo, restarting);
         }
+    }
 
+    private void setupKeyboardForNewTextField(final EditorInfo editorInfo,
+            final MainKeyboardView mainKeyboardView) {
+        hideEmojiView();
+        hideClipboardHistory();
+        loadSettings();
+        final SettingsValues refreshedSettingsValues = mSettings.getCurrent();
+        mainKeyboardView.closing();
+        mKeyboardSwitcher.loadKeyboard(editorInfo, refreshedSettingsValues,
+                getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
+    private void updateKeyboardForEditor(final EditorInfo editorInfo, final boolean restarting,
+            final MainKeyboardView mainKeyboardView) {
+        final SettingsValues currentSettingsValues = mSettings.getCurrent();
+        final boolean isDifferentTextField = !restarting || !currentSettingsValues.isSameInputType(editorInfo);
         if (isDifferentTextField) {
-            hideEmojiView();
-            hideClipboardHistory();
-            loadSettings();
-            currentSettingsValues = mSettings.getCurrent();
-            mainKeyboardView.closing();
-            switcher.loadKeyboard(editorInfo, currentSettingsValues, getCurrentAutoCapsState(),
-                    getCurrentRecapitalizeState());
+            setupKeyboardForNewTextField(editorInfo, mainKeyboardView);
         } else if (restarting) {
-            switcher.requestUpdatingShiftState();
+            mKeyboardSwitcher.requestUpdatingShiftState();
         }
+    }
 
+    private void postStartInputView() {
         if (mClipboardHistoryManager != null) {
             mClipboardHistoryManager.updateCurrentClip();
         }
-
         if (mTopBarView != null) {
             mTopBarView.setLanguageButtonVisible(shouldShowLanguageSwitchKey());
             updateSuggestions();
         }
-
         if (TRACE) Debug.startMethodTracing("/data/trace/latinime");
-
         hideClipboardHistory();
         hideEmojiView();
+    }
+
+    void onStartInputViewInternal(final EditorInfo editorInfo, final boolean restarting) {
+        super.onStartInputView(editorInfo, restarting);
+        resetInputViewUiState();
+
+        if (!validateAndLogEditorInfo(editorInfo, restarting)) {
+            return;
+        }
+
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+
+        updateFullscreenMode();
+        initializeInputLogicForEditor(editorInfo, restarting);
+        updateKeyboardForEditor(editorInfo, restarting, mainKeyboardView);
+        postStartInputView();
     }
 
     @Override
@@ -902,6 +910,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     protected void deallocateMemory() {
+        mScratchSuggestions.clear();
+        mScratchPredictions.clear();
+        mScratchMerged.clear();
+        mScratchDeduplicationSet.clear();
+        if (mClipboardHistoryManager != null) {
+            mClipboardHistoryManager.deallocateMemory();
+        }
         if (mClipboardHistoryView != null) {
             mClipboardHistoryView.deallocateMemory();
         }
@@ -933,88 +948,123 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
-    private void loadDictionaryForLocale(final Locale currentLocale) {
+    private void clearLoadedDictionariesIfNeeded() {
+        if (mLoadedLocale != null || mLoadedLanguages != null) {
+            mLoadedLocale = null;
+            mLoadedLanguages = null;
+            mBinaryTrieDictionary = null;
+            mBeamSearchDecoder = null;
+            mPrefixDictionary.clear();
+        }
+    }
+
+    private boolean checkAndHandleSuggestionsDisabled() {
         final SettingsValues settingsValues = mSettings.getCurrent();
         if (settingsValues != null && !settingsValues.mShowSuggestions) {
-            if (mLoadedLocale != null || mLoadedLanguages != null) {
-                mLoadedLocale = null;
-                mLoadedLanguages = null;
-                mBinaryTrieDictionary = null;
-                mBeamSearchDecoder = null;
-                mPrefixDictionary.clear();
-            }
+            clearLoadedDictionariesIfNeeded();
+            return true;
+        }
+        return false;
+    }
+
+    private void collectLanguagesFromSubtypes(final java.util.Set<String> enabledLangs) {
+        final java.util.Set<rkr.simplekeyboard.inputmethod.latin.Subtype> subtypes =
+                mRichImm.getEnabledSubtypes(false);
+        if (subtypes == null) {
             return;
         }
+        for (final rkr.simplekeyboard.inputmethod.latin.Subtype st : subtypes) {
+            final String l = st.getLocale();
+            if (l != null && l.length() >= 2) {
+                enabledLangs.add(l.substring(0, 2).toLowerCase());
+            }
+        }
+    }
 
-        final String currentLang = (currentLocale != null) ? currentLocale.getLanguage() : "es";
+    private java.util.Set<String> resolveEnabledLanguages(final String currentLang) {
         final java.util.Set<String> enabledLangs = new java.util.LinkedHashSet<>();
         if (mRichImm != null) {
-            final java.util.Set<rkr.simplekeyboard.inputmethod.latin.Subtype> subtypes =
-                    mRichImm.getEnabledSubtypes(false);
-            if (subtypes != null) {
-                for (rkr.simplekeyboard.inputmethod.latin.Subtype st : subtypes) {
-                    final String l = st.getLocale();
-                    if (l != null && l.length() >= 2) {
-                        enabledLangs.add(l.substring(0, 2).toLowerCase());
-                    }
-                }
-            }
+            collectLanguagesFromSubtypes(enabledLangs);
         }
         if (enabledLangs.isEmpty()) {
             enabledLangs.add(currentLang);
         }
+        return enabledLangs;
+    }
 
-        if (currentLocale != null && currentLocale.equals(mLoadedLocale)
+    private boolean isDictionaryAlreadyLoaded(final Locale currentLocale,
+            final java.util.Set<String> enabledLangs) {
+        return currentLocale != null && currentLocale.equals(mLoadedLocale)
                 && enabledLangs.equals(mLoadedLanguages)
-                && mPrefixDictionary.getWordCount() > 0) {
+                && mPrefixDictionary.getWordCount() > 0;
+    }
+
+    private boolean isExecutorAvailable() {
+        return !mDictExecutor.isShutdown() && !mDictExecutor.isTerminated();
+    }
+
+    private void applyLoadedDictionary(final BinaryTrieDictionary binaryDict,
+            final BeamSearchDecoder decoder, final int loadGeneration) {
+        if (loadGeneration != mDictLoadGeneration) {
+            return;
+        }
+        if (binaryDict != null) {
+            mBinaryTrieDictionary = binaryDict;
+            mBeamSearchDecoder = decoder;
+            mPrefixDictionary.setBinaryDictionary(binaryDict);
+        }
+        final SettingsValues currentSettings = mSettings.getCurrent();
+        if (currentSettings != null) {
+            mPrefixDictionary.setAutoCorrectionThreshold(currentSettings.mAutoCorrectionThreshold);
+        }
+        updateSuggestions();
+    }
+
+    private void postDictionaryLoadResult(final BinaryTrieDictionary binaryDict,
+            final BeamSearchDecoder decoder, final int loadGeneration) {
+        mHandler.post(() -> applyLoadedDictionary(binaryDict, decoder, loadGeneration));
+    }
+
+    private void loadDictionaryTask(final String currentLang, final int loadGeneration) {
+        BinaryTrieDictionary newBinaryDict = null;
+        BeamSearchDecoder newDecoder = null;
+        final String primaryAssetName = getDictionaryAssetForLanguage(currentLang);
+        try (InputStream is = getAssets().open(primaryAssetName)) {
+            final byte[] bytes = new byte[is.available()];
+            is.read(bytes);
+            final ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            newBinaryDict = new BinaryTrieDictionary(buffer);
+            newDecoder = new BeamSearchDecoder(newBinaryDict, mSpatialTouchModel);
+        } catch (Exception e) {
+            Log.w(TAG, "Could not load binary trie dictionary asset: " + primaryAssetName, e);
+        }
+        postDictionaryLoadResult(newBinaryDict, newDecoder, loadGeneration);
+    }
+
+    private void executeDictionaryLoad(final String currentLang, final int loadGeneration) {
+        try {
+            mDictExecutor.execute(() -> loadDictionaryTask(currentLang, loadGeneration));
+        } catch (java.util.concurrent.RejectedExecutionException ignored) {
+            // Executor shutting down or terminated
+        }
+    }
+
+    private void loadDictionaryForLocale(final Locale currentLocale) {
+        if (checkAndHandleSuggestionsDisabled()) {
             return;
         }
 
-        if (mDictExecutor.isShutdown() || mDictExecutor.isTerminated()) {
+        final String currentLang = (currentLocale != null) ? currentLocale.getLanguage() : "es";
+        final java.util.Set<String> enabledLangs = resolveEnabledLanguages(currentLang);
+
+        if (isDictionaryAlreadyLoaded(currentLocale, enabledLangs) || !isExecutorAvailable()) {
             return;
         }
 
         mLoadedLocale = currentLocale;
         mLoadedLanguages = new java.util.HashSet<>(enabledLangs);
         final int loadGeneration = ++mDictLoadGeneration;
-
-        try {
-            mDictExecutor.execute(() -> {
-            BinaryTrieDictionary newBinaryDict = null;
-            BeamSearchDecoder newDecoder = null;
-            final String primaryAssetName = getDictionaryAssetForLanguage(currentLang);
-            try (InputStream is = getAssets().open(primaryAssetName)) {
-                byte[] bytes = new byte[is.available()];
-                is.read(bytes);
-                ByteBuffer buffer = ByteBuffer.wrap(bytes);
-                newBinaryDict = new BinaryTrieDictionary(buffer);
-                newDecoder = new BeamSearchDecoder(newBinaryDict, mSpatialTouchModel);
-            } catch (Exception e) {
-                Log.w(TAG, "Could not load binary trie dictionary asset: " + primaryAssetName, e);
-            }
-
-            final BinaryTrieDictionary finalBinaryDict = newBinaryDict;
-            final BeamSearchDecoder finalDecoder = newDecoder;
-
-            mHandler.post(() -> {
-                if (loadGeneration != mDictLoadGeneration) {
-                    return;
-                }
-                if (finalBinaryDict != null) {
-                    mBinaryTrieDictionary = finalBinaryDict;
-                    mBeamSearchDecoder = finalDecoder;
-                    mPrefixDictionary.setBinaryDictionary(finalBinaryDict);
-                }
-                final SettingsValues currentSettings = mSettings.getCurrent();
-                if (currentSettings != null) {
-                    mPrefixDictionary.setAutoCorrectionThreshold(currentSettings.mAutoCorrectionThreshold);
-                }
-                updateSuggestions();
-            });
-        });
-        } catch (java.util.concurrent.RejectedExecutionException ignored) {
-            // Executor shutting down or terminated
-        }
+        executeDictionaryLoad(currentLang, loadGeneration);
     }
 
     private String getDictionaryAssetForLanguage(final String lang) {
@@ -1195,54 +1245,54 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (isWordEmpty(w2)) {
             return false;
         }
-        final java.util.List<CharSequence> predictions = new java.util.ArrayList<>(3);
-        final java.util.Set<String> added = new java.util.HashSet<>();
+        mScratchPredictions.clear();
+        mScratchDeduplicationSet.clear();
 
         final java.util.List<CharSequence> nextWordPredictions = mPrefixDictionary.getNextWordPredictions(w1, w2, 3);
         if (nextWordPredictions != null) {
             for (CharSequence np : nextWordPredictions) {
-                if (predictions.size() >= 3) break;
-                if (added.add(np.toString().toLowerCase())) {
-                    predictions.add(np);
+                if (mScratchPredictions.size() >= 3) break;
+                if (mScratchDeduplicationSet.add(np.toString().toLowerCase())) {
+                    mScratchPredictions.add(np);
                 }
             }
         }
 
-        if (!predictions.isEmpty()) {
-            mTopBarView.setSuggestions(predictions, -1);
+        if (!mScratchPredictions.isEmpty()) {
+            mTopBarView.setSuggestions(mScratchPredictions, -1);
             return true;
         }
         return false;
     }
 
     private java.util.List<CharSequence> getSuggestionsForWord(final String word, final String w1, final String w2) {
-        final java.util.List<CharSequence> merged = new java.util.ArrayList<>(3);
-        final java.util.Set<String> added = new java.util.HashSet<>();
+        mScratchMerged.clear();
+        mScratchDeduplicationSet.clear();
 
         if (mBeamSearchDecoder != null) {
             final java.util.List<CharSequence> matches = mBeamSearchDecoder.getSuggestions(word, 3, w2);
             if (matches != null) {
                 for (CharSequence m : matches) {
-                    if (merged.size() >= 3) break;
-                    if (added.add(m.toString().toLowerCase())) {
-                        merged.add(m);
+                    if (mScratchMerged.size() >= 3) break;
+                    if (mScratchDeduplicationSet.add(m.toString().toLowerCase())) {
+                        mScratchMerged.add(m);
                     }
                 }
-                if (merged.size() >= 3) return merged;
+                if (mScratchMerged.size() >= 3) return mScratchMerged;
             }
         }
         if (mPrefixDictionary != null) {
             final java.util.List<CharSequence> dictMatches = mPrefixDictionary.getSuggestions(word, 3, w1, w2);
             if (dictMatches != null) {
                 for (CharSequence d : dictMatches) {
-                    if (merged.size() >= 3) break;
-                    if (added.add(d.toString().toLowerCase())) {
-                        merged.add(d);
+                    if (mScratchMerged.size() >= 3) break;
+                    if (mScratchDeduplicationSet.add(d.toString().toLowerCase())) {
+                        mScratchMerged.add(d);
                     }
                 }
             }
         }
-        return merged;
+        return mScratchMerged;
     }
 
     private CharSequence getDecoderBestCorrection(final String word, final String prevWord) {
@@ -1302,20 +1352,20 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void displayComposingSuggestions(final String word, final String w1, final String w2, final long seq) {
-        final java.util.List<CharSequence> suggestions = new java.util.ArrayList<>(4);
-        suggestions.add("\"" + word + "\"");
+        mScratchSuggestions.clear();
+        mScratchSuggestions.add("\"" + word + "\"");
 
         final java.util.List<CharSequence> matches = getSuggestionsForWord(word, w1, w2);
         final CharSequence bestCorrection = resolveBestCorrection(word, w1, w2);
 
         final int boldIndex;
         if (bestCorrection != null) {
-            appendCorrectionAndCandidates(suggestions, word, w1, w2, bestCorrection, matches);
+            appendCorrectionAndCandidates(mScratchSuggestions, word, w1, w2, bestCorrection, matches);
             boldIndex = 1;
             mPendingAutoCorrection = bestCorrection;
             mPendingAutoCorrectionWord = word;
         } else {
-            appendMatchingSuggestions(suggestions, matches, word);
+            appendMatchingSuggestions(mScratchSuggestions, matches, word);
             boldIndex = -1;
             mPendingAutoCorrection = null;
             mPendingAutoCorrectionWord = null;
@@ -1324,7 +1374,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (seq == mSuggestionSeq.get() && mTopBarView != null) {
             mTopBarView.post(() -> {
                 if (seq == mSuggestionSeq.get() && mTopBarView != null) {
-                    mTopBarView.setSuggestions(suggestions, boldIndex);
+                    mTopBarView.setSuggestions(mScratchSuggestions, boldIndex);
                 }
             });
         }
@@ -1344,53 +1394,85 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         super.hideWindow();
     }
 
+    private static boolean isViewVisible(final View view) {
+        return view != null && view.getVisibility() == View.VISIBLE;
+    }
+
+    private View getVisibleKeyboardViewOrNull() {
+        if (mInputView == null) {
+            return null;
+        }
+        return mKeyboardSwitcher.getVisibleKeyboardView();
+    }
+
+    private boolean isAnyOverlayVisible() {
+        return isViewVisible(mClipboardHistoryView) || isViewVisible(mEmojiPalettesView);
+    }
+
+    private boolean isImeContentHiddenByHardware(final boolean isOverlayVisible, final boolean isKeyboardShown) {
+        return !isOverlayVisible && !isKeyboardShown && isImeSuppressedByHardwareKeyboard();
+    }
+
+    private int computeKeyboardWithTopBarHeight(final View visibleKeyboardView) {
+        final View topBar = mInputView.findViewById(rkr.simplekeyboard.inputmethod.R.id.top_bar_view);
+        final int topBarHeight = isViewVisible(topBar) ? topBar.getHeight() : 0;
+        return visibleKeyboardView.getHeight() + topBarHeight;
+    }
+
+    private int computeVisibleViewHeight(final View visibleKeyboardView) {
+        if (isViewVisible(mClipboardHistoryView)) {
+            return mClipboardHistoryView.getHeight();
+        }
+        if (isViewVisible(mEmojiPalettesView)) {
+            return mEmojiPalettesView.getHeight();
+        }
+        return computeKeyboardWithTopBarHeight(visibleKeyboardView);
+    }
+
+    private boolean shouldExtendTouchToTop(final boolean isOverlayVisible) {
+        return !isOverlayVisible && mKeyboardSwitcher.isShowingMoreKeysPanel();
+    }
+
+    private void updateTouchableInsetsRegion(final InputMethodService.Insets outInsets,
+            final boolean isOverlayVisible, final int visibleTopY, final int inputHeight) {
+        final int touchTop = shouldExtendTouchToTop(isOverlayVisible) ? 0 : visibleTopY;
+        outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
+        outInsets.touchableRegion.set(0, touchTop, mInputView.getWidth(),
+                inputHeight + EXTENDED_TOUCHABLE_REGION_HEIGHT);
+    }
+
+    private void applyInsets(final InputMethodService.Insets outInsets, final int topInsets) {
+        outInsets.contentTopInsets = topInsets;
+        outInsets.visibleTopInsets = topInsets;
+        if (mInsetsUpdater != null) {
+            mInsetsUpdater.setInsets(outInsets);
+        }
+    }
+
     @Override
     public void onComputeInsets(final InputMethodService.Insets outInsets) {
         super.onComputeInsets(outInsets);
-        if (mInputView == null) {
-            return;
-        }
-        final View visibleKeyboardView = mKeyboardSwitcher.getVisibleKeyboardView();
+        final View visibleKeyboardView = getVisibleKeyboardViewOrNull();
         if (visibleKeyboardView == null) {
             return;
         }
         final int inputHeight = mInputView.getHeight();
-
-        final boolean isClipboardVisible = (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE);
-        final boolean isEmojiVisible = (mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE);
-        final boolean isOverlayVisible = isClipboardVisible || isEmojiVisible;
+        final boolean isOverlayVisible = isAnyOverlayVisible();
         final boolean isKeyboardShown = visibleKeyboardView.isShown();
 
-        if (!isOverlayVisible && isImeSuppressedByHardwareKeyboard() && !isKeyboardShown) {
-            outInsets.contentTopInsets = inputHeight;
-            outInsets.visibleTopInsets = inputHeight;
+        if (isImeContentHiddenByHardware(isOverlayVisible, isKeyboardShown)) {
+            applyInsets(outInsets, inputHeight);
             return;
         }
 
-        final int visibleHeight;
-        if (isClipboardVisible) {
-            visibleHeight = mClipboardHistoryView.getHeight();
-        } else if (isEmojiVisible) {
-            visibleHeight = mEmojiPalettesView.getHeight();
-        } else {
-            final View topBar = mInputView.findViewById(rkr.simplekeyboard.inputmethod.R.id.top_bar_view);
-            final int topBarHeight = (topBar != null && topBar.getVisibility() == View.VISIBLE) ? topBar.getHeight() : 0;
-            visibleHeight = visibleKeyboardView.getHeight() + topBarHeight;
-        }
-
+        final int visibleHeight = computeVisibleViewHeight(visibleKeyboardView);
         final int visibleTopY = Math.max(0, inputHeight - visibleHeight);
 
         if (isOverlayVisible || isKeyboardShown) {
-            final int touchTop = (!isOverlayVisible && mKeyboardSwitcher.isShowingMoreKeysPanel()) ? 0 : visibleTopY;
-            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
-            outInsets.touchableRegion.set(0, touchTop, mInputView.getWidth(), inputHeight + EXTENDED_TOUCHABLE_REGION_HEIGHT);
+            updateTouchableInsetsRegion(outInsets, isOverlayVisible, visibleTopY, inputHeight);
         }
 
-        outInsets.contentTopInsets = visibleTopY;
-        outInsets.visibleTopInsets = visibleTopY;
-        if (mInsetsUpdater != null) {
-            mInsetsUpdater.setInsets(outInsets);
-        }
+        applyInsets(outInsets, visibleTopY);
     }
 
     @Override

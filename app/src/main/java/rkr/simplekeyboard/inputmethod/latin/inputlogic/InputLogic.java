@@ -23,6 +23,7 @@ package rkr.simplekeyboard.inputmethod.latin.inputlogic;
 
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.SparseArray;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
@@ -138,6 +139,30 @@ public final class InputLogic {
         return inputTransaction;
     }
 
+    @FunctionalInterface
+    private interface FunctionalEventHandler {
+        void handle(InputLogic logic, Event event, InputTransaction inputTransaction);
+    }
+
+    private static final SparseArray<FunctionalEventHandler> sFunctionalHandlers = new SparseArray<>();
+
+    static {
+        sFunctionalHandlers.put(Constants.CODE_DELETE, (logic, event, tx) -> logic.handleBackspaceEvent(event, tx));
+        sFunctionalHandlers.put(Constants.CODE_SHIFT, (logic, event, tx) -> {
+            logic.performRecapitalization();
+            tx.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
+        });
+        sFunctionalHandlers.put(Constants.CODE_CAPSLOCK, (logic, event, tx) -> {});
+        sFunctionalHandlers.put(Constants.CODE_SYMBOL_SHIFT, (logic, event, tx) -> {});
+        sFunctionalHandlers.put(Constants.CODE_SWITCH_ALPHA_SYMBOL, (logic, event, tx) -> {});
+        sFunctionalHandlers.put(Constants.CODE_SETTINGS, (logic, event, tx) -> logic.onSettingsKeyPressed());
+        sFunctionalHandlers.put(Constants.CODE_PASTE, (logic, event, tx) -> logic.mConnection.pasteClipboard());
+        sFunctionalHandlers.put(Constants.CODE_ACTION_NEXT, (logic, event, tx) -> logic.performEditorAction(EditorInfo.IME_ACTION_NEXT));
+        sFunctionalHandlers.put(Constants.CODE_ACTION_PREVIOUS, (logic, event, tx) -> logic.performEditorAction(EditorInfo.IME_ACTION_PREVIOUS));
+        sFunctionalHandlers.put(Constants.CODE_LANGUAGE_SWITCH, (logic, event, tx) -> logic.handleLanguageSwitchKey());
+        sFunctionalHandlers.put(Constants.CODE_SHIFT_ENTER, (logic, event, tx) -> logic.sendDownUpKeyEventWithMeta(KeyEvent.KEYCODE_ENTER, KeyEvent.META_SHIFT_ON));
+    }
+
     /**
      * Handle a functional key event.
      *
@@ -151,49 +176,12 @@ public final class InputLogic {
      * @param inputTransaction The transaction in progress.
      */
     private void handleFunctionalEvent(final Event event, final InputTransaction inputTransaction) {
-        switch (event.mKeyCode) {
-            case Constants.CODE_DELETE:
-                handleBackspaceEvent(event, inputTransaction);
-                // Backspace is a functional key, but it affects the contents of the editor.
-                break;
-            case Constants.CODE_SHIFT:
-                performRecapitalization();
-                inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
-                break;
-            case Constants.CODE_CAPSLOCK:
-                // Note: Changing keyboard to shift lock state is handled in
-                // {@link KeyboardSwitcher#onEvent(Event)}.
-                break;
-            case Constants.CODE_SYMBOL_SHIFT:
-                // Note: Calling back to the keyboard on the symbol Shift key is handled in
-                // {@link #onPressKey(int,int,boolean)} and {@link #onReleaseKey(int,boolean)}.
-                break;
-            case Constants.CODE_SWITCH_ALPHA_SYMBOL:
-                // Note: Calling back to the keyboard on symbol key is handled in
-                // {@link #onPressKey(int,int,boolean)} and {@link #onReleaseKey(int,boolean)}.
-                break;
-            case Constants.CODE_SETTINGS:
-                onSettingsKeyPressed();
-                break;
-            case Constants.CODE_PASTE:
-                mConnection.pasteClipboard();
-                break;
-            case Constants.CODE_ACTION_NEXT:
-                performEditorAction(EditorInfo.IME_ACTION_NEXT);
-                break;
-            case Constants.CODE_ACTION_PREVIOUS:
-                performEditorAction(EditorInfo.IME_ACTION_PREVIOUS);
-                break;
-            case Constants.CODE_LANGUAGE_SWITCH:
-                handleLanguageSwitchKey();
-                break;
-            case Constants.CODE_SHIFT_ENTER:
-                sendDownUpKeyEventWithMeta(KeyEvent.KEYCODE_ENTER, KeyEvent.META_SHIFT_ON);
-                // Shift + Enter is not supported in all devices
-                break;
-            default:
-                throw new RuntimeException("Unknown key code : " + event.mKeyCode);
+        final FunctionalEventHandler handler = sFunctionalHandlers.get(event.mKeyCode);
+        if (handler != null) {
+            handler.handle(this, event, inputTransaction);
+            return;
         }
+        throw new RuntimeException("Unknown key code : " + event.mKeyCode);
     }
 
     /**
@@ -278,34 +266,35 @@ public final class InputLogic {
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
     }
 
+    private int resolveBackspaceShiftUpdateKind(final Event event) {
+        if (event.isKeyRepeat() && mConnection.getExpectedSelectionStart() > 0) {
+            return InputTransaction.SHIFT_UPDATE_LATER;
+        }
+        return InputTransaction.SHIFT_UPDATE_NOW;
+    }
+
+    private void deleteCharacterBeforeCursor() {
+        final int codePointBeforeCursor = mConnection.getCodePointBeforeCursor();
+        if (codePointBeforeCursor == Constants.NOT_A_CODE) {
+            sendDownUpKeyEvent(KeyEvent.KEYCODE_DEL);
+            return;
+        }
+        final int numChars = Character.isSupplementaryCodePoint(codePointBeforeCursor) ? 2 : 1;
+        mConnection.deleteTextBeforeCursor(numChars);
+    }
+
     /**
      * Handle a press on the backspace key.
      * @param event The event to handle.
      * @param inputTransaction The transaction in progress.
      */
     private void handleBackspaceEvent(final Event event, final InputTransaction inputTransaction) {
-        // In many cases after backspace, we need to update the shift state. Normally we need
-        // to do this right away to avoid the shift state being out of date in case the user types
-        // backspace then some other character very fast. However, in the case of backspace key
-        // repeat, this can lead to flashiness when the cursor flies over positions where the
-        // shift state should be updated, so if this is a key repeat, we update after a small delay.
-        // Then again, even in the case of a key repeat, if the cursor is at start of text, it
-        // can't go any further back, so we can update right away even if it's a key repeat.
-        final int shiftUpdateKind =
-                event.isKeyRepeat() && mConnection.getExpectedSelectionStart() > 0
-                ? InputTransaction.SHIFT_UPDATE_LATER : InputTransaction.SHIFT_UPDATE_NOW;
-        inputTransaction.requireShiftUpdate(shiftUpdateKind);
+        inputTransaction.requireShiftUpdate(resolveBackspaceShiftUpdateKind(event));
 
         if (mConnection.hasSelection()) {
             mConnection.deleteSelectedText();
         } else {
-            final int codePointBeforeCursor = mConnection.getCodePointBeforeCursor();
-            if (codePointBeforeCursor == Constants.NOT_A_CODE) {
-                sendDownUpKeyEvent(KeyEvent.KEYCODE_DEL);
-            } else {
-                final int numChars = Character.isSupplementaryCodePoint(codePointBeforeCursor) ? 2 : 1;
-                mConnection.deleteTextBeforeCursor(numChars);
-            }
+            deleteCharacterBeforeCursor();
         }
     }
 
@@ -316,36 +305,49 @@ public final class InputLogic {
         mLatinIME.switchToNextSubtype();
     }
 
-    /**
-     * Performs a recapitalization event.
-     */
-    private void performRecapitalization() {
+    private boolean canRecapitalize(final int selectionStart, final int selectionEnd) {
         if (!mConnection.hasSelection() || !mRecapitalizeStatus.mIsEnabled()) {
-            return; // No selection or recapitalize is disabled for now
+            return false;
         }
-        final int selectionStart = mConnection.getExpectedSelectionStart();
-        final int selectionEnd = mConnection.getExpectedSelectionEnd();
         final int numCharsSelected = selectionEnd - selectionStart;
-        if (numCharsSelected > Constants.MAX_CHARACTERS_FOR_RECAPITALIZATION) {
-            // We bail out if we have too many characters for performance reasons. We don't want
-            // to suck possibly multiple-megabyte data.
-            return;
+        return numCharsSelected <= Constants.MAX_CHARACTERS_FOR_RECAPITALIZATION;
+    }
+
+    private boolean ensureRecapitalizeStarted(final int selectionStart, final int selectionEnd) {
+        if (mRecapitalizeStatus.isStarted() && mRecapitalizeStatus.isSetAt(selectionStart, selectionEnd)) {
+            return true;
         }
-        // If we have a recapitalize in progress, use it; otherwise, start a new one.
-        if (!mRecapitalizeStatus.isStarted()
-                || !mRecapitalizeStatus.isSetAt(selectionStart, selectionEnd)) {
-            final CharSequence selectedText = mConnection.getSelectedText();
-            if (TextUtils.isEmpty(selectedText)) return; // Race condition with the input connection
-            mRecapitalizeStatus.start(selectionStart, selectionEnd, selectedText.toString(), mLatinIME.getCurrentLayoutLocale());
-            // We trim leading and trailing whitespace.
-            mRecapitalizeStatus.trim();
+        final CharSequence selectedText = mConnection.getSelectedText();
+        if (TextUtils.isEmpty(selectedText)) {
+            return false;
         }
+        mRecapitalizeStatus.start(selectionStart, selectionEnd, selectedText.toString(), mLatinIME.getCurrentLayoutLocale());
+        mRecapitalizeStatus.trim();
+        return true;
+    }
+
+    private void applyRecapitalization(final int selectionStart, final int selectionEnd) {
         mConnection.beginBatchEdit();
         mConnection.setSelection(selectionStart, selectionStart);
         mRecapitalizeStatus.rotate();
         mConnection.replaceText(selectionStart, selectionEnd, mRecapitalizeStatus.getRecapitalizedString());
         mConnection.setSelection(mRecapitalizeStatus.getNewCursorStart(), mRecapitalizeStatus.getNewCursorEnd());
         mConnection.endBatchEdit();
+    }
+
+    /**
+     * Performs a recapitalization event.
+     */
+    private void performRecapitalization() {
+        final int selectionStart = mConnection.getExpectedSelectionStart();
+        final int selectionEnd = mConnection.getExpectedSelectionEnd();
+        if (!canRecapitalize(selectionStart, selectionEnd)) {
+            return;
+        }
+        if (!ensureRecapitalizeStarted(selectionStart, selectionEnd)) {
+            return;
+        }
+        applyRecapitalization(selectionStart, selectionEnd);
     }
 
     /**

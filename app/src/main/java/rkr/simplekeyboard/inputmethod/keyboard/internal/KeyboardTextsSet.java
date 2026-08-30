@@ -58,17 +58,90 @@ public final class KeyboardTextsSet {
         return KeyboardTextsTable.getText(name, mTextsTable);
     }
 
+    private static boolean isLowerAlpha(final char c) {
+        return c >= 'a' && c <= 'z';
+    }
+
+    private static boolean isDigit(final char c) {
+        return c >= '0' && c <= '9';
+    }
+
+    private static boolean isValidTextNameChar(final char c) {
+        return c == '_' || isLowerAlpha(c) || isDigit(c);
+    }
+
     private static int searchTextNameEnd(final String text, final int start) {
         final int size = text.length();
         for (int pos = start; pos < size; pos++) {
-            final char c = text.charAt(pos);
-            // Label name should be consisted of [a-zA-Z_0-9].
-            if ((c >= 'a' && c <= 'z') || c == '_' || (c >= '0' && c <= '9')) {
-                continue;
+            if (!isValidTextNameChar(text.charAt(pos))) {
+                return pos;
             }
-            return pos;
         }
         return size;
+    }
+
+    private static void checkIndirectionLimit(final int level, final String text) {
+        if (level >= MAX_REFERENCE_INDIRECTION) {
+            throw new RuntimeException("Too many " + PREFIX_TEXT + " or " + PREFIX_RESOURCE +
+                    " reference indirection: " + text);
+        }
+    }
+
+    private static int findFirstReference(final String text) {
+        final int size = text.length();
+        for (int pos = 0; pos < size; pos++) {
+            if (text.startsWith(PREFIX_TEXT, pos) || text.startsWith(PREFIX_RESOURCE, pos)) {
+                return pos;
+            }
+        }
+        return -1;
+    }
+
+    private static void appendNonReferenceChar(final String text, final int pos, final int size,
+            final StringBuilder sb) {
+        if (text.charAt(pos) == BACKSLASH) {
+            sb.append(text.substring(pos, Math.min(pos + 2, size)));
+        } else {
+            sb.append(text.charAt(pos));
+        }
+    }
+
+    private int expandAtPos(final String text, final int pos, final StringBuilder sb) {
+        if (text.startsWith(PREFIX_TEXT, pos)) {
+            return expandReference(text, pos, PREFIX_TEXT, sb);
+        }
+        if (text.startsWith(PREFIX_RESOURCE, pos)) {
+            return expandReference(text, pos, PREFIX_RESOURCE, sb);
+        }
+        return -1;
+    }
+
+    private void expandRemainder(final String text, final int startPos, final StringBuilder sb) {
+        final int size = text.length();
+        for (int pos = startPos; pos < size; pos++) {
+            final int nextPos = expandAtPos(text, pos, sb);
+            if (nextPos >= 0) {
+                pos = nextPos;
+            } else {
+                appendNonReferenceChar(text, pos, size, sb);
+                if (text.charAt(pos) == BACKSLASH) {
+                    pos++;
+                }
+            }
+        }
+    }
+
+    private String expandPass(final String text) {
+        if (text.length() < PREFIX_TEXT.length()) {
+            return null;
+        }
+        final int firstRef = findFirstReference(text);
+        if (firstRef < 0) {
+            return null;
+        }
+        final StringBuilder sb = new StringBuilder(text.substring(0, firstRef));
+        expandRemainder(text, firstRef, sb);
+        return sb.toString();
     }
 
     // TODO: Resolve text reference when creating {@link KeyboardTextsTable} class.
@@ -78,48 +151,14 @@ public final class KeyboardTextsSet {
         }
         int level = 0;
         String text = rawText;
-        StringBuilder sb;
-        do {
-            level++;
-            if (level >= MAX_REFERENCE_INDIRECTION) {
-                throw new RuntimeException("Too many " + PREFIX_TEXT + " or " + PREFIX_RESOURCE +
-                        " reference indirection: " + text);
-            }
-
-            final int prefixLength = PREFIX_TEXT.length();
-            final int size = text.length();
-            if (size < prefixLength) {
+        while (true) {
+            checkIndirectionLimit(++level, text);
+            final String expanded = expandPass(text);
+            if (expanded == null) {
                 break;
             }
-
-            sb = null;
-            for (int pos = 0; pos < size; pos++) {
-                final char c = text.charAt(pos);
-                if (text.startsWith(PREFIX_TEXT, pos)) {
-                    if (sb == null) {
-                        sb = new StringBuilder(text.substring(0, pos));
-                    }
-                    pos = expandReference(text, pos, PREFIX_TEXT, sb);
-                } else if (text.startsWith(PREFIX_RESOURCE, pos)) {
-                    if (sb == null) {
-                        sb = new StringBuilder(text.substring(0, pos));
-                    }
-                    pos = expandReference(text, pos, PREFIX_RESOURCE, sb);
-                } else if (c == BACKSLASH) {
-                    if (sb != null) {
-                        // Append both escape character and escaped character.
-                        sb.append(text.substring(pos, Math.min(pos + 2, size)));
-                    }
-                    pos++;
-                } else if (sb != null) {
-                    sb.append(c);
-                }
-            }
-
-            if (sb != null) {
-                text = sb.toString();
-            }
-        } while (sb != null);
+            text = expanded;
+        }
         return TextUtils.isEmpty(text) ? null : text;
     }
 

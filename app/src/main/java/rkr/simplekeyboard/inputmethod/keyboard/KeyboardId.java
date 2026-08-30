@@ -20,6 +20,7 @@ package rkr.simplekeyboard.inputmethod.keyboard;
 
 import android.text.InputType;
 import android.text.TextUtils;
+import android.util.SparseArray;
 import android.view.inputmethod.EditorInfo;
 
 import java.util.Arrays;
@@ -52,6 +53,31 @@ public final class KeyboardId {
     public static final int ELEMENT_PHONE = 7;
     public static final int ELEMENT_PHONE_SYMBOLS = 8;
     public static final int ELEMENT_NUMBER = 9;
+
+    private static final SparseArray<String> ELEMENT_ID_TO_NAME = new SparseArray<>();
+    private static final SparseArray<String> MODE_TO_NAME = new SparseArray<>();
+
+    static {
+        ELEMENT_ID_TO_NAME.put(ELEMENT_ALPHABET, "alphabet");
+        ELEMENT_ID_TO_NAME.put(ELEMENT_ALPHABET_MANUAL_SHIFTED, "alphabetManualShifted");
+        ELEMENT_ID_TO_NAME.put(ELEMENT_ALPHABET_AUTOMATIC_SHIFTED, "alphabetAutomaticShifted");
+        ELEMENT_ID_TO_NAME.put(ELEMENT_ALPHABET_SHIFT_LOCKED, "alphabetShiftLocked");
+        ELEMENT_ID_TO_NAME.put(ELEMENT_SYMBOLS, "symbols");
+        ELEMENT_ID_TO_NAME.put(ELEMENT_SYMBOLS_SHIFTED, "symbolsShifted");
+        ELEMENT_ID_TO_NAME.put(ELEMENT_PHONE, "phone");
+        ELEMENT_ID_TO_NAME.put(ELEMENT_PHONE_SYMBOLS, "phoneSymbols");
+        ELEMENT_ID_TO_NAME.put(ELEMENT_NUMBER, "number");
+
+        MODE_TO_NAME.put(MODE_TEXT, "text");
+        MODE_TO_NAME.put(MODE_URL, "url");
+        MODE_TO_NAME.put(MODE_EMAIL, "email");
+        MODE_TO_NAME.put(MODE_IM, "im");
+        MODE_TO_NAME.put(MODE_PHONE, "phone");
+        MODE_TO_NAME.put(MODE_NUMBER, "number");
+        MODE_TO_NAME.put(MODE_DATE, "date");
+        MODE_TO_NAME.put(MODE_TIME, "time");
+        MODE_TO_NAME.put(MODE_DATETIME, "datetime");
+    }
 
     public final Subtype mSubtype;
     public final int mThemeId;
@@ -113,21 +139,51 @@ public final class KeyboardId {
     private boolean equals(final KeyboardId other) {
         if (other == this)
             return true;
+        if (other == null)
+            return false;
+        return equalsLayout(other) && equalsSettings(other);
+    }
+
+    private boolean equalsLayout(final KeyboardId other) {
+        return equalsDimensions(other) && equalsModes(other);
+    }
+
+    private boolean equalsDimensions(final KeyboardId other) {
+        return other.mWidth == mWidth
+                && other.mHeight == mHeight
+                && other.mBottomOffset == mBottomOffset;
+    }
+
+    private boolean equalsModes(final KeyboardId other) {
         return other.mElementId == mElementId
                 && other.mMode == mMode
-                && other.mWidth == mWidth
-                && other.mHeight == mHeight
-                && other.mBottomOffset == mBottomOffset
-                && other.passwordInput() == passwordInput()
-                && other.mClobberSettingsKey == mClobberSettingsKey
-                && other.mLanguageSwitchKeyEnabled == mLanguageSwitchKeyEnabled
+                && other.mThemeId == mThemeId
+                && other.mSubtype.equals(mSubtype);
+    }
+
+    private boolean equalsSettings(final KeyboardId other) {
+        return equalsEditorSettings(other) && equalsKeySettings(other);
+    }
+
+    private boolean equalsEditorSettings(final KeyboardId other) {
+        return other.passwordInput() == passwordInput()
                 && other.isMultiLine() == isMultiLine()
                 && other.imeAction() == imeAction()
-                && TextUtils.equals(other.mCustomActionLabel, mCustomActionLabel)
-                && other.navigateNext() == navigateNext()
-                && other.navigatePrevious() == navigatePrevious()
-                && other.mSubtype.equals(mSubtype)
-                && other.mThemeId == mThemeId
+                && TextUtils.equals(other.mCustomActionLabel, mCustomActionLabel);
+    }
+
+    private boolean equalsKeySettings(final KeyboardId other) {
+        return equalsNavigation(other) && equalsKeyFlags(other);
+    }
+
+    private boolean equalsNavigation(final KeyboardId other) {
+        return other.navigateNext() == navigateNext()
+                && other.navigatePrevious() == navigatePrevious();
+    }
+
+    private boolean equalsKeyFlags(final KeyboardId other) {
+        return other.mClobberSettingsKey == mClobberSettingsKey
+                && other.mLanguageSwitchKeyEnabled == mLanguageSwitchKeyEnabled
                 && other.mShowNumberRow == mShowNumberRow
                 && other.mShowMoreKeys == mShowMoreKeys;
     }
@@ -180,59 +236,53 @@ public final class KeyboardId {
 
     @Override
     public String toString() {
-        return String.format(Locale.ROOT, "[%s %s:%s %dx%d +%d %s %s%s%s%s%s%s %s]",
+        return String.format(Locale.ROOT, "[%s %s:%s %dx%d +%d %s %s%s %s]",
                 elementIdToName(mElementId),
                 mSubtype.getLocale(),
                 mSubtype.getKeyboardLayoutSet(),
                 mWidth, mHeight, mBottomOffset,
                 modeName(mMode),
                 actionName(imeAction()),
-                (navigateNext() ? " navigateNext" : ""),
-                (navigatePrevious() ? " navigatePrevious" : ""),
-                (mClobberSettingsKey ? " clobberSettingsKey" : ""),
-                (passwordInput() ? " passwordInput" : ""),
-                (mLanguageSwitchKeyEnabled ? " languageSwitchKeyEnabled" : ""),
-                (isMultiLine() ? " isMultiLine" : ""),
+                getFlagsString(),
                 KeyboardTheme.getKeyboardThemeName(mThemeId)
         );
     }
 
+    private String getFlagsString() {
+        final StringBuilder sb = new StringBuilder();
+        appendFlag(sb, navigateNext(), " navigateNext");
+        appendFlag(sb, navigatePrevious(), " navigatePrevious");
+        appendFlag(sb, mClobberSettingsKey, " clobberSettingsKey");
+        appendFlag(sb, passwordInput(), " passwordInput");
+        appendFlag(sb, mLanguageSwitchKeyEnabled, " languageSwitchKeyEnabled");
+        appendFlag(sb, isMultiLine(), " isMultiLine");
+        return sb.toString();
+    }
+
+    private static void appendFlag(final StringBuilder sb, final boolean condition, final String flagName) {
+        if (condition) {
+            sb.append(flagName);
+        }
+    }
+
     public static boolean equivalentEditorInfoForKeyboard(final EditorInfo a, final EditorInfo b) {
-        if (a == null && b == null) return true;
+        if (a == b) return true;
         if (a == null || b == null) return false;
+        return hasSameEditorOptions(a, b);
+    }
+
+    private static boolean hasSameEditorOptions(final EditorInfo a, final EditorInfo b) {
         return a.inputType == b.inputType
                 && a.imeOptions == b.imeOptions
                 && TextUtils.equals(a.privateImeOptions, b.privateImeOptions);
     }
 
     public static String elementIdToName(final int elementId) {
-        switch (elementId) {
-        case ELEMENT_ALPHABET: return "alphabet";
-        case ELEMENT_ALPHABET_MANUAL_SHIFTED: return "alphabetManualShifted";
-        case ELEMENT_ALPHABET_AUTOMATIC_SHIFTED: return "alphabetAutomaticShifted";
-        case ELEMENT_ALPHABET_SHIFT_LOCKED: return "alphabetShiftLocked";
-        case ELEMENT_SYMBOLS: return "symbols";
-        case ELEMENT_SYMBOLS_SHIFTED: return "symbolsShifted";
-        case ELEMENT_PHONE: return "phone";
-        case ELEMENT_PHONE_SYMBOLS: return "phoneSymbols";
-        case ELEMENT_NUMBER: return "number";
-        default: return null;
-        }
+        return ELEMENT_ID_TO_NAME.get(elementId);
     }
 
     public static String modeName(final int mode) {
-        switch (mode) {
-        case MODE_TEXT: return "text";
-        case MODE_URL: return "url";
-        case MODE_EMAIL: return "email";
-        case MODE_IM: return "im";
-        case MODE_PHONE: return "phone";
-        case MODE_NUMBER: return "number";
-        case MODE_DATE: return "date";
-        case MODE_TIME: return "time";
-        case MODE_DATETIME: return "datetime";
-        default: return null;
-        }
+        return MODE_TO_NAME.get(mode);
     }
 
     public static String actionName(final int actionId) {

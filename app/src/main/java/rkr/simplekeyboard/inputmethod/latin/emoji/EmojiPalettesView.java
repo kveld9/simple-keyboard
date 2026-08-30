@@ -243,12 +243,13 @@ public class EmojiPalettesView extends LinearLayout {
 
     public void reloadRecentEmojis() {
         loadRecentEmojis(getContext());
-        if (mCurrentCategoryIndex == 0) {
-            selectCategory(0);
-        }
+        selectCategory(mCurrentCategoryIndex);
     }
 
     public void selectCategory(int index) {
+        if (index < 0 || index >= EmojiData.CATEGORY_ICONS.length) {
+            index = 1;
+        }
         mCurrentCategoryIndex = index;
         for (int i = 0; i < mCategoryTabViews.size(); i++) {
             TextView tab = mCategoryTabViews.get(i);
@@ -269,6 +270,7 @@ public class EmojiPalettesView extends LinearLayout {
 
         mGridAdapter.setItems(items);
         mEmojiGridView.setSelection(0);
+        mEmojiGridView.invalidateViews();
     }
 
     private void loadRecentEmojis(Context context) {
@@ -329,9 +331,6 @@ public class EmojiPalettesView extends LinearLayout {
 
     public void deallocateMemory() {
         mRecentEmojis.clear();
-        if (mGridAdapter != null) {
-            mGridAdapter.setItems(new ArrayList<>());
-        }
     }
 
     private static class EmojiGridAdapter extends BaseAdapter {

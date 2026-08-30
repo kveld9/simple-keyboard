@@ -47,8 +47,6 @@ public class Event {
     final private static int FLAG_NONE = 0;
     // This event is coming from a key repeat, software or hardware.
     final private static int FLAG_REPEAT = 0x2;
-    // This event has already been consumed.
-    final private static int FLAG_CONSUMED = 0x4;
 
     final private int mEventType; // The type of event - one of the constants above
     // The code point associated with the event, if relevant. This is a unicode code point, and
@@ -73,12 +71,9 @@ public class Event {
     // Some flags that can't go into the key code. It's a bit field of FLAG_*
     final private int mFlags;
 
-    // The next event, if any. Null if there is no next event yet.
-    final public Event mNextEvent;
-
     // This method is private - to create a new event, use one of the create* utility methods.
     private Event(final int type, final CharSequence text, final int codePoint, final int keyCode,
-            final int x, final int y, final int flags, final Event next) {
+            final int x, final int y, final int flags) {
         mEventType = type;
         mText = text;
         mCodePoint = codePoint;
@@ -86,13 +81,12 @@ public class Event {
         mX = x;
         mY = y;
         mFlags = flags;
-        mNextEvent = next;
     }
 
     public static Event createSoftwareKeypressEvent(final int codePoint, final int keyCode,
             final int x, final int y, final boolean isKeyRepeat) {
         return new Event(EVENT_TYPE_INPUT_KEYPRESS, null, codePoint, keyCode, x, y,
-                isKeyRepeat ? FLAG_REPEAT : FLAG_NONE, null);
+                isKeyRepeat ? FLAG_REPEAT : FLAG_NONE);
     }
 
     /**
@@ -107,7 +101,7 @@ public class Event {
         return new Event(EVENT_TYPE_SOFTWARE_GENERATED_STRING, text, NOT_A_CODE_POINT, keyCode,
                 rkr.simplekeyboard.inputmethod.latin.common.Constants.NOT_A_COORDINATE,
                 rkr.simplekeyboard.inputmethod.latin.common.Constants.NOT_A_COORDINATE,
-                FLAG_NONE, null /* next */);
+                FLAG_NONE);
     }
 
     // Returns whether this is a function key like backspace, ctrl, settings... as opposed to keys
@@ -121,12 +115,7 @@ public class Event {
         return 0 != (FLAG_REPEAT & mFlags);
     }
 
-    public boolean isConsumed() { return 0 != (FLAG_CONSUMED & mFlags); }
-
     public CharSequence getTextToCommit() {
-        if (isConsumed()) {
-            return ""; // A consumed event should input no text.
-        }
         switch (mEventType) {
         case EVENT_TYPE_INPUT_KEYPRESS:
             return StringUtils.newSingleCodePointString(mCodePoint);

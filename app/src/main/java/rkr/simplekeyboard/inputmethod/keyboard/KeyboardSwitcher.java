@@ -36,6 +36,7 @@ import rkr.simplekeyboard.inputmethod.keyboard.internal.KeyboardTextsSet;
 import rkr.simplekeyboard.inputmethod.latin.InputView;
 import rkr.simplekeyboard.inputmethod.latin.LatinIME;
 import rkr.simplekeyboard.inputmethod.latin.RichInputMethodManager;
+import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 import rkr.simplekeyboard.inputmethod.latin.utils.CapsModeUtils;
@@ -169,14 +170,34 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         return null;
     }
 
+    private int getCurrentAutoCapsState() {
+        return mLatinIME != null ? mLatinIME.getCurrentAutoCapsState() : Constants.TextUtils.CAP_MODE_OFF;
+    }
+
+    private int getCurrentRecapitalizeState() {
+        return mLatinIME != null ? mLatinIME.getCurrentRecapitalizeState() : RecapitalizeStatus.NOT_A_RECAPITALIZE_MODE;
+    }
+
+    public void onPressKey(final int primaryCode, final boolean isSinglePointer) {
+        onPressKey(primaryCode, isSinglePointer, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
     public void onPressKey(final int code, final boolean isSinglePointer,
             final int currentAutoCapsState, final int currentRecapitalizeState) {
         mState.onPressKey(code, isSinglePointer, currentAutoCapsState, currentRecapitalizeState);
     }
 
+    public void onReleaseKey(final int primaryCode, final boolean withSliding) {
+        onReleaseKey(primaryCode, withSliding, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
     public void onReleaseKey(final int code, final boolean withSliding,
             final int currentAutoCapsState, final int currentRecapitalizeState) {
         mState.onReleaseKey(code, withSliding, currentAutoCapsState, currentRecapitalizeState);
+    }
+
+    public void onFinishSlidingInput() {
+        onFinishSlidingInput(getCurrentAutoCapsState(), getCurrentRecapitalizeState());
     }
 
     public void onFinishSlidingInput(final int currentAutoCapsState,
@@ -280,6 +301,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         return KeyboardSwitchState.OTHER;
     }
 
+    public void requestUpdatingShiftState() {
+        requestUpdatingShiftState(getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
     // Future method for requesting an updating to the shift state.
     @Override
     public void requestUpdatingShiftState(final int autoCapsFlags, final int recapitalizeMode) {
@@ -328,6 +353,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     /**
      * Updates state machine to figure out when to automatically switch back to the previous mode.
      */
+    public void onEvent(final Event event) {
+        onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+    }
+
     public void onEvent(final Event event, final int currentAutoCapsState,
             final int currentRecapitalizeState) {
         mState.onEvent(event, currentAutoCapsState, currentRecapitalizeState);

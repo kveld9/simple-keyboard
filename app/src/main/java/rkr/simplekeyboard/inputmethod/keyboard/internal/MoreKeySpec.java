@@ -112,7 +112,7 @@ public final class MoreKeySpec {
                 : KeyboardIconsSet.PREFIX_ICON + KeyboardIconsSet.getIconName(mIconId));
         final String output = (mCode == Constants.CODE_OUTPUT_TEXT ? mOutputText
                 : Constants.printableCode(mCode));
-        if (StringUtils.codePointCount(label) == 1 && label.codePointAt(0) == mCode) {
+        if (StringUtils.getSingleCodePoint(label, Constants.CODE_UNSPECIFIED) == mCode) {
             return output;
         }
         return label + "|" + output;
@@ -289,7 +289,7 @@ public final class MoreKeySpec {
             // Append remained additional more keys to the tail of more keys.
             out = CollectionUtils.arrayAsList(moreKeys, 0, moreKeysCount);
             for (int i = additionalIndex; i < additionalCount; i++) {
-                out.add(additionalMoreKeys[additionalIndex]);
+                out.add(additionalMoreKeys[i]);
             }
         }
         if (out == null && moreKeysCount > 0) {

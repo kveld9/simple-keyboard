@@ -11,6 +11,10 @@ public class SpatialCandidate implements Comparable<SpatialCandidate> {
         this.logProb = logProb;
     }
 
+    public static SpatialCandidate exact(final int codePoint) {
+        return new SpatialCandidate((char) codePoint, 1.0f, 0.0f);
+    }
+
     @Override
     public int compareTo(SpatialCandidate other) {
         // Sort descending by probability

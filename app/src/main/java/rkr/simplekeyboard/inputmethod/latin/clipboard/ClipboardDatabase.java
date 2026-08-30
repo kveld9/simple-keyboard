@@ -10,6 +10,7 @@ import android.util.Log;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class ClipboardDatabase extends SQLiteOpenHelper {
     private static final String TAG = "ClipboardDatabase";
@@ -126,6 +127,30 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         }
     }
 
+    private int deleteClipsAndFiles(final SQLiteDatabase db, final String whereClause, final String[] whereArgs) {
+        if (db == null) {
+            return 0;
+        }
+        Cursor c = null;
+        try {
+            c = db.query(TABLE_NAME, new String[]{COL_URI}, whereClause, whereArgs, null, null, null);
+            if (c != null) {
+                while (c.moveToNext()) {
+                    deleteCachedFileIfPresent(c.getString(0));
+                }
+            }
+        } catch (Throwable e) {
+            Log.e(TAG, "Error querying clips for deletion", e);
+        } finally {
+            if (c != null) {
+                try {
+                    c.close();
+                } catch (Throwable ignored) {}
+            }
+        }
+        return db.delete(TABLE_NAME, whereClause, whereArgs);
+    }
+
     public synchronized void deleteExpiredClips(long retentionMinutes) {
         if (retentionMinutes <= 0) {
             return; // Never / Unlimited
@@ -134,16 +159,8 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         try {
             db = getWritableDatabase();
             db.beginTransaction();
-            long cutoffTimestamp = System.currentTimeMillis() - (retentionMinutes * 60 * 1000L);
-            Cursor c = db.query(TABLE_NAME, new String[]{COL_URI}, COL_PINNED + "=0 AND " + COL_TIMESTAMP + " < ?",
-                    new String[]{String.valueOf(cutoffTimestamp)}, null, null, null);
-            if (c != null) {
-                while (c.moveToNext()) {
-                    deleteCachedFileIfPresent(c.getString(0));
-                }
-                c.close();
-            }
-            db.delete(TABLE_NAME, COL_PINNED + "=0 AND " + COL_TIMESTAMP + " < ?",
+            long cutoffTimestamp = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(retentionMinutes);
+            deleteClipsAndFiles(db, COL_PINNED + "=0 AND " + COL_TIMESTAMP + " < ?",
                     new String[]{String.valueOf(cutoffTimestamp)});
             db.setTransactionSuccessful();
         } catch (Throwable e) {
@@ -161,16 +178,7 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         try {
             String subquery = "SELECT " + COL_ID + " FROM " + TABLE_NAME
                     + " WHERE " + COL_PINNED + "=0 ORDER BY " + COL_TIMESTAMP + " DESC LIMIT " + MAX_CLIPS;
-            Cursor c = db.query(TABLE_NAME, new String[]{COL_URI}, COL_PINNED + "=0 AND " + COL_ID + " NOT IN (" + subquery + ")",
-                    null, null, null, null);
-            if (c != null) {
-                while (c.moveToNext()) {
-                    deleteCachedFileIfPresent(c.getString(0));
-                }
-                c.close();
-            }
-            db.execSQL("DELETE FROM " + TABLE_NAME + " WHERE " + COL_PINNED + "=0 AND "
-                    + COL_ID + " NOT IN (" + subquery + ")");
+            deleteClipsAndFiles(db, COL_PINNED + "=0 AND " + COL_ID + " NOT IN (" + subquery + ")", null);
         } catch (Throwable e) {
             Log.e(TAG, "Error cleaning up old clips", e);
         }
@@ -179,15 +187,7 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     public synchronized void deleteClip(long id) {
         try {
             SQLiteDatabase db = getWritableDatabase();
-            Cursor c = db.query(TABLE_NAME, new String[]{COL_URI}, COL_ID + "=?",
-                    new String[]{String.valueOf(id)}, null, null, null);
-            if (c != null) {
-                if (c.moveToFirst()) {
-                    deleteCachedFileIfPresent(c.getString(0));
-                }
-                c.close();
-            }
-            db.delete(TABLE_NAME, COL_ID + "=?", new String[]{String.valueOf(id)});
+            deleteClipsAndFiles(db, COL_ID + "=?", new String[]{String.valueOf(id)});
         } catch (Throwable e) {
             Log.e(TAG, "Error deleting clip", e);
         }
@@ -207,15 +207,7 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     public synchronized void clearUnpinned() {
         try {
             SQLiteDatabase db = getWritableDatabase();
-            Cursor c = db.query(TABLE_NAME, new String[]{COL_URI}, COL_PINNED + "=0",
-                    null, null, null, null);
-            if (c != null) {
-                while (c.moveToNext()) {
-                    deleteCachedFileIfPresent(c.getString(0));
-                }
-                c.close();
-            }
-            db.delete(TABLE_NAME, COL_PINNED + "=0", null);
+            deleteClipsAndFiles(db, COL_PINNED + "=0", null);
         } catch (Throwable e) {
             Log.e(TAG, "Error clearing unpinned clips", e);
         }
@@ -230,18 +222,11 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
                     COL_PINNED + " DESC, " + COL_TIMESTAMP + " DESC");
 
             if (cursor != null && cursor.moveToFirst()) {
-                int idCol = cursor.getColumnIndexOrThrow(COL_ID);
-                int textCol = cursor.getColumnIndexOrThrow(COL_TEXT);
-                int timeCol = cursor.getColumnIndexOrThrow(COL_TIMESTAMP);
-                int pinCol = cursor.getColumnIndexOrThrow(COL_PINNED);
-                int uriCol = cursor.getColumnIndex(COL_URI);
                 do {
-                    long id = cursor.getLong(idCol);
-                    String text = cursor.getString(textCol);
-                    long timestamp = cursor.getLong(timeCol);
-                    boolean isPinned = cursor.getInt(pinCol) == 1;
-                    String uri = (uriCol != -1 && !cursor.isNull(uriCol)) ? cursor.getString(uriCol) : null;
-                    clips.add(new ClipboardHistoryEntry(id, text, timestamp, isPinned, uri));
+                    ClipboardHistoryEntry entry = ClipboardHistoryEntry.fromCursor(cursor);
+                    if (entry != null) {
+                        clips.add(entry);
+                    }
                 } while (cursor.moveToNext());
             }
         } catch (Throwable e) {

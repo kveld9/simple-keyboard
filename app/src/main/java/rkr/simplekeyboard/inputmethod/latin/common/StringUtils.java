@@ -17,8 +17,6 @@
 
 package rkr.simplekeyboard.inputmethod.latin.common;
 
-import android.text.TextUtils;
-
 import java.util.Arrays;
 import java.util.Locale;
 
@@ -28,10 +26,14 @@ public final class StringUtils {
     }
 
     public static int codePointCount(final CharSequence text) {
-        if (TextUtils.isEmpty(text)) {
+        if (text == null || text.length() == 0) {
             return 0;
         }
         return Character.codePointCount(text, 0, text.length());
+    }
+
+    public static int getSingleCodePoint(final CharSequence text, final int defaultCode) {
+        return codePointCount(text) == 1 ? Character.codePointAt(text, 0) : defaultCode;
     }
 
     public static String newSingleCodePointString(final int codePoint) {
@@ -255,8 +257,7 @@ public final class StringUtils {
         }
         final String label = newSingleCodePointString(code);
         final String titleCaseLabel = toTitleCaseOfKeyLabel(label, locale);
-        return codePointCount(titleCaseLabel) == 1
-                ? titleCaseLabel.codePointAt(0) : Constants.CODE_UNSPECIFIED;
+        return getSingleCodePoint(titleCaseLabel, Constants.CODE_UNSPECIFIED);
     }
 
     private static final char[] ACCENT_MAP = new char[512];

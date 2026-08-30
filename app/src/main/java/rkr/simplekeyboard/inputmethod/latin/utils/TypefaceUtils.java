@@ -74,9 +74,7 @@ public final class TypefaceUtils {
         final int labelSize = (int)paint.getTextSize();
         final Typeface face = paint.getTypeface();
         final int codePointOffset = referenceChar << 15;
-        if (face == Typeface.DEFAULT) {
-            return codePointOffset + labelSize;
-        } else if (face == Typeface.DEFAULT_BOLD) {
+        if (face == Typeface.DEFAULT_BOLD) {
             return codePointOffset + labelSize + 0x1000;
         } else if (face == Typeface.MONOSPACE) {
             return codePointOffset + labelSize + 0x2000;
@@ -99,5 +97,22 @@ public final class TypefaceUtils {
 
     public static float getStringWidth(final String string, final Paint paint) {
         return paint.measureText(string);
+    }
+
+    public static float computeScaleX(final String text, final Paint paint, final float maxWidth) {
+        return computeScaleX(text, paint, maxWidth, 0.0f);
+    }
+
+    public static float computeScaleX(final String text, final Paint paint,
+            final float maxWidth, final float minScaleX) {
+        if (text == null || text.isEmpty() || maxWidth <= 0.0f) {
+            return 1.0f;
+        }
+        final float textWidth = getStringWidth(text, paint);
+        if (textWidth <= maxWidth || textWidth <= 0.0f) {
+            return 1.0f;
+        }
+        final float scaleX = maxWidth / textWidth;
+        return Math.max(minScaleX, scaleX);
     }
 }

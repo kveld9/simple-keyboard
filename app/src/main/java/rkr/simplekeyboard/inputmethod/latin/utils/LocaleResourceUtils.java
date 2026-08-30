@@ -117,6 +117,13 @@ public final class LocaleResourceUtils {
         return getLocaleDisplayNameInternal(localeString, displayLocale);
     }
 
+    private static String resolveLanguageString(final String localeString) {
+        if (sExceptionalLocaleDisplayedInRootLocale.containsKey(localeString)) {
+            return localeString;
+        }
+        return LocaleUtils.constructLocaleFromString(localeString).getLanguage();
+    }
+
     /**
      * Get the display name of the language in the system's locale.
      * For example in an English system, en_US: "English", fr_CA: "French"
@@ -126,13 +133,7 @@ public final class LocaleResourceUtils {
     public static String getLanguageDisplayNameInSystemLocale(
             final String localeString) {
         final Locale displayLocale = sResources.getConfiguration().locale;
-        final String languageString;
-        if (sExceptionalLocaleDisplayedInRootLocale.containsKey(localeString)) {
-            languageString = localeString;
-        } else {
-            languageString = LocaleUtils.constructLocaleFromString(localeString).getLanguage();
-        }
-        return getLocaleDisplayNameInternal(languageString, displayLocale);
+        return getLocaleDisplayNameInternal(resolveLanguageString(localeString), displayLocale);
     }
 
     /**
@@ -143,13 +144,7 @@ public final class LocaleResourceUtils {
      */
     public static String getLanguageDisplayNameInLocale(final String localeString) {
         final Locale displayLocale = getDisplayLocale(localeString);
-        final String languageString;
-        if (sExceptionalLocaleDisplayedInRootLocale.containsKey(localeString)) {
-            languageString = localeString;
-        } else {
-            languageString = LocaleUtils.constructLocaleFromString(localeString).getLanguage();
-        }
-        return getLocaleDisplayNameInternal(languageString, displayLocale);
+        return getLocaleDisplayNameInternal(resolveLanguageString(localeString), displayLocale);
     }
 
     private static String getLocaleDisplayNameInternal(final String localeString,

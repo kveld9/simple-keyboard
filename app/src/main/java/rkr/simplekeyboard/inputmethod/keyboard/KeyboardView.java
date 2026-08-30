@@ -407,8 +407,8 @@ public class KeyboardView extends View {
                 paint.setTextAlign(Align.CENTER);
             }
             if (key.needsAutoXScale()) {
-                final float ratio = Math.min(1.0f, (keyWidth * MAX_LABEL_RATIO) /
-                        TypefaceUtils.getStringWidth(label, paint));
+                final float ratio = TypefaceUtils.computeScaleX(
+                        label, paint, keyWidth * MAX_LABEL_RATIO, 0.0f);
                 if (key.needsAutoScale()) {
                     final float autoSize = paint.getTextSize() * ratio;
                     paint.setTextSize(autoSize);

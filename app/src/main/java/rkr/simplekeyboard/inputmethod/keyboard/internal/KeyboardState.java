@@ -176,11 +176,7 @@ public final class KeyboardState {
         }
         if (mIsAlphabetMode) {
             mPrevMainKeyboardWasShiftLocked = mAlphabetShiftState.isShiftLocked();
-            if (mPrevSymbolsKeyboardWasShifted) {
-                setSymbolsShiftedKeyboard();
-            } else {
-                setSymbolsKeyboard();
-            }
+            setSymbolsKeyboard(mPrevSymbolsKeyboardWasShifted);
             mPrevSymbolsKeyboardWasShifted = false;
         } else {
             mPrevSymbolsKeyboardWasShifted = mIsSymbolShifted;
@@ -193,11 +189,7 @@ public final class KeyboardState {
     }
 
     private void toggleShiftInSymbols() {
-        if (mIsSymbolShifted) {
-            setSymbolsKeyboard();
-        } else {
-            setSymbolsShiftedKeyboard();
-        }
+        setSymbolsKeyboard(!mIsSymbolShifted);
     }
 
     private void setAlphabetKeyboard(final int autoCapsFlags, final int recapitalizeMode) {
@@ -213,26 +205,17 @@ public final class KeyboardState {
         mSwitchActions.requestUpdatingShiftState(autoCapsFlags, recapitalizeMode);
     }
 
-    private void setSymbolsKeyboard() {
+    private void setSymbolsKeyboard(final boolean isShifted) {
         if (DEBUG_INTERNAL_ACTION) {
-            Log.d(TAG, "setSymbolsKeyboard");
+            Log.d(TAG, isShifted ? "setSymbolsShiftedKeyboard" : "setSymbolsKeyboard");
         }
-        mSwitchActions.setSymbolsKeyboard();
-        mIsAlphabetMode = false;
-        mIsSymbolShifted = false;
-        mRecapitalizeMode = RecapitalizeStatus.NOT_A_RECAPITALIZE_MODE;
-        // Reset alphabet shift state.
-        mAlphabetShiftState.setShiftLocked(false);
-        mSwitchState = SWITCH_STATE_SYMBOL_BEGIN;
-    }
-
-    private void setSymbolsShiftedKeyboard() {
-        if (DEBUG_INTERNAL_ACTION) {
-            Log.d(TAG, "setSymbolsShiftedKeyboard");
+        if (isShifted) {
+            mSwitchActions.setSymbolsShiftedKeyboard();
+        } else {
+            mSwitchActions.setSymbolsKeyboard();
         }
-        mSwitchActions.setSymbolsShiftedKeyboard();
         mIsAlphabetMode = false;
-        mIsSymbolShifted = true;
+        mIsSymbolShifted = isShifted;
         mRecapitalizeMode = RecapitalizeStatus.NOT_A_RECAPITALIZE_MODE;
         // Reset alphabet shift state.
         mAlphabetShiftState.setShiftLocked(false);

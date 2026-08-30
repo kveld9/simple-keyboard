@@ -22,9 +22,9 @@ package rkr.simplekeyboard.inputmethod.latin.utils;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
-import android.graphics.Color;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
+import androidx.core.graphics.ColorUtils;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
@@ -108,26 +108,17 @@ public final class ResourceUtils {
 
     public static float getDimensionOrFraction(final TypedArray a, final int index, final int base,
             final float defValue) {
-        final TypedValue value = a.peekValue(index);
-        if (value == null) {
-            return defValue;
-        }
-        if (isFractionValue(value)) {
-            return a.getFraction(index, base, base, defValue);
-        } else if (isDimensionValue(value)) {
-            return a.getDimension(index, defValue);
-        }
-        return defValue;
+        return getDimensionOrFraction(a, index, (float) base, defValue);
     }
 
     public static float getDimensionOrFraction(final TypedArray a, final int index,
-                                               final float base, final float defValue) {
+            final float base, final float defValue) {
         final TypedValue value = a.peekValue(index);
         if (value == null) {
             return defValue;
         }
         if (isFractionValue(value)) {
-            return value.getFraction(index, base);
+            return value.getFraction(base, base);
         } else if (isDimensionValue(value)) {
             return a.getDimension(index, defValue);
         }
@@ -162,16 +153,6 @@ public final class ResourceUtils {
     }
 
     public static boolean isBrightColor(int color) {
-        if (android.R.color.transparent == color) {
-            return true;
-        }
-        // See http://www.nbdtech.com/Blog/archive/2008/04/27/Calculating-the-Perceived-Brightness-of-a-Color.aspx
-        boolean bright = false;
-        int[] rgb = {Color.red(color), Color.green(color), Color.blue(color)};
-        int brightness = (int) Math.sqrt(rgb[0] * rgb[0] * .241 + rgb[1] * rgb[1] * .691 + rgb[2] * rgb[2] * .068);
-        if (brightness >= 210) {
-            bright = true;
-        }
-        return bright;
+        return ColorUtils.calculateLuminance(color) >= 0.5f;
     }
 }

@@ -310,7 +310,6 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         }
 
         locatePreviewPlacerView();
-        getLocationInWindow(mOriginCoords);
         final int backgroundColor = Color.TRANSPARENT;
         final float cornerRadius = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getCornerRadius(getContext(), mKeyShape);
         mKeyPreviewChoreographer.placeAndShowKeyPreview(key, keyboard.mIconsSet, getKeyDrawParams(),
@@ -553,7 +552,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
             return true;
         }
 
-        final float scaleX = maxTextWidth / textWidth;
+        final float scaleX = TypefaceUtils.computeScaleX(text, paint, maxTextWidth, 0.0f);
         if (scaleX < MINIMUM_XSCALE_OF_LANGUAGE_NAME) {
             return false;
         }

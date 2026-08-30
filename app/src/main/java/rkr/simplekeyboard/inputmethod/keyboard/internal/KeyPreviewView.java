@@ -22,8 +22,6 @@ import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.text.TextPaint;
-import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -32,6 +30,8 @@ import androidx.appcompat.widget.AppCompatTextView;
 import java.util.HashSet;
 
 import rkr.simplekeyboard.inputmethod.keyboard.Key;
+import rkr.simplekeyboard.inputmethod.latin.utils.TypefaceUtils;
+import rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils;
 
 /**
  * The pop up key preview view.
@@ -66,17 +66,13 @@ public class KeyPreviewView extends AppCompatTextView {
         // TODO Should take care of temporaryShiftLabel here.
         setTextAndScaleX(key.getPreviewLabel());
         setColor(backgroundColor);
-
-        final Drawable background = getBackground();
-        if (background instanceof android.graphics.drawable.GradientDrawable) {
-            ((android.graphics.drawable.GradientDrawable) background.mutate()).setCornerRadius(cornerRadius);
-        }
+        ViewUtils.setGradientCornerRadius(this, cornerRadius);
     }
 
     private void setTextAndScaleX(final String text) {
         setTextScaleX(1.0f);
         setText(text);
-        if (sNoScaleXTextSet.contains(text)) {
+        if (text == null || sNoScaleXTextSet.contains(text)) {
             return;
         }
         // TODO: Override {@link #setBackground(Drawable)} that is supported from API 16 and
@@ -88,12 +84,12 @@ public class KeyPreviewView extends AppCompatTextView {
         background.getPadding(mBackgroundPadding);
         final int maxWidth = background.getIntrinsicWidth() - mBackgroundPadding.left
                 - mBackgroundPadding.right;
-        final float width = getTextWidth(text, getPaint());
-        if (width <= maxWidth) {
+        final float scaleX = TypefaceUtils.computeScaleX(text, getPaint(), maxWidth, 0.0f);
+        if (scaleX >= 1.0f) {
             sNoScaleXTextSet.add(text);
             return;
         }
-        setTextScaleX(maxWidth / width);
+        setTextScaleX(scaleX);
     }
 
     private void setColor(final int backgroundColor) {
@@ -108,19 +104,5 @@ public class KeyPreviewView extends AppCompatTextView {
 
     public static void clearTextCache() {
         sNoScaleXTextSet.clear();
-    }
-
-    private static float getTextWidth(final String text, final TextPaint paint) {
-        if (TextUtils.isEmpty(text)) {
-            return 0.0f;
-        }
-        final int len = text.length();
-        final float[] widths = new float[len];
-        final int count = paint.getTextWidths(text, 0, len, widths);
-        float width = 0;
-        for (int i = 0; i < count; i++) {
-            width += widths[i];
-        }
-        return width;
     }
 }

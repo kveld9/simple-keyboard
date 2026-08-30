@@ -107,4 +107,16 @@ public class BeamSearchDecoderTest {
         decoder.onBackspace();
         assertNotNull(decoder.getSuggestions("h", 3, ""));
     }
+
+    @Test
+    public void testBestCorrectionThreshold() {
+        decoder.onTouch(10.0f, 10.0f, 's');
+        // If threshold is very high, it should return null
+        assertNull(decoder.getBestCorrection("s", 100.0f, ""));
+        
+        // If threshold is reasonable and best correction differs from typedWord, it returns the correction
+        // In our mock, if typed "x", best terminal hypothesis might be returned if score >= threshold
+        String correction = decoder.getBestCorrection("x", 0.5f, "");
+        assertNotNull(correction);
+    }
 }

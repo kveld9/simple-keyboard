@@ -118,33 +118,36 @@ public final class AudioAndHapticFeedbackManager {
         });
     }
 
-    public void performHapticFeedback(final View viewToPerformHapticFeedbackOn) {
-        if (!mSettingsValues.mVibrateOn || mVibrator == null) {
+    private void vibratePredefined(final int effectId, final View fallbackView) {
+        if (mSettingsValues == null || !mSettingsValues.mVibrateOn || mVibrator == null) {
             return;
         }
         mBackgroundThread.execute(() -> {
             if (BuildCompatUtils.isAtLeastQ()) {
-                mVibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK));
-            } else if (viewToPerformHapticFeedbackOn != null) {
-                viewToPerformHapticFeedbackOn.performHapticFeedback(
+                mVibrator.vibrate(VibrationEffect.createPredefined(effectId));
+            } else if (fallbackView != null) {
+                fallbackView.performHapticFeedback(
                         HapticFeedbackConstants.KEYBOARD_TAP,
                         HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
             }
         });
     }
 
+    public void performHapticFeedback(final View viewToPerformHapticFeedbackOn) {
+        vibratePredefined(VibrationEffect.EFFECT_CLICK, viewToPerformHapticFeedbackOn);
+    }
+
     public void performTickFeedback() {
-        if (!mSettingsValues.mVibrateOn
+        if (mSettingsValues == null
+                || !mSettingsValues.mVibrateOn
                 || mVibrator == null
-                || System.currentTimeMillis() - mLastTickTime < TICK_FREQUENCY ) {
+                || System.currentTimeMillis() - mLastTickTime < TICK_FREQUENCY) {
             return;
         }
 
         if (BuildCompatUtils.isAtLeastQ()) {
             mLastTickTime = System.currentTimeMillis();
-            mBackgroundThread.execute(() -> {
-                mVibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK));
-            });
+            vibratePredefined(VibrationEffect.EFFECT_TICK, null);
         }
     }
 

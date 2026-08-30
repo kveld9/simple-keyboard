@@ -386,6 +386,24 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
         }
     }
 
+    private static final class KeyStyleAndAttrs {
+        public final KeyStyle mKeyStyle;
+        public final TypedArray mKeyAttr;
+
+        public KeyStyleAndAttrs(final KeyStyle keyStyle, final TypedArray keyAttr) {
+            mKeyStyle = keyStyle;
+            mKeyAttr = keyAttr;
+        }
+    }
+
+    private KeyStyleAndAttrs obtainKeyStyleAndAttrs(final XmlPullParser parser)
+            throws XmlParseUtils.ParseException {
+        final TypedArray keyAttr = mResources.obtainAttributes(
+                Xml.asAttributeSet(parser), R.styleable.Keyboard_Key);
+        final KeyStyle keyStyle = mParams.mKeyStyles.getKeyStyle(keyAttr, parser);
+        return new KeyStyleAndAttrs(keyStyle, keyAttr);
+    }
+
     private void parseKey(final XmlPullParser parser, final KeyboardRow row, final boolean skip)
             throws XmlPullParserException, IOException {
         if (skip) {
@@ -393,9 +411,9 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
             if (DEBUG) startEndTag("<%s /> skipped", TAG_KEY);
             return;
         }
-        final TypedArray keyAttr = mResources.obtainAttributes(
-                Xml.asAttributeSet(parser), R.styleable.Keyboard_Key);
-        final KeyStyle keyStyle = mParams.mKeyStyles.getKeyStyle(keyAttr, parser);
+        final KeyStyleAndAttrs styleAndAttrs = obtainKeyStyleAndAttrs(parser);
+        final TypedArray keyAttr = styleAndAttrs.mKeyAttr;
+        final KeyStyle keyStyle = styleAndAttrs.mKeyStyle;
         final String keySpec = keyStyle.getString(keyAttr, R.styleable.Keyboard_Key_keySpec);
         if (TextUtils.isEmpty(keySpec)) {
             throw new ParseException("Empty keySpec", parser);
@@ -416,9 +434,9 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
             if (DEBUG) startEndTag("<%s /> skipped", TAG_SPACER);
             return;
         }
-        final TypedArray keyAttr = mResources.obtainAttributes(
-                Xml.asAttributeSet(parser), R.styleable.Keyboard_Key);
-        final KeyStyle keyStyle = mParams.mKeyStyles.getKeyStyle(keyAttr, parser);
+        final KeyStyleAndAttrs styleAndAttrs = obtainKeyStyleAndAttrs(parser);
+        final TypedArray keyAttr = styleAndAttrs.mKeyAttr;
+        final KeyStyle keyStyle = styleAndAttrs.mKeyStyle;
         final Key spacer = new Key.Spacer(keyAttr, keyStyle, mParams, row);
         keyAttr.recycle();
         if (DEBUG) startEndTag("<%s />", TAG_SPACER);

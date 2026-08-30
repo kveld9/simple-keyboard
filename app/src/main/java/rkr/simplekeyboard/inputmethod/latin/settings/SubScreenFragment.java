@@ -23,15 +23,10 @@ import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
-
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceScreen;
-import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.Set;
 
@@ -41,9 +36,8 @@ import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
  * A base abstract class for a {@link PreferenceFragmentCompat} that implements a nested
  * {@link PreferenceScreen} of the main preference screen.
  */
-public abstract class SubScreenFragment extends PreferenceFragmentCompat
+public abstract class SubScreenFragment extends BasePreferenceFragment
         implements OnSharedPreferenceChangeListener {
-    private OnSharedPreferenceChangeListener mSharedPreferenceChangeListener;
 
     static void removePreference(final String prefKey, final PreferenceScreen screen) {
         if (screen == null) return;
@@ -79,28 +73,6 @@ public abstract class SubScreenFragment extends PreferenceFragmentCompat
                     }
                 }
             }
-        }
-    }
-
-    @Override
-    public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
-        getPreferenceManager().setStorageDeviceProtected();
-    }
-
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        setDivider(null);
-        setDividerHeight(0);
-
-        RecyclerView recyclerView = getListView();
-        if (recyclerView != null) {
-            recyclerView.setItemAnimator(null);
-            recyclerView.setClipToPadding(false);
-            recyclerView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
-            float density = getResources().getDisplayMetrics().density;
-            int paddingBottom = (int) (16 * density);
-            recyclerView.setPadding(0, 0, 0, paddingBottom);
         }
     }
 
@@ -141,34 +113,23 @@ public abstract class SubScreenFragment extends PreferenceFragmentCompat
     @Override
     public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        mSharedPreferenceChangeListener = new OnSharedPreferenceChangeListener() {
-            @Override
-            public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
-                final SubScreenFragment fragment = SubScreenFragment.this;
-                final Context context = fragment.getActivity();
-                if (context == null || fragment.getPreferenceScreen() == null) {
-                    final String tag = fragment.getClass().getSimpleName();
-                    Log.w(tag, "onSharedPreferenceChanged called before activity starts.");
-                    return;
-                }
-                new BackupManager(context).dataChanged();
-                fragment.onSharedPreferenceChanged(prefs, key);
-            }
-        };
-        getSharedPreferences().registerOnSharedPreferenceChangeListener(
-                mSharedPreferenceChangeListener);
+        getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
     }
 
     @Override
     public void onDestroy() {
-        getSharedPreferences().unregisterOnSharedPreferenceChangeListener(
-                mSharedPreferenceChangeListener);
+        getSharedPreferences().unregisterOnSharedPreferenceChangeListener(this);
         super.onDestroy();
     }
 
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
-        // This method may be overridden by an extended class.
+        final Context context = getActivity();
+        if (context == null || getPreferenceScreen() == null) {
+            final String tag = getClass().getSimpleName();
+            Log.w(tag, "onSharedPreferenceChanged called before activity starts.");
+            return;
+        }
+        new BackupManager(context).dataChanged();
     }
 }

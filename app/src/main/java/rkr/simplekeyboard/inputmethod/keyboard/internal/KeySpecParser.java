@@ -196,17 +196,14 @@ public final class KeySpecParser {
         if (outputText != null) {
             // If output text is one code point, it should be treated as a code.
             // See {@link #getOutputText(String)}.
-            if (StringUtils.codePointCount(outputText) == 1) {
-                return outputText.codePointAt(0);
-            }
-            return CODE_OUTPUT_TEXT;
+            return StringUtils.getSingleCodePoint(outputText, CODE_OUTPUT_TEXT);
         }
         final String label = getLabel(keySpec);
         if (label == null) {
             throw new KeySpecParserError("Empty label: " + keySpec);
         }
         // Code is automatically generated for one letter label.
-        return (StringUtils.codePointCount(label) == 1) ? label.codePointAt(0) : CODE_OUTPUT_TEXT;
+        return StringUtils.getSingleCodePoint(label, CODE_OUTPUT_TEXT);
     }
 
     public static int parseCode(final String text, final int defaultCode) {

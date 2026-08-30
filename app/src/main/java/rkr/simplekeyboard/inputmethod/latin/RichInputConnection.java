@@ -27,6 +27,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.os.Build;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
@@ -36,6 +37,7 @@ import android.view.inputmethod.SurroundingText;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import rkr.simplekeyboard.inputmethod.compat.BuildCompatUtils;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 import rkr.simplekeyboard.inputmethod.latin.settings.SpacingAndPunctuations;
@@ -143,7 +145,7 @@ public final class RichInputConnection {
         }
         updateSelection(editorInfo.initialSelStart, editorInfo.initialSelEnd);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (BuildCompatUtils.isAtLeastS()) {
             final SurroundingText textAroundCursor = editorInfo
                     .getInitialSurroundingText(Constants.EDITOR_CONTENTS_CACHE_SIZE, Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
             setTextAroundCursor(textAroundCursor);
@@ -169,7 +171,7 @@ public final class RichInputConnection {
             if (!isConnected()) {
                 return;
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (BuildCompatUtils.isAtLeastS()) {
                 final SurroundingText textAroundCursor =
                         mIC.getSurroundingText(Constants.EDITOR_CONTENTS_CACHE_SIZE, Constants.EDITOR_CONTENTS_CACHE_SIZE, 0);
                 if (expectedSelStart != mExpectedSelStart || expectedSelEnd != mExpectedSelEnd) {
@@ -236,6 +238,29 @@ public final class RichInputConnection {
         mTextAfterCursor = "";
     }
 
+    private void advanceExpectedSelection(final int delta) {
+        if (hasCursorPosition()) {
+            mExpectedSelStart += delta;
+            mExpectedSelEnd = mExpectedSelStart;
+        }
+    }
+
+    private static int skipWordCharactersBackwards(final CharSequence text, final int startIndex) {
+        int i = startIndex;
+        while (i >= 0 && StringUtils.isWordCharacter(text.charAt(i))) {
+            i--;
+        }
+        return i;
+    }
+
+    private static int skipSeparatorsBackwards(final CharSequence text, final int startIndex) {
+        int i = startIndex;
+        while (i >= 0 && !StringUtils.isWordCharacter(text.charAt(i))) {
+            i--;
+        }
+        return i;
+    }
+
     /**
      * Calls {@link InputConnection#commitText(CharSequence, int)}.
      *
@@ -248,10 +273,7 @@ public final class RichInputConnection {
         // TODO: the following is exceedingly error-prone. Right now when the cursor is in the
         // middle of the composing word mComposingText only holds the part of the composing text
         // that is before the cursor, so this actually works, but it's terribly confusing. Fix this.
-        if (hasCursorPosition()) {
-            mExpectedSelStart += text.length();
-            mExpectedSelEnd = mExpectedSelStart;
-        }
+        advanceExpectedSelection(text.length());
         if (isConnected()) {
             mIC.commitText(text, newCursorPosition);
         }
@@ -276,14 +298,7 @@ public final class RichInputConnection {
         if (text == null || text.isEmpty()) {
             return "";
         }
-        int i = text.length() - 1;
-        while (i >= 0) {
-            char c = text.charAt(i);
-            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
-                break;
-            }
-            i--;
-        }
+        final int i = skipWordCharactersBackwards(text, text.length() - 1);
         return text.substring(i + 1);
     }
 
@@ -304,54 +319,24 @@ public final class RichInputConnection {
         }
         int i = text.length() - 1;
         // Skip current word (if any)
-        while (i >= 0) {
-            char c = text.charAt(i);
-            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
-                break;
-            }
-            i--;
-        }
+        i = skipWordCharactersBackwards(text, i);
         // Skip whitespace/separators before w2
-        while (i >= 0) {
-            char c = text.charAt(i);
-            if (Character.isLetter(c) || c == '\'' || c == '-') {
-                break;
-            }
-            i--;
-        }
+        i = skipSeparatorsBackwards(text, i);
         if (i < 0) {
             return new String[]{"", ""};
         }
-        int end2 = i + 1;
-        while (i >= 0) {
-            char c = text.charAt(i);
-            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
-                break;
-            }
-            i--;
-        }
-        String w2 = text.substring(i + 1, end2);
+        final int end2 = i + 1;
+        i = skipWordCharactersBackwards(text, i);
+        final String w2 = text.substring(i + 1, end2);
 
         // Skip whitespace/separators before w1
-        while (i >= 0) {
-            char c = text.charAt(i);
-            if (Character.isLetter(c) || c == '\'' || c == '-') {
-                break;
-            }
-            i--;
-        }
+        i = skipSeparatorsBackwards(text, i);
         if (i < 0) {
             return new String[]{"", w2};
         }
-        int end1 = i + 1;
-        while (i >= 0) {
-            char c = text.charAt(i);
-            if (Character.isWhitespace(c) || (!Character.isLetter(c) && c != '\'' && c != '-')) {
-                break;
-            }
-            i--;
-        }
-        String w1 = text.substring(i + 1, end1);
+        final int end1 = i + 1;
+        i = skipWordCharactersBackwards(text, i);
+        final String w1 = text.substring(i + 1, end1);
         return new String[]{w1, w2};
     }
 
@@ -482,7 +467,7 @@ public final class RichInputConnection {
 
         RichInputMethodManager.getInstance().resetSubtypeCycleOrder();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        if (BuildCompatUtils.isAtLeastUpsideDownCake()) {
             mIC.replaceText(startPosition, endPosition, text, 0, null);
         } else {
             mIC.deleteSurroundingText(0, numCharsSelected);
@@ -496,8 +481,7 @@ public final class RichInputConnection {
             mTextBeforeCursor = textBeforeCursor.substring(0, textBeforeCursor.length() - numChars);
         }
         if (mExpectedSelStart >= numChars) {
-            mExpectedSelStart -= numChars;
-            mExpectedSelEnd = mExpectedSelStart;
+            advanceExpectedSelection(-numChars);
         }
 
         mIC.deleteSurroundingText(numChars, 0);
@@ -555,18 +539,12 @@ public final class RichInputConnection {
             switch (keyEvent.getKeyCode()) {
             case KeyEvent.KEYCODE_ENTER:
                 mTextBeforeCursor += "\n";
-                if (hasCursorPosition()) {
-                    mExpectedSelStart += 1;
-                    mExpectedSelEnd = mExpectedSelStart;
-                }
+                advanceExpectedSelection(1);
                 break;
             case KeyEvent.KEYCODE_UNKNOWN:
                 if (null != keyEvent.getCharacters()) {
                     mTextBeforeCursor += keyEvent.getCharacters();
-                    if (hasCursorPosition()) {
-                        mExpectedSelStart += keyEvent.getCharacters().length();
-                        mExpectedSelEnd = mExpectedSelStart;
-                    }
+                    advanceExpectedSelection(keyEvent.getCharacters().length());
                 }
                 break;
             case KeyEvent.KEYCODE_DEL:
@@ -574,10 +552,7 @@ public final class RichInputConnection {
             default:
                 final String text = StringUtils.newSingleCodePointString(keyEvent.getUnicodeChar());
                 mTextBeforeCursor += text;
-                if (hasCursorPosition()) {
-                    mExpectedSelStart += text.length();
-                    mExpectedSelEnd = mExpectedSelStart;
-                }
+                advanceExpectedSelection(text.length());
                 break;
             }
         }
@@ -651,7 +626,7 @@ public final class RichInputConnection {
             CharSequence charsBeforeCursor = rightSidePointer && hasSelection() ?
                     getSelectedText() :
                     mTextBeforeCursor;
-            if (charsBeforeCursor == null || charsBeforeCursor == "") {
+            if (TextUtils.isEmpty(charsBeforeCursor)) {
                 return chars;
             }
             for (int i = charsBeforeCursor.length() - 1; i >= 0 && chars < 0; i--, steps--) {
@@ -671,7 +646,7 @@ public final class RichInputConnection {
             CharSequence charsAfterCursor = !rightSidePointer && hasSelection() ?
                     getSelectedText() :
                     mTextAfterCursor;
-            if (charsAfterCursor == null || charsAfterCursor == "") {
+            if (TextUtils.isEmpty(charsAfterCursor)) {
                 return chars;
             }
             for (int i = 0; i < charsAfterCursor.length() && chars > 0; i++, steps++) {

@@ -159,10 +159,6 @@ public final class PrefixDictionary {
         }
     }
 
-    public static String stripAccents(final String s) {
-        return StringUtils.stripAccents(s);
-    }
-
     /**
      * Calculates the weighted Damerau-Levenshtein distance between two strings,
      * incorporating physical keyboard key proximity.
@@ -224,8 +220,8 @@ public final class PrefixDictionary {
         if (typed == null || candidate == null) {
             return 0.0f;
         }
-        final String normTyped = stripAccents(typed.toLowerCase());
-        final String normCandidate = stripAccents(candidate.toLowerCase());
+        final String normTyped = StringUtils.toNormalizedLower(typed);
+        final String normCandidate = StringUtils.toNormalizedLower(candidate);
 
         if (normTyped.equals(normCandidate)) {
             return candidateFreq + 1000.0f;
@@ -243,7 +239,7 @@ public final class PrefixDictionary {
         if (word == null || word.isEmpty()) {
             return;
         }
-        final String normalized = stripAccents(word.toLowerCase());
+        final String normalized = StringUtils.toNormalizedLower(word);
         TrieNode current = mRoot;
         for (int i = 0; i < normalized.length(); i++) {
             final char ch = normalized.charAt(i);
@@ -279,78 +275,65 @@ public final class PrefixDictionary {
         }
     }
 
-    public synchronized void setTrigram(final String w1, final String w2, final String word, final int freq) {
-        if (w1 == null || w2 == null || word == null || w1.isEmpty() || w2.isEmpty() || word.isEmpty()) {
-            return;
-        }
-        final String normW1 = stripAccents(w1.toLowerCase());
-        final String normW2 = stripAccents(w2.toLowerCase());
-        final String normWord = stripAccents(word.toLowerCase());
-        final String key = normW1 + " " + normW2;
-        Map<String, Short> nextMap = mTrigrams.get(key);
+    private void putNGram(final Map<String, Map<String, Short>> storage, final String contextKey, final String word, final int freq) {
+        final String normWord = StringUtils.toNormalizedLower(word);
+        Map<String, Short> nextMap = storage.get(contextKey);
         if (nextMap == null) {
             nextMap = new HashMap<>();
-            mTrigrams.put(key, nextMap);
+            storage.put(contextKey, nextMap);
         }
         short currentFreq = nextMap.containsKey(normWord) ? nextMap.get(normWord) : 0;
         short newFreq = (short) Math.min(Short.MAX_VALUE, currentFreq > 0 ? currentFreq + 25 : Math.max(1, freq));
         nextMap.put(normWord, newFreq);
+    }
+
+    private int getNGram(final Map<String, Map<String, Short>> storage, final String contextKey, final String word) {
+        final Map<String, Short> nextMap = storage.get(contextKey);
+        if (nextMap == null) {
+            return 0;
+        }
+        final String normWord = StringUtils.toNormalizedLower(word);
+        final Short freq = nextMap.get(normWord);
+        return freq != null ? (freq & 0xFFFF) : 0;
+    }
+
+    public synchronized void setTrigram(final String w1, final String w2, final String word, final int freq) {
+        if (w1 == null || w2 == null || word == null || w1.isEmpty() || w2.isEmpty() || word.isEmpty()) {
+            return;
+        }
+        final String contextKey = StringUtils.toNormalizedLower(w1) + " " + StringUtils.toNormalizedLower(w2);
+        putNGram(mTrigrams, contextKey, word, freq);
     }
 
     public synchronized int getTrigramFrequency(final String w1, final String w2, final String word) {
         if (w1 == null || w2 == null || word == null || w1.isEmpty() || w2.isEmpty() || word.isEmpty()) {
             return 0;
         }
-        final String normW1 = stripAccents(w1.toLowerCase());
-        final String normW2 = stripAccents(w2.toLowerCase());
-        final String normWord = stripAccents(word.toLowerCase());
-        final String key = normW1 + " " + normW2;
-        final Map<String, Short> nextMap = mTrigrams.get(key);
-        if (nextMap == null) {
-            return 0;
-        }
-        final Short freq = nextMap.get(normWord);
-        return freq != null ? (freq & 0xFFFF) : 0;
+        final String contextKey = StringUtils.toNormalizedLower(w1) + " " + StringUtils.toNormalizedLower(w2);
+        return getNGram(mTrigrams, contextKey, word);
     }
 
     public synchronized void setBigram(final String prevWord, final String word, final int freq) {
         if (prevWord == null || word == null || prevWord.isEmpty() || word.isEmpty()) {
             return;
         }
-        final String normPrev = stripAccents(prevWord.toLowerCase());
-        final String normWord = stripAccents(word.toLowerCase());
-        Map<String, Short> nextMap = mBigrams.get(normPrev);
-        if (nextMap == null) {
-            nextMap = new HashMap<>();
-            mBigrams.put(normPrev, nextMap);
-        }
-        short currentFreq = nextMap.containsKey(normWord) ? nextMap.get(normWord) : 0;
-        short newFreq = (short) Math.min(Short.MAX_VALUE, currentFreq > 0 ? currentFreq + 25 : Math.max(1, freq));
-        nextMap.put(normWord, newFreq);
+        final String contextKey = StringUtils.toNormalizedLower(prevWord);
+        putNGram(mBigrams, contextKey, word, freq);
     }
 
     public synchronized int getBigramFrequency(final String prevWord, final String word) {
         if (prevWord == null || word == null || prevWord.isEmpty() || word.isEmpty()) {
             return 0;
         }
-        final String normPrev = stripAccents(prevWord.toLowerCase());
-        final String normWord = stripAccents(word.toLowerCase());
-        final Map<String, Short> nextMap = mBigrams.get(normPrev);
-        if (nextMap == null) {
-            return 0;
-        }
-        final Short freq = nextMap.get(normWord);
-        return freq != null ? (freq & 0xFFFF) : 0;
+        final String contextKey = StringUtils.toNormalizedLower(prevWord);
+        return getNGram(mBigrams, contextKey, word);
     }
 
     public synchronized int getWordFrequency(final String word) {
         if (word == null || word.isEmpty()) return 0;
-        final String norm = stripAccents(word.toLowerCase());
-        TrieNode current = mRoot;
-        for (int i = 0; i < norm.length(); i++) {
-            current = current.getChild(norm.charAt(i));
-            if (current == null) return 0;
-        }
+        final String norm = StringUtils.toNormalizedLower(word);
+        final TrieNode current = findPrefixNode(norm);
+        if (current == null) return 0;
         for (int i = 0; i < current.words.length; i++) {
             if (current.words[i].equalsIgnoreCase(word)) {
                 return current.freqs[i] & 0xFFFF;
@@ -373,7 +356,7 @@ public final class PrefixDictionary {
         }
 
         final String trimmed = prefix.trim();
-        final String normPrefix = stripAccents(trimmed.toLowerCase());
+        final String normPrefix = StringUtils.toNormalizedLower(trimmed);
         final TrieNode current = findPrefixNode(normPrefix);
         if (current == null) {
             return Collections.emptyList();
@@ -409,7 +392,7 @@ public final class PrefixDictionary {
 
     private float calcPrefixWordScore(final ScoredWord sw, final String normPrefix, final String w1, final String w2) {
         float score = sw.frequency;
-        if (stripAccents(sw.word.toLowerCase()).equals(normPrefix)) {
+        if (StringUtils.toNormalizedLower(sw.word).equals(normPrefix)) {
             score += 500.0f;
         }
         return score + getPrefixContextBonus(w1, w2, sw.word);
@@ -433,7 +416,7 @@ public final class PrefixDictionary {
             if (results.size() >= maxCount) {
                 break;
             }
-            final String formatted = applyCasing(originalPrefix, sw.word);
+            final String formatted = StringUtils.applyCasing(originalPrefix, sw.word);
             if (added.add(formatted.toLowerCase())) {
                 results.add(formatted);
             }
@@ -475,7 +458,7 @@ public final class PrefixDictionary {
         if (s == null || s.length() <= 1) {
             return false;
         }
-        if (isAllUpperCase(s)) {
+        if (StringUtils.isAllUpperCase(s)) {
             return false;
         }
         for (int i = 1; i < s.length(); i++) {
@@ -502,26 +485,14 @@ public final class PrefixDictionary {
         return false;
     }
 
-    public static boolean isAllUpperCase(final String s) {
-        return StringUtils.isAllUpperCase(s);
-    }
-
-    public static String applyCasing(final String typed, final String suggestion) {
-        return StringUtils.applyCasing(typed, suggestion);
-    }
-
     public synchronized boolean containsWord(final String word) {
         if (word == null || word.isEmpty()) {
             return false;
         }
-        final String lower = word.toLowerCase();
-        final String norm = stripAccents(lower);
-        TrieNode current = mRoot;
-        for (int i = 0; i < norm.length(); i++) {
-            current = current.getChild(norm.charAt(i));
-            if (current == null) {
-                return false;
-            }
+        final String norm = StringUtils.toNormalizedLower(word);
+        final TrieNode current = findPrefixNode(norm);
+        if (current == null) {
+            return false;
         }
         for (String w : current.words) {
             if (w.equalsIgnoreCase(word)) {
@@ -535,21 +506,17 @@ public final class PrefixDictionary {
         if (word == null || word.isEmpty() || shouldSkipAutoCorrection(word)) {
             return null;
         }
-        final String lower = word.toLowerCase();
-        final String norm = stripAccents(lower);
-        TrieNode current = mRoot;
-        for (int i = 0; i < norm.length(); i++) {
-            current = current.getChild(norm.charAt(i));
-            if (current == null) {
-                return null;
-            }
+        final String norm = StringUtils.toNormalizedLower(word);
+        final TrieNode current = findPrefixNode(norm);
+        if (current == null) {
+            return null;
         }
         if (current.words.length > 0) {
             final String best = current.words[0];
             if (best.equalsIgnoreCase(word)) {
                 return null;
             }
-            return applyCasing(word, best);
+            return StringUtils.applyCasing(word, best);
         }
         return null;
     }
@@ -590,12 +557,12 @@ public final class PrefixDictionary {
     }
 
     private CharSequence getBestFuzzyCorrection(final String word, final String w1, final String w2, final boolean isWordValid) {
-        final String norm = stripAccents(word.toLowerCase());
+        final String norm = StringUtils.toNormalizedLower(word);
         final ScoredWord best = findBestFuzzyCandidate(norm, w1, w2);
         if (best == null || !isValidCorrection(best, word, norm, w1, w2, isWordValid)) {
             return null;
         }
-        return applyCasing(word, best.word);
+        return StringUtils.applyCasing(word, best.word);
     }
 
     private ScoredWord findBestFuzzyCandidate(final String norm, final String w1, final String w2) {
@@ -691,7 +658,7 @@ public final class PrefixDictionary {
         if (word == null || word.length() <= 1 || maxCount <= 0) {
             return Collections.emptyList();
         }
-        final String norm = stripAccents(word.toLowerCase());
+        final String norm = StringUtils.toNormalizedLower(word);
         final List<ScoredWord> candidates = searchAndScoreFuzzyCandidates(norm, w1, w2);
         return formatSuggestions(candidates, word, maxCount);
     }
@@ -763,16 +730,31 @@ public final class PrefixDictionary {
 
     public synchronized String getCanonicalWord(final String word) {
         if (word == null || word.isEmpty()) return word;
-        final String norm = stripAccents(word.toLowerCase());
-        TrieNode current = mRoot;
-        for (int i = 0; i < norm.length(); i++) {
-            current = current.getChild(norm.charAt(i));
-            if (current == null) return word;
-        }
+        final String norm = StringUtils.toNormalizedLower(word);
+        final TrieNode current = findPrefixNode(norm);
+        if (current == null) return word;
         if (current.words.length > 0) {
             return current.words[0];
         }
         return word;
+    }
+
+    private boolean collectTopNGramWords(final Map<String, Short> nextMap, final List<CharSequence> results, final Set<String> added, final int limit) {
+        if (nextMap == null || nextMap.isEmpty()) {
+            return false;
+        }
+        final List<Map.Entry<String, Short>> sortedEntries = new ArrayList<>(nextMap.entrySet());
+        Collections.sort(sortedEntries, (a, b) -> Integer.compare(b.getValue() & 0xFFFF, a.getValue() & 0xFFFF));
+        for (Map.Entry<String, Short> entry : sortedEntries) {
+            final String candidate = getCanonicalWord(entry.getKey());
+            if (added.add(candidate.toLowerCase())) {
+                results.add(candidate);
+                if (results.size() >= limit) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public synchronized List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
@@ -788,41 +770,17 @@ public final class PrefixDictionary {
 
         // 1. Trigram Lookup (w1 + w2 -> w3)
         if (w1 != null && !w1.trim().isEmpty() && w2 != null && !w2.trim().isEmpty()) {
-            final String normW1 = stripAccents(w1.trim().toLowerCase());
-            final String normW2 = stripAccents(w2.trim().toLowerCase());
-            final String key = normW1 + " " + normW2;
-            final Map<String, Short> nextMap = mTrigrams.get(key);
-            if (nextMap != null && !nextMap.isEmpty()) {
-                final List<Map.Entry<String, Short>> sortedEntries = new ArrayList<>(nextMap.entrySet());
-                Collections.sort(sortedEntries, (a, b) -> Integer.compare(b.getValue() & 0xFFFF, a.getValue() & 0xFFFF));
-                for (Map.Entry<String, Short> entry : sortedEntries) {
-                    final String candidate = getCanonicalWord(entry.getKey());
-                    if (added.add(candidate.toLowerCase())) {
-                        results.add(candidate);
-                        if (results.size() >= limit) {
-                            return results;
-                        }
-                    }
-                }
+            final String key = StringUtils.toNormalizedLower(w1.trim()) + " " + StringUtils.toNormalizedLower(w2.trim());
+            if (collectTopNGramWords(mTrigrams.get(key), results, added, limit)) {
+                return results;
             }
         }
 
         // 2. Bigram Lookup Backoff (w2 -> w3)
         if (w2 != null && !w2.trim().isEmpty()) {
-            final String normW2 = stripAccents(w2.trim().toLowerCase());
-            final Map<String, Short> nextMap = mBigrams.get(normW2);
-            if (nextMap != null && !nextMap.isEmpty()) {
-                final List<Map.Entry<String, Short>> sortedEntries = new ArrayList<>(nextMap.entrySet());
-                Collections.sort(sortedEntries, (a, b) -> Integer.compare(b.getValue() & 0xFFFF, a.getValue() & 0xFFFF));
-                for (Map.Entry<String, Short> entry : sortedEntries) {
-                    final String candidate = getCanonicalWord(entry.getKey());
-                    if (added.add(candidate.toLowerCase())) {
-                        results.add(candidate);
-                        if (results.size() >= limit) {
-                            return results;
-                        }
-                    }
-                }
+            final String key = StringUtils.toNormalizedLower(w2.trim());
+            if (collectTopNGramWords(mBigrams.get(key), results, added, limit)) {
+                return results;
             }
         }
 

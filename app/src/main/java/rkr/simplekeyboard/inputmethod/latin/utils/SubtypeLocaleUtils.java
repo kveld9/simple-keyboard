@@ -87,7 +87,7 @@ public final class SubtypeLocaleUtils {
      * @return the default subtype for the specified locale or null if the locale isn't supported.
      */
     public static Subtype getDefaultSubtype(final String locale, final Resources resources) {
-        final List<Subtype> subtypes = new SubtypeBuilder(locale, true, resources).getSubtypes();
+        final List<Subtype> subtypes = new SubtypeBuilder(locale, false, resources).getSubtypes();
         return subtypes.size() == 0 ? null : subtypes.get(0);
     }
 

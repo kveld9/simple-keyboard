@@ -21,6 +21,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -318,12 +320,12 @@ public class PrefixDictionaryTest {
 
     @Test
     public void testApplyCasingAndInheritance() {
-        assertEquals("ÁRBOL", PrefixDictionary.applyCasing("ARBOL", "árbol"));
-        assertEquals("Canción", PrefixDictionary.applyCasing("Cancion", "canción"));
-        assertEquals("canción", PrefixDictionary.applyCasing("cancion", "canción"));
-        assertEquals("HELLO", PrefixDictionary.applyCasing("HEL", "hello"));
-        assertEquals("Hello", PrefixDictionary.applyCasing("He", "hello"));
-        assertEquals("hello", PrefixDictionary.applyCasing("he", "HELLO"));
+        assertEquals("ÁRBOL", StringUtils.applyCasing("ARBOL", "árbol"));
+        assertEquals("Canción", StringUtils.applyCasing("Cancion", "canción"));
+        assertEquals("canción", StringUtils.applyCasing("cancion", "canción"));
+        assertEquals("HELLO", StringUtils.applyCasing("HEL", "hello"));
+        assertEquals("Hello", StringUtils.applyCasing("He", "hello"));
+        assertEquals("hello", StringUtils.applyCasing("he", "HELLO"));
 
         mDict.insert("árbol", 100);
         mDict.insert("canción", 100);

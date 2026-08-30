@@ -28,6 +28,7 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.compat.BuildCompatUtils;
 import rkr.simplekeyboard.inputmethod.event.Event;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet.KeyboardLayoutSetException;
 import rkr.simplekeyboard.inputmethod.keyboard.internal.KeyboardState;
@@ -90,7 +91,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         mKeyboardTheme = KeyboardTheme.getKeyboardTheme(mLatinIME);
         mThemeContext = new ContextThemeWrapper(mLatinIME, mKeyboardTheme.mStyleId);
         KeyboardLayoutSet.onKeyboardThemeChanged();
-        if (mKeyboardView != null && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        if (mKeyboardView != null && !BuildCompatUtils.isAtLeastS()) {
             // Live color pallet reloading doesn't work, need to rerender the View
             mLatinIME.setInputView(onCreateInputView());
         }

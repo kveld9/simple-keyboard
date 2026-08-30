@@ -56,12 +56,9 @@ public class TopBarView extends FrameLayout {
     }
 
     private void init(Context context) {
-        Drawable bg = ViewUtils.getThemeDrawable(context, R.attr.keyboardViewStyle, R.style.KeyboardView, android.R.attr.background);
-        if (bg != null) {
-            setBackground(bg);
-        }
+        ViewUtils.applyKeyboardBackground(this);
 
-        mTextColor = ViewUtils.getThemeColor(context, R.attr.keyTextColor, 0xFFCCCCCC);
+        mTextColor = ViewUtils.getKeyTextColor(context);
 
         int iconWidthPx = ViewUtils.dpToPx(context, 34);
 
@@ -144,14 +141,7 @@ public class TopBarView extends FrameLayout {
     }
 
     private View createDivider(Context context) {
-        View divider = new View(context);
-        int dividerWidth = ViewUtils.dpToPx(context, 1);
-        int dividerHeight = ViewUtils.dpToPx(context, 18);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dividerWidth, dividerHeight);
-        lp.gravity = Gravity.CENTER_VERTICAL;
-        divider.setLayoutParams(lp);
-        divider.setBackgroundColor(mTextColor);
-        divider.setAlpha(0.18f);
+        View divider = ViewUtils.createVerticalDivider(context, 18, mTextColor, 0.18f);
         divider.setVisibility(View.INVISIBLE);
         return divider;
     }
@@ -247,6 +237,20 @@ public class TopBarView extends FrameLayout {
         bindSlot(mRightSlot, null, false);
     }
 
+    private void setupSingleCenterPillMode() {
+        mLeftSlot.setVisibility(View.GONE);
+        mDivider1.setVisibility(View.GONE);
+        mDivider2.setVisibility(View.GONE);
+        mRightSlot.setVisibility(View.GONE);
+
+        mCenterSlot.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
+        int paddingH = ViewUtils.dpToPx(getContext(), 12);
+        mCenterSlot.setPadding(paddingH, 0, paddingH, 0);
+        mCenterSlot.setVisibility(View.VISIBLE);
+        mCenterSlot.setTypeface(Typeface.DEFAULT_BOLD);
+        mCenterSlot.setAlpha(1.0f);
+    }
+
     public void setClipboardSuggestion(final String fullClipText) {
         if (isExternalViewActive()) {
             setExternalView(null);
@@ -256,14 +260,7 @@ public class TopBarView extends FrameLayout {
             return;
         }
 
-        mLeftSlot.setVisibility(View.GONE);
-        mDivider1.setVisibility(View.GONE);
-        mDivider2.setVisibility(View.GONE);
-        mRightSlot.setVisibility(View.GONE);
-
-        mCenterSlot.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
-        int paddingH = ViewUtils.dpToPx(getContext(), 12);
-        mCenterSlot.setPadding(paddingH, 0, paddingH, 0);
+        setupSingleCenterPillMode();
 
         String cleanText = fullClipText.replace('\n', ' ').replace('\r', ' ').trim();
         if (cleanText.length() > 200) {
@@ -274,9 +271,6 @@ public class TopBarView extends FrameLayout {
         mCenterSlot.setText(displayText);
         mCenterSlot.setCompoundDrawablesRelative(null, null, null, null);
         mCenterSlot.setCompoundDrawablePadding(0);
-        mCenterSlot.setVisibility(View.VISIBLE);
-        mCenterSlot.setTypeface(Typeface.DEFAULT_BOLD);
-        mCenterSlot.setAlpha(1.0f);
         mCenterSlot.setOnClickListener(v -> {
             if (mListener != null) {
                 mListener.onClipboardSuggestionClicked(fullClipText);
@@ -293,14 +287,7 @@ public class TopBarView extends FrameLayout {
             return;
         }
 
-        mLeftSlot.setVisibility(View.GONE);
-        mDivider1.setVisibility(View.GONE);
-        mDivider2.setVisibility(View.GONE);
-        mRightSlot.setVisibility(View.GONE);
-
-        mCenterSlot.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
-        int paddingH = ViewUtils.dpToPx(getContext(), 12);
-        mCenterSlot.setPadding(paddingH, 0, paddingH, 0);
+        setupSingleCenterPillMode();
 
         mCenterSlot.setText("Screenshot");
         if (thumbnail != null) {
@@ -315,9 +302,6 @@ public class TopBarView extends FrameLayout {
             mCenterSlot.setCompoundDrawablesRelative(null, null, null, null);
             mCenterSlot.setCompoundDrawablePadding(0);
         }
-        mCenterSlot.setVisibility(View.VISIBLE);
-        mCenterSlot.setTypeface(Typeface.DEFAULT_BOLD);
-        mCenterSlot.setAlpha(1.0f);
         mCenterSlot.setOnClickListener(v -> {
             if (mListener != null) {
                 mListener.onScreenshotSuggestionClicked(imageUri);

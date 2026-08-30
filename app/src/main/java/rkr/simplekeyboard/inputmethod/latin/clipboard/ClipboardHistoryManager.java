@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import rkr.simplekeyboard.inputmethod.compat.BuildCompatUtils;
+import rkr.simplekeyboard.inputmethod.compat.PermissionCompatUtils;
 import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 
@@ -148,7 +150,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         if (description == null) {
             return false;
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        if (BuildCompatUtils.isAtLeastN()) {
             PersistableBundle extras = description.getExtras();
             if (extras != null) {
                 if (extras.getBoolean("android.content.extra.IS_SENSITIVE", false)
@@ -199,7 +201,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         final String currentText = text.toString();
         long clipTimestamp = System.currentTimeMillis();
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && clip.getDescription() != null && clip.getDescription().getTimestamp() > 0) {
+            if (BuildCompatUtils.isAtLeastO() && clip.getDescription() != null && clip.getDescription().getTimestamp() > 0) {
                 clipTimestamp = clip.getDescription().getTimestamp();
             }
         } catch (Throwable ignored) {}
@@ -216,16 +218,16 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
             mLastText = currentText;
             mLastTextTime = clipTimestamp;
             mLastTextUsed = false;
+
             final long retentionMinutes = getRetentionMinutes();
-            mExecutor.execute(() -> {
-                mDatabase.deleteExpiredClips(retentionMinutes);
-                if (retentionMinutes <= 0 || (System.currentTimeMillis() - clipTimestamp <= retentionMinutes * 60 * 1000L)) {
-                    mDatabase.insertClip(currentText, false, clipTimestamp);
+            mDatabase.deleteExpiredClips(retentionMinutes);
+            mDatabase.insertClip(currentText, false, clipTimestamp, null);
+
+            mMainHandler.post(() -> {
+                if (mOnPrimaryClipChangeListener != null) {
+                    mOnPrimaryClipChangeListener.run();
                 }
             });
-            if (mOnPrimaryClipChangeListener != null) {
-                mMainHandler.post(mOnPrimaryClipChangeListener);
-            }
         } else if (mLastTextTime <= 0) {
             mLastTextTime = clipTimestamp;
         }
@@ -287,9 +289,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     }
 
     private boolean hasStoragePermission() {
-        final String permission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                ? Manifest.permission.READ_MEDIA_IMAGES
-                : Manifest.permission.READ_EXTERNAL_STORAGE;
+        final String permission = PermissionCompatUtils.getMediaImagesPermission();
         return mContext.checkCallingOrSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
     }
 
@@ -334,7 +334,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
             projectionList.add(MediaStore.Images.Media._ID);
             projectionList.add(MediaStore.Images.Media.DISPLAY_NAME);
             projectionList.add(MediaStore.Images.Media.DATE_ADDED);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (BuildCompatUtils.isAtLeastQ()) {
                 projectionList.add(MediaStore.Images.Media.RELATIVE_PATH);
             } else {
                 projectionList.add(MediaStore.Images.Media.DATA);
@@ -365,7 +365,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
                             if (fileName == null) fileName = "";
 
                             String fullPath = "";
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            if (BuildCompatUtils.isAtLeastQ()) {
                                 int relIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH);
                                 fullPath = cursor.getString(relIndex);
                             } else {
@@ -466,7 +466,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
                 return BitmapFactory.decodeFile(info.fullPath, options);
             } catch (Throwable ignored) {}
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.uri != null) {
+        if (BuildCompatUtils.isAtLeastQ() && info.uri != null) {
             try {
                 return mContext.getContentResolver().loadThumbnail(info.uri, new Size(120, 120), null);
             } catch (Throwable ignored) {}

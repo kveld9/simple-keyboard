@@ -18,12 +18,19 @@
 package rkr.simplekeyboard.inputmethod.latin.utils;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.net.Uri;
 import android.util.Log;
+import android.view.inputmethod.InputMethodInfo;
+import android.view.inputmethod.InputMethodManager;
+
+import java.util.List;
 
 public final class ApplicationUtils {
     private static final String TAG = ApplicationUtils.class.getSimpleName();
@@ -80,5 +87,36 @@ public final class ApplicationUtils {
             Log.e(TAG, "Could not find version info.", e);
         }
         return 0;
+    }
+
+    public static boolean isImeEnabled(final Context context, final InputMethodManager imm) {
+        if (context == null || imm == null) {
+            return false;
+        }
+        final String imePackageName = context.getPackageName();
+        final List<InputMethodInfo> enabledImes = imm.getEnabledInputMethodList();
+        if (enabledImes != null) {
+            for (final InputMethodInfo imi : enabledImes) {
+                if (imi.getPackageName().equals(imePackageName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static void openUrl(final Context context, final String uri) {
+        if (context == null || uri == null) {
+            return;
+        }
+        try {
+            final Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+            if (!(context instanceof Activity)) {
+                browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            context.startActivity(browserIntent);
+        } catch (final ActivityNotFoundException e) {
+            Log.e(TAG, "Browser not found", e);
+        }
     }
 }

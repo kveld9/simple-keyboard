@@ -19,12 +19,12 @@
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.os.Bundle;
 
 import androidx.annotation.Nullable;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.compat.BuildCompatUtils;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet;
 
 /**
@@ -36,7 +36,7 @@ public final class PreferencesSettingsFragment extends SubScreenFragment {
         super.onCreatePreferences(savedInstanceState, rootKey);
         setPreferencesFromResource(R.xml.prefs_screen_preferences, rootKey);
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+        if (!BuildCompatUtils.isAtLeastBaklava()) {
             removePreference(Settings.PREF_USE_ON_SCREEN);
         }
     }

@@ -98,9 +98,9 @@ public class BeamSearchDecoder {
     }
 
     private void matchChildWithCandidates(BeamHypothesis hyp, char childChar, int childNode, List<SpatialCandidate> candidates, List<BeamHypothesis> next) {
-        char lowerChildChar = Character.toLowerCase(childChar);
+        final char foldedChild = StringUtils.foldChar(childChar);
         for (SpatialCandidate cand : candidates) {
-            if (StringUtils.removeAccents(lowerChildChar) == StringUtils.removeAccents(Character.toLowerCase(cand.codePoint))) {
+            if (foldedChild == StringUtils.foldChar(cand.codePoint)) {
                 next.add(createHypothesis(hyp, childChar, childNode, cand));
             }
         }

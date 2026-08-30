@@ -18,26 +18,20 @@
 
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
-import android.content.ActivityNotFoundException;
 import android.content.Context;
-import android.content.Intent;
 import android.content.res.Resources;
 import android.database.ContentObserver;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
-import android.util.Log;
-import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
 
 import androidx.annotation.Nullable;
 import androidx.preference.Preference;
 
-import java.util.List;
-
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.latin.utils.ApplicationUtils;
 
 public final class SettingsFragment extends InputMethodSettingsFragment {
     private static final String TAG = "SettingsFragment";
@@ -64,7 +58,7 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
         final Preference privacyPref = findPreference("privacy_policy");
         if (privacyPref != null) {
             privacyPref.setOnPreferenceClickListener(preference -> {
-                openUrl(res.getString(R.string.privacy_policy_url));
+                ApplicationUtils.openUrl(getContext(), res.getString(R.string.privacy_policy_url));
                 return true;
             });
         }
@@ -72,7 +66,7 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
         final Preference licensePref = findPreference("license");
         if (licensePref != null) {
             licensePref.setOnPreferenceClickListener(preference -> {
-                openUrl(res.getString(R.string.license_url));
+                ApplicationUtils.openUrl(getContext(), res.getString(R.string.license_url));
                 return true;
             });
         }
@@ -81,7 +75,7 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
         if (versionPref != null) {
             versionPref.setSummary(rkr.simplekeyboard.inputmethod.BuildConfig.VERSION_NAME);
             versionPref.setOnPreferenceClickListener(preference -> {
-                openUrl(res.getString(R.string.check_for_updates_url));
+                ApplicationUtils.openUrl(getContext(), res.getString(R.string.check_for_updates_url));
                 return true;
             });
         }
@@ -148,35 +142,13 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
         }
 
         mImeBannerPref.setVisible(true);
-        final boolean isEnabled = isImeEnabled(context, imm);
+        final boolean isEnabled = ApplicationUtils.isImeEnabled(context, imm);
         if (!isEnabled) {
             mImeBannerPref.setTitle(R.string.ime_not_enabled_title);
             mImeBannerPref.setSummary(R.string.ime_not_enabled_summary);
         } else {
             mImeBannerPref.setTitle(R.string.ime_not_active_title);
             mImeBannerPref.setSummary(R.string.ime_not_active_summary);
-        }
-    }
-
-    private boolean isImeEnabled(Context context, InputMethodManager imm) {
-        final String imePackageName = context.getPackageName();
-        final List<InputMethodInfo> enabledImes = imm.getEnabledInputMethodList();
-        if (enabledImes != null) {
-            for (final InputMethodInfo imi : enabledImes) {
-                if (imi.getPackageName().equals(imePackageName)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private void openUrl(String uri) {
-        try {
-            final Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
-            startActivity(browserIntent);
-        } catch (ActivityNotFoundException e) {
-            Log.e(TAG, "Browser not found");
         }
     }
 }

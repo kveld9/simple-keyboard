@@ -61,27 +61,7 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
         }
         final SharedPreferences prefs = getSharedPreferences();
         final Resources res = getResources();
-        pref.setInterface(new SeekBarDialogPreference.ValueProxy() {
-            private static final float PERCENTAGE_FLOAT = 100.0f;
-
-            private float getValueFromPercentage(final int percentage) {
-                return percentage / PERCENTAGE_FLOAT;
-            }
-
-            private int getPercentageFromValue(final float floatValue) {
-                return Math.round(floatValue * PERCENTAGE_FLOAT);
-            }
-
-            @Override
-            public void writeValue(final int value, final String key) {
-                prefs.edit().putFloat(key, getValueFromPercentage(value)).apply();
-            }
-
-            @Override
-            public void writeDefaultValue(final String key) {
-                prefs.edit().remove(key).apply();
-            }
-
+        pref.setInterface(new SeekBarDialogPreference.PercentageFloatProxy(prefs) {
             @Override
             public int readValue(final String key) {
                 return getPercentageFromValue(Settings.readKeyboardHeight(prefs, 1));
@@ -99,9 +79,6 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
                 }
                 return res.getString(R.string.abbreviation_unit_percent, value);
             }
-
-            @Override
-            public void feedbackValue(final int value) {}
         });
     }
 
@@ -112,17 +89,7 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
         }
         final SharedPreferences prefs = getSharedPreferences();
         final Resources res = getResources();
-        pref.setInterface(new SeekBarDialogPreference.ValueProxy() {
-            @Override
-            public void writeValue(final int value, final String key) {
-                prefs.edit().putInt(key, value).apply();
-            }
-
-            @Override
-            public void writeDefaultValue(final String key) {
-                prefs.edit().remove(key).apply();
-            }
-
+        pref.setInterface(new SeekBarDialogPreference.SimpleIntProxy(prefs) {
             @Override
             public int readValue(final String key) {
                 return Settings.readBottomOffsetPortrait(prefs);
@@ -140,9 +107,6 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
                 }
                 return res.getString(R.string.abbreviation_unit_dp, value);
             }
-
-            @Override
-            public void feedbackValue(final int value) {}
         });
     }
 }

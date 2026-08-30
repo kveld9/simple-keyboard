@@ -84,15 +84,8 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
 
     private GradientDrawable getActiveKeyDrawable() {
         if (mActiveKeyDrawable == null) {
-            final Context context = getContext();
-            final GradientDrawable gd = new GradientDrawable();
-            gd.setShape(GradientDrawable.RECTANGLE);
-            int pressedColor = rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.getThemeColor(
-                    context, R.attr.keyPressedBackgroundColor, android.graphics.Color.DKGRAY);
-            gd.setColor(pressedColor);
-            final float cornerRadius = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getCornerRadius(context, mKeyShape);
-            gd.setCornerRadius(cornerRadius);
-            mActiveKeyDrawable = gd;
+            mActiveKeyDrawable = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper
+                    .createActivePopupKeyDrawable(getContext(), mKeyShape);
         }
         return mActiveKeyDrawable;
     }
@@ -111,12 +104,7 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
                 ((GradientDrawable) containerBg.mutate()).setCornerRadius(cornerRadius);
             }
         }
-        if (mActiveKeyDrawable != null) {
-            mActiveKeyDrawable.setCornerRadius(cornerRadius);
-            int pressedColor = rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.getThemeColor(
-                    context, R.attr.keyPressedBackgroundColor, android.graphics.Color.DKGRAY);
-            mActiveKeyDrawable.setColor(pressedColor);
-        }
+        mActiveKeyDrawable = null; // Recreate lazily with updated theme/shape
     }
 
     @Override
@@ -172,7 +160,26 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
     @Override
     public void onDownEvent(final int x, final int y, final int pointerId) {
         mActivePointerId = pointerId;
-        mCurrentKey = detectKey(x, y);
+        Key key = detectKey(x, y);
+        if (key == null) {
+            final Keyboard keyboard = getKeyboard();
+            if (keyboard != null) {
+                final int targetX = getDefaultCoordX();
+                int minDiff = Integer.MAX_VALUE;
+                for (final Key k : keyboard.getSortedKeys()) {
+                    final int diff = Math.abs(k.getX() + k.getWidth() / 2 - targetX);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        key = k;
+                    }
+                }
+                if (key != null) {
+                    mCurrentKey = key;
+                    updatePressKeyGraphics(key);
+                    invalidateAllKeys();
+                }
+            }
+        }
     }
 
     @Override
@@ -224,12 +231,11 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
         // A new key is detected.
         if (oldKey != null) {
             updateReleaseKeyGraphics(oldKey);
-            invalidateKey(oldKey);
         }
         if (newKey != null) {
             updatePressKeyGraphics(newKey);
-            invalidateKey(newKey);
         }
+        invalidateAllKeys();
         return newKey;
     }
 

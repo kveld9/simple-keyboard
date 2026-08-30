@@ -77,7 +77,7 @@ public class TopBarView extends FrameLayout {
         // 3-slot centered suggestions container with subtle dividers
         mSuggestionsContainer = new LinearLayout(context);
         mSuggestionsContainer.setOrientation(LinearLayout.HORIZONTAL);
-        mSuggestionsContainer.setGravity(Gravity.CENTER_VERTICAL);
+        mSuggestionsContainer.setGravity(Gravity.CENTER);
         mSuggestionsContainer.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
 
         mLeftSlot = createSuggestionSlot(context, 16.0f, false);
@@ -94,8 +94,7 @@ public class TopBarView extends FrameLayout {
         mNormalModeContainer.addView(mSuggestionsContainer);
 
         View rightSpacer = new View(context);
-        int spacerWidth = ViewUtils.dpToPx(context, 18);
-        rightSpacer.setLayoutParams(new LinearLayout.LayoutParams(spacerWidth, LayoutParams.MATCH_PARENT));
+        rightSpacer.setLayoutParams(new LinearLayout.LayoutParams(iconWidthPx, LayoutParams.MATCH_PARENT));
         mNormalModeContainer.addView(rightSpacer);
 
         addView(mNormalModeContainer);
@@ -208,6 +207,9 @@ public class TopBarView extends FrameLayout {
         resetSlot(mCenterSlot);
         mDivider2.setVisibility(View.INVISIBLE);
         resetSlot(mRightSlot);
+        mLeftSlot.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
+        mCenterSlot.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
+        mRightSlot.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
     }
 
     private void dispatchSuggestions(List<CharSequence> suggestions, int boldIndex) {
@@ -259,6 +261,10 @@ public class TopBarView extends FrameLayout {
         mDivider2.setVisibility(View.GONE);
         mRightSlot.setVisibility(View.GONE);
 
+        mCenterSlot.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
+        int paddingH = ViewUtils.dpToPx(getContext(), 12);
+        mCenterSlot.setPadding(paddingH, 0, paddingH, 0);
+
         String cleanText = fullClipText.replace('\n', ' ').replace('\r', ' ').trim();
         if (cleanText.length() > 200) {
             cleanText = cleanText.substring(0, 200) + "...";
@@ -292,13 +298,19 @@ public class TopBarView extends FrameLayout {
         mDivider2.setVisibility(View.GONE);
         mRightSlot.setVisibility(View.GONE);
 
-        mCenterSlot.setText("🖼️ Screenshot");
+        mCenterSlot.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
+        int paddingH = ViewUtils.dpToPx(getContext(), 12);
+        mCenterSlot.setPadding(paddingH, 0, paddingH, 0);
+
+        mCenterSlot.setText("Screenshot");
         if (thumbnail != null) {
-            android.graphics.drawable.BitmapDrawable thumbDrawable = new android.graphics.drawable.BitmapDrawable(getResources(), thumbnail);
-            int size = ViewUtils.dpToPx(getContext(), 24);
-            thumbDrawable.setBounds(0, 0, size, size);
-            mCenterSlot.setCompoundDrawablesRelative(thumbDrawable, null, null, null);
-            mCenterSlot.setCompoundDrawablePadding(ViewUtils.dpToPx(getContext(), 6));
+            final androidx.core.graphics.drawable.RoundedBitmapDrawable roundedThumb =
+                    androidx.core.graphics.drawable.RoundedBitmapDrawableFactory.create(getResources(), thumbnail);
+            final int size = ViewUtils.dpToPx(getContext(), 24);
+            roundedThumb.setCornerRadius(ViewUtils.dpToPx(getContext(), 4));
+            roundedThumb.setBounds(0, 0, size, size);
+            mCenterSlot.setCompoundDrawablesRelative(roundedThumb, null, null, null);
+            mCenterSlot.setCompoundDrawablePadding(ViewUtils.dpToPx(getContext(), 8));
         } else {
             mCenterSlot.setCompoundDrawablesRelative(null, null, null, null);
             mCenterSlot.setCompoundDrawablePadding(0);
@@ -317,6 +329,8 @@ public class TopBarView extends FrameLayout {
         slot.setText("");
         slot.setCompoundDrawablesRelative(null, null, null, null);
         slot.setCompoundDrawablePadding(0);
+        int paddingH = ViewUtils.dpToPx(getContext(), 4);
+        slot.setPadding(paddingH, 0, paddingH, 0);
         slot.setVisibility(View.INVISIBLE);
         slot.setOnClickListener(null);
     }

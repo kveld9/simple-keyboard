@@ -1100,21 +1100,25 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     public void onImageSelected(final String imageUri) {
+        if (imageUri == null || imageUri.trim().isEmpty()) {
+            return;
+        }
         final EditorInfo editorInfo = getCurrentInputEditorInfo();
         if (editorInfo == null) {
             return;
         }
 
-        Uri contentUri;
-        if (imageUri.startsWith("content://")) {
-            contentUri = Uri.parse(imageUri);
-        } else {
-            final File file = new File(imageUri);
-            if (!file.exists()) return;
-            contentUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
-        }
-
         try {
+            Uri contentUri;
+            if (imageUri.startsWith("content://")) {
+                contentUri = Uri.parse(imageUri);
+            } else {
+                final File file = new File(imageUri);
+                if (!file.exists()) return;
+                final Context context = PreferenceManagerCompat.getDeviceContext(this);
+                contentUri = FileProvider.getUriForFile(context, getPackageName() + ".fileprovider", file);
+            }
+
             final String mimeType = getContentResolver().getType(contentUri);
             final String finalMimeType = mimeType != null ? mimeType : "image/png";
 

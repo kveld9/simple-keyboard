@@ -19,10 +19,8 @@ package rkr.simplekeyboard.inputmethod.latin.utils;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.net.Uri;
@@ -37,20 +35,6 @@ public final class ApplicationUtils {
 
     private ApplicationUtils() {
         // This utility class is not publicly instantiable.
-    }
-
-    public static int getActivityTitleResId(final Context context,
-            final Class<? extends Activity> cls) {
-        final ComponentName cn = new ComponentName(context, cls);
-        try {
-            final ActivityInfo ai = context.getPackageManager().getActivityInfo(cn, 0);
-            if (ai != null) {
-                return ai.labelRes;
-            }
-        } catch (final NameNotFoundException e) {
-            Log.e(TAG, "Failed to get settings activity title res id.", e);
-        }
-        return 0;
     }
 
     /**

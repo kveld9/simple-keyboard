@@ -20,16 +20,11 @@ package rkr.simplekeyboard.inputmethod.latin.common;
 
 import android.content.res.Resources;
 import android.os.LocaleList;
-import android.text.TextUtils;
-
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-
-import rkr.simplekeyboard.inputmethod.latin.utils.LocaleResourceUtils;
 
 /**
  * A class to help with handling Locales in string form.

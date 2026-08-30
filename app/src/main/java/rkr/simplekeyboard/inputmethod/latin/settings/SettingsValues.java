@@ -20,7 +20,6 @@
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.view.inputmethod.EditorInfo;
 
@@ -35,7 +34,6 @@ public class SettingsValues {
     public final SpacingAndPunctuations mSpacingAndPunctuations;
     // From configuration:
     public final boolean mHasHardwareKeyboard;
-    public final int mDisplayOrientation;
     // From preferences, in the same order as xml/prefs.xml:
     public final boolean mAutoCap;
     public final boolean mVibrateOn;
@@ -94,7 +92,6 @@ public class SettingsValues {
         mKeyPreviewPopupDismissDelay = res.getInteger(R.integer.config_key_preview_linger_timeout);
         mKeyboardHeightScale = Settings.readKeyboardHeight(prefs, DEFAULT_SIZE_SCALE);
         mBottomOffsetPortrait = Settings.readBottomOffsetPortrait(prefs);
-        mDisplayOrientation = res.getConfiguration().orientation;
         mShowSpecialChars = prefs.getBoolean(Settings.PREF_SHOW_SPECIAL_CHARS, true);
         mShowNumberRow = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, false);
         mSpaceSwipeEnabled = prefs.getBoolean(Settings.PREF_SPACE_SWIPE, false);
@@ -117,9 +114,5 @@ public class SettingsValues {
 
     public boolean isSameInputType(final EditorInfo editorInfo) {
         return mInputAttributes.isSameInputType(editorInfo);
-    }
-
-    public boolean hasSameOrientation(final Configuration configuration) {
-        return mDisplayOrientation == configuration.orientation;
     }
 }

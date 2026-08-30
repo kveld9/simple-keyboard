@@ -86,7 +86,6 @@ import rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;

@@ -29,11 +29,6 @@ public final class InputTypeUtils implements InputType {
             TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_PASSWORD;
     private static final int TEXT_VISIBLE_PASSWORD_INPUT_TYPE =
             TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_VISIBLE_PASSWORD;
-    private static final int[] SUPPRESSING_AUTO_SPACES_FIELD_VARIATION = {
-        InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
-        InputType.TYPE_TEXT_VARIATION_PASSWORD,
-        InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
-        InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD };
     public static final int IME_ACTION_CUSTOM_LABEL = EditorInfo.IME_MASK_ACTION + 1;
 
     private InputTypeUtils() {
@@ -41,13 +36,11 @@ public final class InputTypeUtils implements InputType {
     }
 
     private static boolean isWebPasswordInputType(final int inputType) {
-        return WEB_TEXT_PASSWORD_INPUT_TYPE != 0
-                && inputType == WEB_TEXT_PASSWORD_INPUT_TYPE;
+        return inputType == WEB_TEXT_PASSWORD_INPUT_TYPE;
     }
 
     private static boolean isNumberPasswordInputType(final int inputType) {
-        return NUMBER_PASSWORD_INPUT_TYPE != 0
-                && inputType == NUMBER_PASSWORD_INPUT_TYPE;
+        return inputType == NUMBER_PASSWORD_INPUT_TYPE;
     }
 
     private static boolean isTextPasswordInputType(final int inputType) {
@@ -76,15 +69,6 @@ public final class InputTypeUtils implements InputType {
         final int maskedInputType =
                 inputType & (TYPE_MASK_CLASS | TYPE_MASK_VARIATION);
         return maskedInputType == TEXT_VISIBLE_PASSWORD_INPUT_TYPE;
-    }
-
-    public static boolean isAutoSpaceFriendlyType(final int inputType) {
-        if (TYPE_CLASS_TEXT != (TYPE_MASK_CLASS & inputType)) return false;
-        final int variation = TYPE_MASK_VARIATION & inputType;
-        for (final int fieldVariation : SUPPRESSING_AUTO_SPACES_FIELD_VARIATION) {
-            if (variation == fieldVariation) return false;
-        }
-        return true;
     }
 
     public static int getImeOptionsActionIdFromEditorInfo(final EditorInfo editorInfo) {

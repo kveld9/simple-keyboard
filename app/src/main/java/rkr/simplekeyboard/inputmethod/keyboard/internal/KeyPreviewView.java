@@ -27,7 +27,7 @@ import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
-import android.widget.TextView;
+import androidx.appcompat.widget.AppCompatTextView;
 
 import java.util.HashSet;
 
@@ -36,7 +36,7 @@ import rkr.simplekeyboard.inputmethod.keyboard.Key;
 /**
  * The pop up key preview view.
  */
-public class KeyPreviewView extends TextView {
+public class KeyPreviewView extends AppCompatTextView {
     private final Rect mBackgroundPadding = new Rect();
     private static final HashSet<String> sNoScaleXTextSet = new HashSet<>();
 

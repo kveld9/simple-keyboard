@@ -253,6 +253,10 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private void setMainKeyboardFrame(
             final SettingsValues settingsValues,
             final KeyboardSwitchState toggleState) {
+        if (mLatinIME != null && (mLatinIME.isEmojiViewShowing() || mLatinIME.isClipboardHistoryShowing())) {
+            mKeyboardView.setVisibility(View.GONE);
+            return;
+        }
         final int visibility =  isImeSuppressedByHardwareKeyboard(settingsValues, toggleState)
                 ? View.GONE : View.VISIBLE;
         mKeyboardView.setVisibility(visibility);

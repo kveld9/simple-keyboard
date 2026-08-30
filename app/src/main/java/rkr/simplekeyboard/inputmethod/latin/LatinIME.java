@@ -605,6 +605,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mInputView.requestLayout();
     }
 
+    public boolean isEmojiViewShowing() {
+        return mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE;
+    }
+
+    public boolean isClipboardHistoryShowing() {
+        return mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE;
+    }
+
     public void hideEmojiView() {
         if (mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE) {
             mEmojiPalettesView.setVisibility(View.GONE);
@@ -639,6 +647,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onFinishInputView(final boolean finishingInput) {
+        hideEmojiView();
+        hideClipboardHistory();
         mCanRevertAutocorrect = false;
         mInputLogic.clearCaches();
         mRichImm.resetSubtypeCycleOrder();
@@ -739,6 +749,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
 
         if (isDifferentTextField) {
+            hideEmojiView();
+            hideClipboardHistory();
             loadSettings();
             currentSettingsValues = mSettings.getCurrent();
             mainKeyboardView.closing();
@@ -1239,6 +1251,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void hideWindow() {
+        hideEmojiView();
+        hideClipboardHistory();
         mKeyboardSwitcher.onHideWindow();
 
         if (TRACE) Debug.stopMethodTracing();

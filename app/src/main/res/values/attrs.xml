@@ -35,6 +35,8 @@
         <attr name="popupPanelBackgroundColor" format="color" />
         <attr name="keyPressedBackgroundColor" format="color" />
         <attr name="keyNormalBackgroundColor" format="color" />
+        <attr name="keyTextColor" />
+        <attr name="functionalTextColor" />
     </declare-styleable>
 
     <declare-styleable name="KeyboardView">

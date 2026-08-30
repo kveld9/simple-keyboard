@@ -164,6 +164,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             case MSG_UPDATE_SHIFT_STATE:
                 switcher.requestUpdatingShiftState(latinIme.getCurrentAutoCapsState(),
                         latinIme.getCurrentRecapitalizeState());
+                latinIme.updateSuggestions();
                 break;
             case MSG_DEALLOCATE_MEMORY:
                 latinIme.deallocateMemory();
@@ -901,6 +902,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
             mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),
                     getCurrentRecapitalizeState());
+            updateSuggestions();
         }
     }
 
@@ -1012,7 +1014,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (isSuggestionsDisabled()) {
             return;
         }
-        final String word = mInputLogic.mConnection.getWordBeforeCursor();
+        final String wordAtCursor = mInputLogic.mConnection.getWordAtCursor();
+        final String word = !isWordEmpty(wordAtCursor) ? wordAtCursor : mInputLogic.mConnection.getWordBeforeCursor();
         final String[] context = getEffectivePreviousWords();
         final String w1 = context[0];
         final String w2 = context[1];

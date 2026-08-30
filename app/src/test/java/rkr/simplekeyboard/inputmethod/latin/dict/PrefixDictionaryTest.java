@@ -409,12 +409,10 @@ public class PrefixDictionaryTest {
 
         mDict.setBigram("hello", "world", 255);
 
-        // "hello" only has 1 bigram ("world"), so remaining 2 slots fall back to top frequent words ("the", "to")
+        // "hello" has 1 bigram ("world"), returns only actual predictions without padding
         List<CharSequence> preds = mDict.getNextWordPredictions("hello", 3);
-        assertEquals(3, preds.size());
+        assertEquals(1, preds.size());
         assertEquals("world", preds.get(0).toString());
-        assertEquals("the", preds.get(1).toString());
-        assertEquals("to", preds.get(2).toString());
     }
 
     @Test
@@ -442,10 +440,10 @@ public class PrefixDictionaryTest {
         assertTrue(mDict.getNextWordPredictions("test", -1).isEmpty());
 
         List<CharSequence> predsNull = mDict.getNextWordPredictions(null, 2);
-        assertEquals(2, predsNull.size());
+        assertTrue(predsNull.isEmpty());
 
         List<CharSequence> predsEmpty = mDict.getNextWordPredictions("", 2);
-        assertEquals(2, predsEmpty.size());
+        assertTrue(predsEmpty.isEmpty());
     }
 
     @Test
@@ -458,7 +456,7 @@ public class PrefixDictionaryTest {
         copied.copyFrom(mDict);
 
         List<CharSequence> copiedPreds = copied.getNextWordPredictions("hello", 2);
-        assertEquals(2, copiedPreds.size());
+        assertEquals(1, copiedPreds.size());
         assertEquals("world", copiedPreds.get(0).toString());
 
         mDict.clear();

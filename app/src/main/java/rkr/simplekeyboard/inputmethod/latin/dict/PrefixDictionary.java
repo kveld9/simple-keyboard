@@ -914,11 +914,6 @@ public final class PrefixDictionary {
         return false;
     }
 
-    private static final String[] DEFAULT_FALLBACK_PREDICTIONS = {
-            "the", "to", "and", "a", "in", "is", "it", "you", "that", "he",
-            "que", "de", "no", "la", "el", "es", "en"
-    };
-
     private boolean predictTrigrams(final String w1, final String w2, final List<CharSequence> results, final Set<String> added, final int limit) {
         if (isNonEmptyText(w1) && isNonEmptyText(w2)) {
             final String key = StringUtils.toNormalizedLower(w1.trim()) + " " + StringUtils.toNormalizedLower(w2.trim());
@@ -939,42 +934,12 @@ public final class PrefixDictionary {
         return text != null && !text.trim().isEmpty();
     }
 
-    private void collectTopDictionaryWords(final List<CharSequence> results, final Set<String> added, final int limit) {
-        if (results.size() >= limit) {
-            return;
-        }
-        for (ScoredWord sw : mTopWords) {
-            if (addPredictionIfAbsent(sw.word, results, added, limit)) {
-                return;
-            }
-        }
-    }
-
-    private void collectDefaultFallbackWords(final List<CharSequence> results, final Set<String> added, final int limit) {
-        if (results.size() >= limit) {
-            return;
-        }
-        for (String w : DEFAULT_FALLBACK_PREDICTIONS) {
-            if (addPredictionIfAbsent(w, results, added, limit)) {
-                return;
-            }
-        }
-    }
-
-    private boolean addPredictionIfAbsent(final String word, final List<CharSequence> results, final Set<String> added, final int limit) {
-        if (added.add(word.toLowerCase())) {
-            results.add(word);
-            return results.size() >= limit;
-        }
-        return false;
-    }
-
     public synchronized List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
         return getNextWordPredictions(null, prevWord, limit);
     }
 
     public synchronized List<CharSequence> getNextWordPredictions(final String w1, final String w2, final int limit) {
-        if (limit <= 0) {
+        if (limit <= 0 || !isNonEmptyText(w2)) {
             return Collections.emptyList();
         }
         final List<CharSequence> results = new ArrayList<>(limit);
@@ -983,9 +948,6 @@ public final class PrefixDictionary {
         if (predictTrigrams(w1, w2, results, added, limit) || predictBigrams(w2, results, added, limit)) {
             return results;
         }
-
-        collectTopDictionaryWords(results, added, limit);
-        collectDefaultFallbackWords(results, added, limit);
 
         return results;
     }

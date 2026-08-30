@@ -175,4 +175,30 @@ public class BinaryTrieDictionary {
         }
         return Math.min(childCount, outChars.length);
     }
+
+    @FunctionalInterface
+    public interface WordConsumer {
+        void accept(String word, int frequency);
+    }
+
+    public void forEachWord(WordConsumer consumer) {
+        if (rootOffset <= 0 || consumer == null) return;
+        dfsTraverse(rootOffset, new StringBuilder(), consumer);
+    }
+
+    private void dfsTraverse(int nodeOffset, StringBuilder sb, WordConsumer consumer) {
+        if (isTerminal(nodeOffset)) {
+            consumer.accept(sb.toString(), getNodeFrequency(nodeOffset));
+        }
+        int childCount = buffer.get(nodeOffset + 4) & 0xFF;
+        if (childCount == 0) return;
+        int childrenOffset = buffer.getInt(nodeOffset + 8);
+        for (int i = 0; i < childCount; i++) {
+            int childNode = childrenOffset + i * 16;
+            char c = (char) (buffer.getShort(childNode) & 0xFFFF);
+            sb.append(c);
+            dfsTraverse(childNode, sb, consumer);
+            sb.setLength(sb.length() - 1);
+        }
+    }
 }

@@ -253,16 +253,10 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
                     COL_PINNED + " DESC, " + COL_TIMESTAMP + " DESC");
 
             if (cursor != null && cursor.moveToFirst()) {
-                final boolean filterActive = query != null && !query.trim().isEmpty();
-                final String queryLower = filterActive ? query.toLowerCase(Locale.getDefault()) : null;
                 do {
                     ClipboardHistoryEntry entry = ClipboardHistoryEntry.fromCursor(cursor);
-                    if (entry != null) {
-                        if (!filterActive) {
-                            clips.add(entry);
-                        } else if (entry.text != null && entry.text.toLowerCase(Locale.getDefault()).contains(queryLower)) {
-                            clips.add(entry);
-                        }
+                    if (entry != null && matchesQuery(entry.text, query)) {
+                        clips.add(entry);
                     }
                 } while (cursor.moveToNext());
             }

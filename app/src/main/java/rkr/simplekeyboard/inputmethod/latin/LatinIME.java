@@ -1575,7 +1575,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mTopBarView.setExternalView(null);
         }
 
-        if (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE && mClipboardHistoryView.isSearchActive()) {
+        if (isClipboardSearchActive()) {
             if (isBackspaceEvent(event)) {
                 mClipboardHistoryView.deleteSearchChar();
                 return;
@@ -1590,7 +1590,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 return;
             }
             if (event.mCodePoint > 0) {
-                mClipboardHistoryView.appendSearchText(new String(Character.toChars(event.mCodePoint)));
+                mClipboardHistoryView.appendSearchText(StringUtils.newSingleCodePointString(event.mCodePoint));
                 mKeyboardSwitcher.onEvent(event);
             }
             return;
@@ -1795,7 +1795,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // Called from PointerTracker through the KeyboardActionListener interface
     @Override
     public void onTextInput(final String rawText) {
-        if (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE && mClipboardHistoryView.isSearchActive()) {
+        if (isClipboardSearchActive()) {
             if (rawText != null && !rawText.isEmpty()) {
                 mClipboardHistoryView.appendSearchText(rawText);
             }
@@ -1879,7 +1879,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     // Callback of the {@link KeyboardActionListener}. This is called when a key is depressed;
-    // release matching call is {@link #onReleaseKey(int,boolean)} below.
+    // release matching call is {@link #onPressKey(int,boolean)} below.
     @Override
     public void onPressKey(final int primaryCode, final int repeatCount,
             final boolean isSinglePointer) {
@@ -1925,6 +1925,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         startActivity(intent);
     }
 
+    private boolean isClipboardSearchActive() {
+        return mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE && mClipboardHistoryView.isSearchActive();
+    }
+
     @Override
     public boolean onKeyDown(final int keyCode, final KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_DOWN) {
@@ -1941,7 +1945,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 return true;
             }
         }
-        if (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE && mClipboardHistoryView.isSearchActive() && event.getAction() == KeyEvent.ACTION_DOWN) {
+        if (isClipboardSearchActive() && event.getAction() == KeyEvent.ACTION_DOWN) {
             if (keyCode == KeyEvent.KEYCODE_DEL) {
                 mClipboardHistoryView.deleteSearchChar();
                 return true;
@@ -1958,7 +1962,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             }
             int unicodeChar = event.getUnicodeChar();
             if (unicodeChar > 0 && !Character.isISOControl(unicodeChar)) {
-                mClipboardHistoryView.appendSearchText(new String(Character.toChars(unicodeChar)));
+                mClipboardHistoryView.appendSearchText(StringUtils.newSingleCodePointString(unicodeChar));
                 return true;
             }
             return true;
@@ -1968,7 +1972,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public boolean onKeyUp(final int keyCode, final KeyEvent event) {
-        if (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE && mClipboardHistoryView.isSearchActive()) {
+        if (isClipboardSearchActive()) {
             if (KeyEvent.isModifierKey(keyCode)) {
                 return super.onKeyUp(keyCode, event);
             }
@@ -1979,7 +1983,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public boolean onKeyMultiple(final int keyCode, final int count, final KeyEvent event) {
-        if (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE && mClipboardHistoryView.isSearchActive()) {
+        if (isClipboardSearchActive()) {
             if (event.getCharacters() != null) {
                 mClipboardHistoryView.appendSearchText(event.getCharacters());
                 return true;
@@ -1998,7 +2002,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             }
             int unicodeChar = event.getUnicodeChar();
             if (unicodeChar > 0 && !Character.isISOControl(unicodeChar)) {
-                final String s = new String(Character.toChars(unicodeChar));
+                final String s = StringUtils.newSingleCodePointString(unicodeChar);
                 for (int i = 0; i < count; i++) {
                     mClipboardHistoryView.appendSearchText(s);
                 }

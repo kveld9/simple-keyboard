@@ -361,6 +361,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onDestroy() {
+        if (mRichImm != null) {
+            mRichImm.setSubtypeChangeHandler(null);
+        }
+        if (mClipboardHistoryView != null) {
+            mClipboardHistoryView.shutdownExecutor();
+        }
         if (mClipboardHistoryManager != null) {
             mClipboardHistoryManager.close();
             mClipboardHistoryManager = null;
@@ -930,11 +936,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
 
+        if (mDictExecutor.isShutdown() || mDictExecutor.isTerminated()) {
+            return;
+        }
+
         mLoadedLocale = currentLocale;
         mLoadedLanguages = new java.util.HashSet<>(enabledLangs);
         final int loadGeneration = ++mDictLoadGeneration;
 
-        mDictExecutor.execute(() -> {
+        try {
+            mDictExecutor.execute(() -> {
             // 1. Construct binary trie dictionary and beam search decoder in background
             BinaryTrieDictionary newBinaryDict = null;
             BeamSearchDecoder newDecoder = null;
@@ -981,6 +992,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 updateSuggestions();
             });
         });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) {
+            // Executor shutting down or terminated
+        }
     }
 
     private String getDictionaryAssetForLanguage(final String lang) {

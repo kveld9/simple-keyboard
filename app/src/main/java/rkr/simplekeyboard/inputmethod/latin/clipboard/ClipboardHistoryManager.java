@@ -70,9 +70,15 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     private Runnable mOnPrimaryClipChangeListener = null;
 
     public ClipboardHistoryManager(Context context) {
-        mContext = context;
-        mDatabase = new ClipboardDatabase(context);
-        mClipboardManager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        mContext = PreferenceManagerCompat.getDeviceContext(context);
+        mDatabase = new ClipboardDatabase(mContext);
+        ClipboardManager cm = null;
+        try {
+            cm = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        } catch (Throwable t) {
+            Log.w(TAG, "Unable to get ClipboardManager in early boot", t);
+        }
+        mClipboardManager = cm;
     }
 
     public void setOnScreenshotChangeListener(Runnable listener) {
@@ -96,19 +102,23 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
                 mClipboardManager.addPrimaryClipChangedListener(this);
                 mIsListening = true;
                 updateCurrentClip();
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 Log.w(TAG, "Failed to start ClipboardHistoryManager listener", e);
             }
         }
-        registerScreenshotObserver();
-        updateLatestScreenshotCache();
+        try {
+            registerScreenshotObserver();
+            updateLatestScreenshotCache();
+        } catch (Throwable e) {
+            Log.w(TAG, "Failed to start screenshot observer", e);
+        }
     }
 
     public void stop() {
         if (mClipboardManager != null && mIsListening) {
             try {
                 mClipboardManager.removePrimaryClipChangedListener(this);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 Log.w(TAG, "Failed to stop ClipboardHistoryManager listener", e);
             }
             mIsListening = false;

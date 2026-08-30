@@ -25,7 +25,7 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     private static final int MAX_TEXT_LENGTH = 50000;
 
     public ClipboardDatabase(Context context) {
-        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        super(rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat.getDeviceContext(context), DATABASE_NAME, null, DATABASE_VERSION);
     }
 
     @Override
@@ -73,9 +73,10 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         if (timestamp <= 0) {
             timestamp = System.currentTimeMillis();
         }
-        SQLiteDatabase db = getWritableDatabase();
-        db.beginTransaction();
+        SQLiteDatabase db = null;
         try {
+            db = getWritableDatabase();
+            db.beginTransaction();
             // Check if exists and whether it was pinned
             boolean isPinned = pinned;
             String queryKey = (uri != null && !uri.isEmpty()) ? uri : text;
@@ -103,10 +104,14 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
 
             cleanupOldClips(db);
             db.setTransactionSuccessful();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Error inserting clip", e);
         } finally {
-            db.endTransaction();
+            if (db != null) {
+                try {
+                    db.endTransaction();
+                } catch (Throwable ignored) {}
+            }
         }
     }
 
@@ -125,9 +130,10 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         if (retentionMinutes <= 0) {
             return; // Never / Unlimited
         }
-        SQLiteDatabase db = getWritableDatabase();
-        db.beginTransaction();
+        SQLiteDatabase db = null;
         try {
+            db = getWritableDatabase();
+            db.beginTransaction();
             long cutoffTimestamp = System.currentTimeMillis() - (retentionMinutes * 60 * 1000L);
             Cursor c = db.query(TABLE_NAME, new String[]{COL_URI}, COL_PINNED + "=0 AND " + COL_TIMESTAMP + " < ?",
                     new String[]{String.valueOf(cutoffTimestamp)}, null, null, null);
@@ -140,10 +146,14 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
             db.delete(TABLE_NAME, COL_PINNED + "=0 AND " + COL_TIMESTAMP + " < ?",
                     new String[]{String.valueOf(cutoffTimestamp)});
             db.setTransactionSuccessful();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Error deleting expired clips", e);
         } finally {
-            db.endTransaction();
+            if (db != null) {
+                try {
+                    db.endTransaction();
+                } catch (Throwable ignored) {}
+            }
         }
     }
 
@@ -161,7 +171,7 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
             }
             db.execSQL("DELETE FROM " + TABLE_NAME + " WHERE " + COL_PINNED + "=0 AND "
                     + COL_ID + " NOT IN (" + subquery + ")");
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Error cleaning up old clips", e);
         }
     }
@@ -178,7 +188,7 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
                 c.close();
             }
             db.delete(TABLE_NAME, COL_ID + "=?", new String[]{String.valueOf(id)});
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Error deleting clip", e);
         }
     }
@@ -189,7 +199,7 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
             ContentValues values = new ContentValues();
             values.put(COL_PINNED, isPinned ? 1 : 0);
             db.update(TABLE_NAME, values, COL_ID + "=?", new String[]{String.valueOf(id)});
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Error setting clip pinned state", e);
         }
     }
@@ -206,7 +216,7 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
                 c.close();
             }
             db.delete(TABLE_NAME, COL_PINNED + "=0", null);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Error clearing unpinned clips", e);
         }
     }
@@ -234,11 +244,13 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
                     clips.add(new ClipboardHistoryEntry(id, text, timestamp, isPinned, uri));
                 } while (cursor.moveToNext());
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Error getting clips", e);
         } finally {
             if (cursor != null) {
-                cursor.close();
+                try {
+                    cursor.close();
+                } catch (Throwable ignored) {}
             }
         }
         return clips;

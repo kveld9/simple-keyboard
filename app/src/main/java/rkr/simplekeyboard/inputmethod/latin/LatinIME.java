@@ -328,15 +328,20 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
         mClipboardHistoryManager.setOnScreenshotChangeListener(this::updateSuggestions);
         mClipboardHistoryManager.setOnPrimaryClipChangeListener(this::updateSuggestions);
-        mClipboardHistoryManager.start();
+        try {
+            mClipboardHistoryManager.start();
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to start ClipboardHistoryManager", t);
+        }
 
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
         loadSettings();
 
-        // Register to receive ringer mode change.
+        // Register to receive ringer mode change and user unlock.
         final IntentFilter filter = new IntentFilter();
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
+        filter.addAction(Intent.ACTION_USER_UNLOCKED);
         registerReceiver(mRingerModeChangeReceiver, filter);
     }
 
@@ -1813,13 +1818,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 getCurrentRecapitalizeState());
     }
 
-    // receive ringer mode change.
+    // receive ringer mode change and user unlock.
     private final BroadcastReceiver mRingerModeChangeReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(final Context context, final Intent intent) {
             final String action = intent.getAction();
-            if (action.equals(AudioManager.RINGER_MODE_CHANGED_ACTION)) {
+            if (AudioManager.RINGER_MODE_CHANGED_ACTION.equals(action)) {
                 AudioAndHapticFeedbackManager.getInstance().onRingerModeChanged();
+            } else if (Intent.ACTION_USER_UNLOCKED.equals(action)) {
+                if (mClipboardHistoryManager != null) {
+                    try {
+                        mClipboardHistoryManager.start();
+                    } catch (Throwable ignored) {}
+                }
             }
         }
     };

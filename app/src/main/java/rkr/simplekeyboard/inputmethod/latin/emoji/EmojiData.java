@@ -18,19 +18,6 @@ package rkr.simplekeyboard.inputmethod.latin.emoji;
 
 public final class EmojiData {
 
-    public static final String[] CATEGORY_NAMES = {
-        "Recents",
-        "Smileys",
-        "People",
-        "Nature",
-        "Food",
-        "Activity",
-        "Travel",
-        "Objects",
-        "Symbols",
-        "Flags"
-    };
-
     public static final String[] CATEGORY_ICONS = {
         "🕒",
         "😀",

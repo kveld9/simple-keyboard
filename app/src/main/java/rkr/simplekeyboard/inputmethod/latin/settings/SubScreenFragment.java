@@ -45,25 +45,12 @@ public abstract class SubScreenFragment extends PreferenceFragmentCompat
         implements OnSharedPreferenceChangeListener {
     private OnSharedPreferenceChangeListener mSharedPreferenceChangeListener;
 
-    static void setPreferenceEnabled(final String prefKey, final boolean enabled,
-                                     final PreferenceScreen screen) {
-        if (screen == null) return;
-        final Preference preference = screen.findPreference(prefKey);
-        if (preference != null) {
-            preference.setEnabled(enabled);
-        }
-    }
-
     static void removePreference(final String prefKey, final PreferenceScreen screen) {
         if (screen == null) return;
         final Preference preference = screen.findPreference(prefKey);
         if (preference != null) {
             screen.removePreference(preference);
         }
-    }
-
-    final void setPreferenceEnabled(final String prefKey, final boolean enabled) {
-        setPreferenceEnabled(prefKey, enabled, getPreferenceScreen());
     }
 
     final void removePreference(final String prefKey) {

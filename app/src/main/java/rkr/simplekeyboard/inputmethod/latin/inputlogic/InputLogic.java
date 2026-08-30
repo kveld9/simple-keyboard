@@ -90,9 +90,8 @@ public final class InputLogic {
      * @return the complete transaction object
      */
     public InputTransaction onTextInput(final SettingsValues settingsValues, final Event event) {
-        final String rawText = event.getTextToCommit().toString();
+        final String text = event.getTextToCommit().toString();
         final InputTransaction inputTransaction = new InputTransaction(settingsValues);
-        final String text = performSpecificTldProcessingOnTextInput(rawText);
         mConnection.commitText(text, 1);
         // Space state must be updated before calling updateShiftState
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
@@ -431,30 +430,6 @@ public final class InputLogic {
      * Perform the processing specific to inputting TLDs.
      *
      * Some keys input a TLD (specifically, the ".com" key) and this warrants some specific
-     * processing. First, if this is a TLD, we ignore PHANTOM spaces -- this is done by type
-     * of character in onCodeInput, but since this gets inputted as a whole string we need to
-     * do it here specifically. Then, if the last character before the cursor is a period, then
-     * we cut the dot at the start of ".com". This is because humans tend to type "www.google."
-     * and then press the ".com" key and instinctively don't expect to get "www.google..com".
-     *
-     * @param text the raw text supplied to onTextInput
-     * @return the text to actually send to the editor
-     */
-    private String performSpecificTldProcessingOnTextInput(final String text) {
-        if (text.length() <= 1 || text.charAt(0) != Constants.CODE_PERIOD
-                || !Character.isLetter(text.charAt(1))) {
-            // Not a tld: do nothing.
-            return text;
-        }
-        final int codePointBeforeCursor = mConnection.getCodePointBeforeCursor();
-        // If no code point, #getCodePointBeforeCursor returns NOT_A_CODE_POINT.
-        if (Constants.CODE_PERIOD == codePointBeforeCursor) {
-            return text.substring(1);
-        }
-        return text;
-    }
-
-    /**
      * Handle a press on the settings key.
      */
     private void onSettingsKeyPressed() {

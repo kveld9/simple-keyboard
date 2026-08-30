@@ -215,26 +215,26 @@ public class TopBarView extends FrameLayout {
     private void dispatchSuggestions(List<CharSequence> suggestions, int boldIndex) {
         final int count = suggestions.size();
         if (count >= 3) {
-            renderThreeSuggestions(suggestions);
+            renderThreeSuggestions(suggestions, boldIndex);
         } else if (count == 2) {
-            renderTwoSuggestions(suggestions);
+            renderTwoSuggestions(suggestions, boldIndex);
         } else {
             renderSingleSuggestion(suggestions, boldIndex == 0);
         }
     }
 
-    private void renderThreeSuggestions(List<CharSequence> suggestions) {
-        bindSlot(mLeftSlot, suggestions.get(0), false);
+    private void renderThreeSuggestions(List<CharSequence> suggestions, int boldIndex) {
+        bindSlot(mLeftSlot, suggestions.get(0), boldIndex == 0);
         mDivider1.setVisibility(View.VISIBLE);
-        bindSlot(mCenterSlot, suggestions.get(1), true);
+        bindSlot(mCenterSlot, suggestions.get(1), boldIndex == 1);
         mDivider2.setVisibility(View.VISIBLE);
-        bindSlot(mRightSlot, suggestions.get(2), false);
+        bindSlot(mRightSlot, suggestions.get(2), boldIndex == 2);
     }
 
-    private void renderTwoSuggestions(List<CharSequence> suggestions) {
-        bindSlot(mLeftSlot, suggestions.get(0), false);
+    private void renderTwoSuggestions(List<CharSequence> suggestions, int boldIndex) {
+        bindSlot(mLeftSlot, suggestions.get(0), boldIndex == 0);
         mDivider1.setVisibility(View.VISIBLE);
-        bindSlot(mCenterSlot, suggestions.get(1), true);
+        bindSlot(mCenterSlot, suggestions.get(1), boldIndex == 1);
         mDivider2.setVisibility(View.INVISIBLE);
         bindSlot(mRightSlot, null, false);
     }

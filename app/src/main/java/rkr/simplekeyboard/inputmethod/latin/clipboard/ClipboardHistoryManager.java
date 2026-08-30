@@ -94,7 +94,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     }
 
     public void start() {
-        if (!isHistoryEnabled()) {
+        if (!isClipboardEnabled()) {
             return;
         }
         if (mClipboardManager != null && !mIsListening) {
@@ -209,7 +209,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     }
 
     private void storeClipTextIfChanged(final String currentText, final long clipTimestamp) {
-        if (!isHistoryEnabled()) {
+        if (!isClipboardEnabled()) {
             return;
         }
         if (!currentText.equals(mLastText)) {
@@ -232,7 +232,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     }
 
     public String getRecentClipForSuggestion() {
-        if (!isHistoryEnabled()) {
+        if (!isClipboardEnabled()) {
             return null;
         }
         final String clip = getLatestClipText();
@@ -259,7 +259,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     }
 
     public ScreenshotInfo getRecentScreenshotForSuggestion() {
-        if (!isHistoryEnabled() || !isScreenshotSuggestionEnabled()) {
+        if (!isClipboardEnabled() || !isScreenshotSuggestionEnabled()) {
             return null;
         }
         final ScreenshotInfo info = mCachedScreenshotInfo;
@@ -324,7 +324,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     }
 
     public void updateLatestScreenshotCache() {
-        if (!isHistoryEnabled() || !hasStoragePermission()) {
+        if (!isClipboardEnabled() || !hasStoragePermission()) {
             mCachedScreenshotInfo = null;
             return;
         }
@@ -474,11 +474,6 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         return null;
     }
 
-    private boolean isHistoryEnabled() {
-        android.content.SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(mContext);
-        return Settings.readClipboardHistoryEnabled(prefs);
-    }
-
     private long getRetentionMinutes() {
         android.content.SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(mContext);
         return Settings.readClipboardRetentionMinutes(prefs);
@@ -486,13 +481,12 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
     public boolean isClipboardEnabled() {
         android.content.SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(mContext);
-        return prefs.getBoolean(Settings.PREF_CLIPBOARD_ENABLED, true);
+        return Settings.readClipboardEnabled(prefs);
     }
 
     @Override
     public void onPrimaryClipChanged() {
-        if (mClipboardManager == null || !isClipboardEnabled() || !isHistoryEnabled()) return;
-
+        if (mClipboardManager == null || !isClipboardEnabled()) return;
 
         try {
             if (mClipboardManager.hasPrimaryClip()) {

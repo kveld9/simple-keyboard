@@ -31,6 +31,8 @@
     <string name="settings_system_default">Predeterminado</string>
     <string name="auto_cap">Mayúsculas automáticas</string>
     <string name="auto_cap_summary">Escribir la primera letra de cada frase en mayúscula</string>
+    <string name="auto_period">Punto al pulsar doble espacio</string>
+    <string name="auto_period_summary">Tocar dos veces el espacio inserta un punto seguido de un espacio</string>
     <string name="select_language">Idiomas</string>
     <string name="locale_name_en_GB">Inglés (Reino Unido)</string>
     <string name="locale_name_en_US">Inglés (EE. UU.)</string>
@@ -53,9 +55,17 @@
     <string name="pref_use_on_screen">Mostrar el teclado en pantalla</string>
     <string name="pref_use_on_screen_summary">Mostrar el teclado en pantalla mientras se usa el teclado físico</string>
     <string name="pref_enable_ime_switch">Cambiar a otros teclados</string>
+    <string name="disable_landscape_fullscreen">Desactivar pantalla completa en horizontal</string>
+    <string name="disable_landscape_fullscreen_summary">No expandir el teclado a pantalla completa en modo horizontal</string>
     <string name="show_number_row">Mostrar fila numérica separada</string>
     <string name="space_swipe">Deslizar la barra espaciadora para mover el cursor</string>
     <string name="delete_swipe">Deslizar para eliminar</string>
+    <string name="swipe_sensitivity">Sensibilidad de deslizamiento</string>
+    <string-array name="swipe_sensitivity_entries">
+        <item>Alta</item>
+        <item>Normal</item>
+        <item>Baja</item>
+    </string-array>
     <string name="user_languages">Idiomas de teclado habilitados</string>
     <string name="change_keyboard">Cambiar teclado</string>
     <string name="privacy_policy">Política de privacidad</string>

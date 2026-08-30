@@ -51,6 +51,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String SCREEN_THEME = "screen_theme";
     // In the same order as xml/prefs.xml
     public static final String PREF_AUTO_CAP = "auto_cap";
+    public static final String PREF_AUTO_PERIOD = "auto_period";
     public static final String PREF_VIBRATE_ON = "vibrate_on";
     public static final String PREF_SOUND_ON = "sound_on";
     public static final String PREF_POPUP_ON = "popup_on";
@@ -67,6 +68,8 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_SHOW_NUMBER_ROW = "pref_show_number_row";
     public static final String PREF_SPACE_SWIPE = "pref_space_swipe";
     public static final String PREF_DELETE_SWIPE = "pref_delete_swipe";
+    public static final String PREF_SWIPE_SENSITIVITY = "pref_swipe_sensitivity";
+    public static final String PREF_DISABLE_LANDSCAPE_FULLSCREEN = "pref_disable_landscape_fullscreen";
     public static final String PREF_CLIPBOARD_ENABLED = "pref_clipboard_enabled";
 
     public static final String PREF_CLIPBOARD_RETENTION_TIME = "pref_clipboard_retention_time";
@@ -210,6 +213,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         });
 
         map.put(PREF_AUTO_CAP, boolApplier);
+        map.put(PREF_AUTO_PERIOD, boolApplier);
         map.put(PREF_SHOW_NUMBER_ROW, boolApplier);
         map.put(PREF_SHOW_SPECIAL_CHARS, boolApplier);
         map.put(PREF_SHOW_LANGUAGE_SWITCH_KEY, boolApplier);
@@ -218,6 +222,8 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         map.put(PREF_ENABLE_IME_SWITCH, boolApplier);
         map.put(PREF_DELETE_SWIPE, boolApplier);
         map.put(PREF_SPACE_SWIPE, boolApplier);
+        map.put(PREF_DISABLE_LANDSCAPE_FULLSCREEN, boolApplier);
+        map.put(PREF_SWIPE_SENSITIVITY, stringApplier);
         map.put(PREF_VIBRATE_ON, boolApplier);
         map.put(PREF_SOUND_ON, boolApplier);
         map.put(PREF_POPUP_ON, boolApplier);
@@ -286,6 +292,18 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
             return Float.parseFloat(str);
         } catch (NumberFormatException | NullPointerException e) {
             return AUTO_CORRECTION_THRESHOLD_MODEST;
+        }
+    }
+
+    public static float readSwipeSensitivity(final SharedPreferences prefs) {
+        if (prefs == null) {
+            return 1.0f;
+        }
+        final String str = prefs.getString(PREF_SWIPE_SENSITIVITY, "1.0");
+        try {
+            return Float.parseFloat(str);
+        } catch (NumberFormatException | NullPointerException e) {
+            return 1.0f;
         }
     }
 

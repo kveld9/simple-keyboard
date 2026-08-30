@@ -66,7 +66,7 @@ public final class BogusMoveEventDetector {
     private int mActualDownY;
 
     public void setKeyboardGeometry(final int keyPaddedWidth, final int keyPaddedHeight) {
-        final float keyDiagonal = (float)Math.hypot(keyPaddedWidth, keyPaddedHeight);
+        final float keyDiagonal = (float) Math.sqrt(keyPaddedWidth * keyPaddedWidth + keyPaddedHeight * keyPaddedHeight);
         mAccumulatedDistanceThreshold = (int)(
                 keyDiagonal * BOGUS_MOVE_ACCUMULATED_DISTANCE_THRESHOLD);
     }

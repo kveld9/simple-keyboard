@@ -34,19 +34,24 @@ def getGitVersionName() {
 
 def computeVersionCode(String versionName) {
     try {
-        def clean = versionName.split('[-+]')[0]
+        def rawParts = versionName.split('-')
+        def clean = rawParts[0]
+        int extraCount = 0
+        if (rawParts.length >= 2 && rawParts[1].isInteger()) {
+            extraCount = rawParts[1].toInteger()
+        }
         def parts = clean.split('\\.')
         if (parts.length >= 3) {
             int major = parts[0].toInteger()
             int minor = parts[1].toInteger()
             int patch = parts[2].toInteger()
-            return major * 10000 + minor * 100 + patch
+            return major * 10000 + minor * 100 + patch + extraCount
         } else if (parts.length == 2) {
             int major = parts[0].toInteger()
             int minor = parts[1].toInteger()
-            return major * 10000 + minor * 100
+            return major * 10000 + minor * 100 + extraCount
         } else if (parts.length == 1 && parts[0].isInteger()) {
-            return parts[0].toInteger()
+            return parts[0].toInteger() + extraCount
         }
     } catch (Exception ignored) {
     }

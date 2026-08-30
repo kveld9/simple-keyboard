@@ -101,32 +101,38 @@ public final class LocaleUtils {
      */
     public static Locale findBestLocale(final Locale localeToMatch,
                                         final Collection<Locale> options) {
-        // Find the best subtype based on a straightforward matching algorithm.
-        // TODO: Use LocaleList#getFirstMatch() instead.
-        for (final Locale locale : options) {
-            if (locale.equals(localeToMatch)) {
-                return locale;
+        if (localeToMatch == null || options == null || options.isEmpty()) {
+            return null;
+        }
+        Locale bestMatch = null;
+        int bestScore = 0;
+        final String targetLang = localeToMatch.getLanguage();
+        final String targetCountry = localeToMatch.getCountry();
+        final String targetVariant = localeToMatch.getVariant();
+
+        for (final Locale candidate : options) {
+            if (candidate.equals(localeToMatch)) {
+                return candidate;
+            }
+            if (!candidate.getLanguage().equals(targetLang)) {
+                continue;
+            }
+            int score = 1;
+            if (candidate.getCountry().equals(targetCountry)) {
+                score = 2;
+                if (candidate.getVariant().equals(targetVariant)) {
+                    score = 3;
+                }
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestMatch = candidate;
+                if (score == 3) {
+                    break;
+                }
             }
         }
-        for (final Locale locale : options) {
-            if (locale.getLanguage().equals(localeToMatch.getLanguage()) &&
-                    locale.getCountry().equals(localeToMatch.getCountry()) &&
-                    locale.getVariant().equals(localeToMatch.getVariant())) {
-                return locale;
-            }
-        }
-        for (final Locale locale : options) {
-            if (locale.getLanguage().equals(localeToMatch.getLanguage()) &&
-                    locale.getCountry().equals(localeToMatch.getCountry())) {
-                return locale;
-            }
-        }
-        for (final Locale locale : options) {
-            if (locale.getLanguage().equals(localeToMatch.getLanguage())) {
-                return locale;
-            }
-        }
-        return null;
+        return bestMatch;
     }
 
     /**

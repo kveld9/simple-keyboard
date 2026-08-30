@@ -199,7 +199,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         final String currentText = text.toString();
         long clipTimestamp = System.currentTimeMillis();
         try {
-            if (clip.getDescription() != null && clip.getDescription().getTimestamp() > 0) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && clip.getDescription() != null && clip.getDescription().getTimestamp() > 0) {
                 clipTimestamp = clip.getDescription().getTimestamp();
             }
         } catch (Throwable ignored) {}

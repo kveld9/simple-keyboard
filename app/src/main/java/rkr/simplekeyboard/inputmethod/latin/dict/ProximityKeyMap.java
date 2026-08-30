@@ -1,17 +1,26 @@
 package rkr.simplekeyboard.inputmethod.latin.dict;
 
+import java.util.Arrays;
 import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 
 /**
- * Ultra-lightweight and efficient key adjacency and physical proximity map
- * for QWERTY and Spanish (QWERTY with 'ñ') layouts.
+ * Ultra-lightweight, zero-overhead key adjacency and physical proximity map
+ * with O(1) direct memory lookup.
  */
 public final class ProximityKeyMap {
 
     private static final int NUM_KEYS = 60; // 0..26 (Latin a-z, ñ), 27..59 (Cyrillic а-я, ё)
     private static final long[] ADJACENCY_MASKS = new long[NUM_KEYS];
+    private static final byte[] CHAR_TO_INDEX = new byte[65536];
+    private static final float[][] DISTANCE_WEIGHTS = new float[NUM_KEYS][NUM_KEYS];
 
     static {
+        Arrays.fill(CHAR_TO_INDEX, (byte) -1);
+
+        for (int c = 0; c < 65536; c++) {
+            CHAR_TO_INDEX[c] = (byte) computeRawIndex((char) c);
+        }
+
         // Latin QWERTY
         link('q', "wa");
         link('w', "qeasd");
@@ -42,9 +51,6 @@ public final class ProximityKeyMap {
         link('m', "njkl");
 
         // Cyrillic JCUKEN (Russian)
-        // Row 1: й ц у к е н г ш щ з х ъ
-        // Row 2: ф ы в а п р о л д ж э
-        // Row 3: я ч с м и т ь б ю
         link('й', "цф");
         link('ц', "йуфыв");
         link('у', "цкыва");
@@ -78,16 +84,29 @@ public final class ProximityKeyMap {
         link('б', "ьлдю");
         link('ю', "бджэ");
         link('ё', "12й");
+
+        // Precalculate full weight matrix
+        for (int u = 0; u < NUM_KEYS; u++) {
+            for (int v = 0; v < NUM_KEYS; v++) {
+                if (u == v) {
+                    DISTANCE_WEIGHTS[u][v] = 0.0f;
+                } else if ((ADJACENCY_MASKS[u] & (1L << v)) != 0) {
+                    DISTANCE_WEIGHTS[u][v] = 0.5f;
+                } else {
+                    DISTANCE_WEIGHTS[u][v] = 1.0f;
+                }
+            }
+        }
     }
 
     private ProximityKeyMap() {
     }
 
     private static void link(final char c, final String neighbors) {
-        final int u = getIndex(c);
+        final int u = CHAR_TO_INDEX[c];
         if (u < 0) return;
         for (int i = 0; i < neighbors.length(); i++) {
-            final int v = getIndex(neighbors.charAt(i));
+            final int v = CHAR_TO_INDEX[neighbors.charAt(i)];
             if (v >= 0 && u != v) {
                 ADJACENCY_MASKS[u] |= (1L << v);
                 ADJACENCY_MASKS[v] |= (1L << u);
@@ -95,7 +114,7 @@ public final class ProximityKeyMap {
         }
     }
 
-    private static int getIndex(final char c) {
+    private static int computeRawIndex(final char c) {
         final char lower = Character.toLowerCase(c);
         if (lower == 'ñ') {
             return 26;
@@ -113,32 +132,21 @@ public final class ProximityKeyMap {
         return -1;
     }
 
-    /**
-     * Checks whether two characters are physically adjacent on the keyboard layout.
-     */
     public static boolean areAdjacent(final char a, final char b) {
-        final int idxA = getIndex(a);
-        final int idxB = getIndex(b);
+        final int idxA = CHAR_TO_INDEX[a];
+        final int idxB = CHAR_TO_INDEX[b];
         if (idxA < 0 || idxB < 0 || idxA == idxB) {
             return false;
         }
         return (ADJACENCY_MASKS[idxA] & (1L << idxB)) != 0;
     }
 
-    /**
-     * Returns the physical distance weight between two characters:
-     * - 0.0f if identical
-     * - 0.35f if physically adjacent on the keyboard
-     * - 1.0f if not adjacent
-     */
     public static float getDistanceWeight(final char a, final char b) {
-        final int idxA = getIndex(a);
-        final int idxB = getIndex(b);
-        if (idxA >= 0 && idxA == idxB) {
-            return 0.0f;
-        }
-        if (areAdjacent(a, b)) {
-            return 0.5f;
+        if (a == b) return 0.0f;
+        final int idxA = CHAR_TO_INDEX[a];
+        final int idxB = CHAR_TO_INDEX[b];
+        if (idxA >= 0 && idxB >= 0) {
+            return DISTANCE_WEIGHTS[idxA][idxB];
         }
         return 1.0f;
     }

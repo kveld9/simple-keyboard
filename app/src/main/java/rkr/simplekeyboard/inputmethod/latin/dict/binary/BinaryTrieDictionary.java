@@ -180,6 +180,62 @@ public class BinaryTrieDictionary {
         void accept(String word, int frequency);
     }
 
+    public void searchFuzzy(int nodeOffset, StringBuilder currentPath, String target, int targetIdx, int remainingDistance, List<rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord> candidates) {
+        if (remainingDistance < 0 || candidates.size() >= 40) {
+            return;
+        }
+
+        if (targetIdx == target.length() && isTerminal(nodeOffset)) {
+            String word = getNodeWord(nodeOffset);
+            if (word != null) {
+                int freq = getNodeFrequency(nodeOffset);
+                candidates.add(new rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord(word, freq));
+            }
+        }
+
+        // 1. Deletion from target (extra character typed by user)
+        if (targetIdx < target.length() && remainingDistance > 0) {
+            searchFuzzy(nodeOffset, currentPath, target, targetIdx + 1, remainingDistance - 1, candidates);
+        }
+
+        int childCount = buffer.get(nodeOffset + 4) & 0xFF;
+        if (childCount == 0) return;
+        int childrenOffset = buffer.getInt(nodeOffset + 8);
+
+        for (int i = 0; i < childCount; i++) {
+            if (candidates.size() >= 40) break;
+            int childNode = childrenOffset + i * 16;
+            char c = (char) (buffer.getShort(childNode) & 0xFFFF);
+            char normC = StringUtils.foldChar(c);
+
+            int cost = 1;
+            int nextTargetIdx = targetIdx;
+
+            if (targetIdx < target.length()) {
+                char t = StringUtils.foldChar(target.charAt(targetIdx));
+                if (normC == t) {
+                    cost = 0;
+                    nextTargetIdx = targetIdx + 1;
+                } else if (remainingDistance > 0) {
+                    nextTargetIdx = targetIdx + 1;
+                } else {
+                    continue;
+                }
+            } else if (remainingDistance > 0) {
+                // Insertion (missing character)
+                nextTargetIdx = targetIdx;
+            } else {
+                continue;
+            }
+
+            if (remainingDistance >= cost) {
+                currentPath.append(c);
+                searchFuzzy(childNode, currentPath, target, nextTargetIdx, remainingDistance - cost, candidates);
+                currentPath.setLength(currentPath.length() - 1);
+            }
+        }
+    }
+
     public void forEachWord(WordConsumer consumer) {
         if (rootOffset <= 0 || consumer == null) return;
         dfsTraverse(rootOffset, new StringBuilder(), consumer);

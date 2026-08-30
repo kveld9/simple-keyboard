@@ -52,13 +52,18 @@ public class SpatialTouchModel {
         List<SpatialCandidate> candidates = new ArrayList<>();
 
         for (SpatialKey key : mKeys) {
+            float dx = touchX - key.centerX;
+            float dy = touchY - key.centerY;
+
+            // Fast AABB pruning before evaluating expensive divisions and Math.exp
+            if (Math.abs(dx) > key.width * 1.4f || Math.abs(dy) > key.height * 1.4f) {
+                continue;
+            }
+
             float sigmaX = key.width * 0.40f;
             float sigmaY = key.height * 0.45f;
             
             if (sigmaX <= 0 || sigmaY <= 0) continue;
-
-            float dx = touchX - key.centerX;
-            float dy = touchY - key.centerY;
 
             float expPart = -((dx * dx) / (2 * sigmaX * sigmaX) + (dy * dy) / (2 * sigmaY * sigmaY));
             float prob = (float) Math.exp(expPart);

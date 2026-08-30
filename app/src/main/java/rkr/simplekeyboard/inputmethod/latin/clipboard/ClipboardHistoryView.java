@@ -496,6 +496,14 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (mAsyncExecutor != null && !mAsyncExecutor.isShutdown()) {
+            mAsyncExecutor.shutdownNow();
+        }
+    }
+
+    @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int height = mTargetHeight;
         if (height <= 0) {

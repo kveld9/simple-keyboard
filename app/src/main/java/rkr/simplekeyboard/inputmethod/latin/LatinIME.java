@@ -1188,15 +1188,35 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private int appendMatchingSuggestions(final java.util.List<CharSequence> suggestions,
-            final java.util.List<CharSequence> matches) {
-        if (matches.isEmpty()) {
-            return -1;
+            final java.util.List<CharSequence> matches, final String word, final String w1, final String w2) {
+        if (matches != null) {
+            for (CharSequence m : matches) {
+                if (suggestions.size() >= 3) break;
+                if (!m.toString().equalsIgnoreCase(word)) {
+                    suggestions.add(m);
+                }
+            }
         }
-        suggestions.add(matches.get(0));
-        if (matches.size() > 1) {
-            suggestions.add(matches.get(1));
+
+        if (suggestions.size() < 3 && mPrefixDictionary != null) {
+            final java.util.List<CharSequence> fuzzy = mPrefixDictionary.getFuzzySuggestions(word, 3, w1, w2);
+            if (fuzzy != null) {
+                for (CharSequence f : fuzzy) {
+                    if (suggestions.size() >= 3) break;
+                    boolean exists = false;
+                    for (CharSequence s : suggestions) {
+                        if (s.toString().equalsIgnoreCase(f.toString()) || s.toString().equalsIgnoreCase("\"" + f + "\"")) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    if (!exists) {
+                        suggestions.add(f);
+                    }
+                }
+            }
         }
-        return 1;
+        return suggestions.size() > 1 ? 1 : -1;
     }
 
     private void displayComposingSuggestions(final String word, final String w1, final String w2) {
@@ -1211,7 +1231,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             appendCorrectionAndCandidates(suggestions, word, w1, w2, bestCorrection, matches);
             boldIndex = 1;
         } else {
-            boldIndex = appendMatchingSuggestions(suggestions, matches);
+            boldIndex = appendMatchingSuggestions(suggestions, matches, word, w1, w2);
         }
 
         mTopBarView.setSuggestions(suggestions, boldIndex);

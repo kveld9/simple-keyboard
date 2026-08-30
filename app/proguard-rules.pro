@@ -17,4 +17,22 @@
 #}
 
 -keep class rkr.simplekeyboard.inputmethod.R
--keep class rkr.simplekeyboard.inputmethod.latin.settings.** { *; }
+
+# Keep Fragments and their default constructors for FragmentFactory reflection
+-keep public class * extends androidx.fragment.app.Fragment {
+    public <init>();
+}
+
+# Keep custom Preference classes and their XML inflation constructors
+-keep public class * extends androidx.preference.Preference {
+    public <init>(android.content.Context, android.util.AttributeSet);
+    public <init>(android.content.Context, android.util.AttributeSet, int);
+    public <init>(android.content.Context, android.util.AttributeSet, int, int);
+}
+
+# Keep custom Views and their XML layout inflation constructors
+-keep public class * extends android.view.View {
+    public <init>(android.content.Context);
+    public <init>(android.content.Context, android.util.AttributeSet);
+    public <init>(android.content.Context, android.util.AttributeSet, int);
+}

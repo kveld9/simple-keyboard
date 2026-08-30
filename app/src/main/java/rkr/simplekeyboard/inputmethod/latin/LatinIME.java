@@ -21,7 +21,7 @@
 
 package rkr.simplekeyboard.inputmethod.latin;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -1561,8 +1561,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mOptionsDialog = null;
         }
 
-        final AlertDialog.Builder builder = new AlertDialog.Builder(
-                DialogUtils.getPlatformDialogThemeContext(this));
+        final AlertDialog.Builder builder = DialogUtils.createMaterialDialogBuilder(this);
         builder.setTitle(R.string.forget_word_title);
         builder.setMessage(getString(R.string.forget_word_message, word));
         builder.setPositiveButton(android.R.string.ok, (dialog, which) -> {

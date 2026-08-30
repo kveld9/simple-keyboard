@@ -44,5 +44,6 @@
         android:key="license" />
     <Preference
         android:title="@string/version"
-        android:key="version_info" />
+        android:key="version_info"
+        android:widgetLayout="@layout/preference_widget_check_update" />
 </PreferenceScreen>

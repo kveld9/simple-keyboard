@@ -19,6 +19,8 @@ package rkr.simplekeyboard.inputmethod.keyboard;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -75,6 +77,32 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
         super.setKeyboard(keyboard);
         mKeyDetector.setKeyboard(
                 keyboard, -getPaddingLeft(), -getPaddingTop() + getVerticalCorrection());
+        updatePopupBackground();
+    }
+
+    private void updatePopupBackground() {
+        final Context context = getContext();
+        final float cornerRadius = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getCornerRadius(context, mKeyShape);
+        final Drawable bg = getBackground();
+        if (bg instanceof android.graphics.drawable.GradientDrawable) {
+            ((android.graphics.drawable.GradientDrawable) bg.mutate()).setCornerRadius(cornerRadius);
+        }
+        final View container = getContainerView();
+        if (container != null) {
+            final Drawable containerBg = container.getBackground();
+            if (containerBg instanceof android.graphics.drawable.GradientDrawable) {
+                ((android.graphics.drawable.GradientDrawable) containerBg.mutate()).setCornerRadius(cornerRadius);
+            }
+        }
+    }
+
+    @Override
+    protected void onDrawKeyBackground(final Key key, final android.graphics.Canvas canvas,
+            final Drawable background) {
+        if (!key.isPressed()) {
+            return;
+        }
+        super.onDrawKeyBackground(key, canvas, background);
     }
 
     @Override
@@ -82,6 +110,7 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
             final int pointX, final int pointY, final KeyboardActionListener listener) {
         mController = controller;
         mListener = listener;
+        updatePopupBackground();
         final View container = getContainerView();
         // The coordinates of panel's left-top corner in parentView's coordinate system.
         // We need to consider background drawable paddings.

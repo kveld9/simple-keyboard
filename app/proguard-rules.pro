@@ -17,4 +17,13 @@
 #}
 
 -keep class rkr.simplekeyboard.inputmethod.R
--keep class rkr.simplekeyboard.inputmethod.latin.settings.** { *; }
+
+# Keep Fragments instantiated via FragmentFactory reflection
+-keep class rkr.simplekeyboard.inputmethod.latin.settings.AppearanceSettingsFragment { public <init>(); }
+-keep class rkr.simplekeyboard.inputmethod.latin.settings.AutocorrectSettingsFragment { public <init>(); }
+-keep class rkr.simplekeyboard.inputmethod.latin.settings.ClipboardSettingsFragment { public <init>(); }
+-keep class rkr.simplekeyboard.inputmethod.latin.settings.KeyPressSettingsFragment { public <init>(); }
+-keep class rkr.simplekeyboard.inputmethod.latin.settings.LanguagesSettingsFragment { public <init>(); }
+-keep class rkr.simplekeyboard.inputmethod.latin.settings.PreferencesSettingsFragment { public <init>(); }
+-keep class rkr.simplekeyboard.inputmethod.latin.settings.SettingsFragment { public <init>(); }
+-keep class rkr.simplekeyboard.inputmethod.latin.settings.ThemeSettingsFragment { public <init>(); }

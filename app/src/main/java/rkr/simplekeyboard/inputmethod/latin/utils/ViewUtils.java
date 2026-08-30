@@ -43,7 +43,14 @@ public final class ViewUtils {
     }
 
     public static int getKeyTextColor(final Context context) {
-        return getThemeColor(context, R.attr.keyTextColor, 0xFFCCCCCC);
+        final TypedValue typedValue = new TypedValue();
+        if (context.getTheme().resolveAttribute(R.attr.keyTextColor, typedValue, true) && typedValue.data != 0) {
+            return typedValue.data;
+        }
+        final TypedArray a = context.obtainStyledAttributes(null, new int[]{R.attr.keyTextColor}, R.attr.keyboardViewStyle, R.style.KeyboardView);
+        final int color = a.getColor(0, 0xFF37474F);
+        a.recycle();
+        return color;
     }
 
     public static int getFunctionalTextColor(final Context context, final int fallbackColor) {
@@ -132,7 +139,9 @@ public final class ViewUtils {
 
     public static ImageView createBarIconButton(final Context context, final int drawableResId,
             final int widthPx) {
-        return createIconButton(context, drawableResId, widthPx, ViewGroup.LayoutParams.MATCH_PARENT, 0, false);
+        final ImageView iv = createIconButton(context, drawableResId, widthPx, ViewGroup.LayoutParams.MATCH_PARENT, 0, false);
+        iv.setColorFilter(getKeyTextColor(context));
+        return iv;
     }
 
     public static int getThemeColor(final Context context, final int attrResId, final int defaultColor) {

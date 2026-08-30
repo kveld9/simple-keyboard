@@ -18,7 +18,10 @@
 package rkr.simplekeyboard.inputmethod.latin.utils;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.view.ContextThemeWrapper;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardTheme;
@@ -28,29 +31,34 @@ public final class DialogUtils {
         // This utility class is not publicly instantiable.
     }
 
-    public static Context getPlatformDialogThemeContext(final Context context) {
+    public static int getPlatformDialogThemeId(final Context context) {
         final KeyboardTheme keyboardTheme = KeyboardTheme.getKeyboardTheme(context);
-        final int dialogThemeResId;
         if (keyboardTheme != null) {
             switch (keyboardTheme.mThemeId) {
                 case KeyboardTheme.THEME_ID_BLACK:
-                    dialogThemeResId = R.style.platformDialogTheme_Black;
-                    break;
+                    return R.style.platformDialogTheme_Black;
                 case KeyboardTheme.THEME_ID_DARK:
                 case KeyboardTheme.THEME_ID_DARK_BORDER:
-                    dialogThemeResId = R.style.platformDialogTheme_Dark;
-                    break;
+                    return R.style.platformDialogTheme_Dark;
                 case KeyboardTheme.THEME_ID_LIGHT:
                 case KeyboardTheme.THEME_ID_LIGHT_BORDER:
-                    dialogThemeResId = R.style.platformDialogTheme_Light;
-                    break;
+                    return R.style.platformDialogTheme_Light;
+                case KeyboardTheme.THEME_ID_SYSTEM:
+                case KeyboardTheme.THEME_ID_SYSTEM_BORDER:
                 default:
-                    dialogThemeResId = R.style.platformDialogTheme;
-                    break;
+                    final boolean isNight = (context.getResources().getConfiguration().uiMode
+                            & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+                    return isNight ? R.style.platformDialogTheme_Dark : R.style.platformDialogTheme_Light;
             }
-        } else {
-            dialogThemeResId = R.style.platformDialogTheme;
         }
-        return new ContextThemeWrapper(context, dialogThemeResId);
+        return R.style.platformDialogTheme;
+    }
+
+    public static MaterialAlertDialogBuilder createMaterialDialogBuilder(final Context context) {
+        return new MaterialAlertDialogBuilder(context, getPlatformDialogThemeId(context));
+    }
+
+    public static Context getPlatformDialogThemeContext(final Context context) {
+        return new ContextThemeWrapper(context, getPlatformDialogThemeId(context));
     }
 }

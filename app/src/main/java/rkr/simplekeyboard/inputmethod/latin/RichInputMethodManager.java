@@ -18,7 +18,7 @@
 
 package rkr.simplekeyboard.inputmethod.latin;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
@@ -609,8 +609,7 @@ public class RichInputMethodManager {
             }
         };
 
-        final AlertDialog.Builder builder = new AlertDialog.Builder(
-                DialogUtils.getPlatformDialogThemeContext(context));
+        final androidx.appcompat.app.AlertDialog.Builder builder = DialogUtils.createMaterialDialogBuilder(context);
         builder.setSingleChoiceItems(items, currentSubtypeIndex, listener)
                 .setTitle(context.getString(R.string.change_keyboard));
         final AlertDialog dialog = builder.create();

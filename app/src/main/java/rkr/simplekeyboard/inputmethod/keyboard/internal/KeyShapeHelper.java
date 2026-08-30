@@ -35,4 +35,17 @@ public final class KeyShapeHelper {
     public static float getRoundedInsetRatioY(final String keyShape) {
         return Settings.KEY_SHAPE_ROUNDED.equals(keyShape) ? 0.02f : 0.0f;
     }
+
+    public static android.graphics.drawable.GradientDrawable createActivePopupKeyDrawable(
+            final Context context, final String keyShape) {
+        final android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+        gd.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        final int textColor = rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.getThemeColor(
+                context, R.attr.keyTextColor, android.graphics.Color.WHITE);
+        final boolean isDarkTheme = androidx.core.graphics.ColorUtils.calculateLuminance(textColor) > 0.4;
+        final int activeColor = isDarkTheme ? 0xDD101418 : 0x44000000;
+        gd.setColor(activeColor);
+        gd.setCornerRadius(getCornerRadius(context, keyShape));
+        return gd;
+    }
 }

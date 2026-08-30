@@ -48,14 +48,11 @@ public abstract class InputMethodSettingsFragment extends PreferenceFragmentComp
         RecyclerView recyclerView = getListView();
         if (recyclerView != null) {
             recyclerView.setItemAnimator(null);
-            recyclerView.addItemDecoration(new SettingsCardItemDecoration(requireContext()));
             recyclerView.setClipToPadding(false);
             recyclerView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
             float density = getResources().getDisplayMetrics().density;
-            int paddingHorizontal = (int) (16 * density);
-            int paddingBottom = (int) (24 * density);
-            int paddingTop = (int) (8 * density);
-            recyclerView.setPadding(paddingHorizontal, paddingTop, paddingHorizontal, paddingBottom);
+            int paddingBottom = (int) (16 * density);
+            recyclerView.setPadding(0, 0, 0, paddingBottom);
         }
     }
 

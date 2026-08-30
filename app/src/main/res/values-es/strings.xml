@@ -27,7 +27,6 @@
     <string name="settings_screen_appearance">Apariencia</string>
     <string name="settings_screen_theme">Tema</string>
     <string name="version">Versión</string>
-    <string name="check_for_updates">Buscar actualizaciones</string>
     <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%s</xliff:g>ms</string>
     <string name="settings_system_default">Predeterminado</string>
     <string name="auto_cap">Mayúsculas automáticas</string>
@@ -43,8 +42,6 @@
     <string name="keyboard_theme_light">Material claro</string>
     <string name="keyboard_theme_system">Predeterminado del sistema</string>
     <string name="keyboard_theme_black">Negro AMOLED</string>
-    <string name="add">Añadir</string>
-    <string name="remove">Quitar</string>
     <string name="prefs_keypress_sound_volume_settings">Volumen de sonido al pulsar tecla</string>
     <string name="prefs_key_longpress_timeout_settings">Retraso al mantener pulsado</string>
     <string name="button_default">Predeterminado</string>
@@ -59,11 +56,7 @@
     <string name="show_number_row">Mostrar fila numérica separada</string>
     <string name="space_swipe">Deslizar la barra espaciadora para mover el cursor</string>
     <string name="delete_swipe">Deslizar para eliminar</string>
-    <string name="setup_message">Simple Keyboard no está habilitado. Pulsa Aceptar para abrir Ajustes de idioma e introducción de texto. Deberás seleccionar Simple Keyboard en tu teclado actual para usarlo.</string>
     <string name="user_languages">Idiomas de teclado habilitados</string>
-    <string name="add_language">Añadir idioma</string>
-    <string name="remove_language">Quitar idioma</string>
-    <string name="generic_language_layouts">Disposiciones de teclado de <xliff:g id="LANGUAGE_NAME" example="Español (EE. UU.)">%s</xliff:g></string>
     <string name="change_keyboard">Cambiar teclado</string>
     <string name="privacy_policy">Política de privacidad</string>
     <string name="license">Licencia</string>
@@ -79,12 +72,10 @@
     <string name="suggest_screenshots">Mostrar capturas de pantalla en el portapapeles</string>
     <string name="suggest_screenshots_summary">Mostrar capturas recientes en sugerencias e historial del portapapeles</string>
     <string name="image_pasting_not_supported">Esta aplicación no admite pegar imágenes</string>
-    <string name="clipboard_history_enabled">Historial del portapapeles</string>
-    <string name="clipboard_history_enabled_summary">Guardar elementos copiados recientemente en el historial del portapapeles</string>
     <string name="retention_time_minutes"><xliff:g id="MINUTES">%d</xliff:g> min</string>
     <string name="retention_time_hours"><xliff:g id="HOURS">%d</xliff:g> h</string>
     <string name="retention_time_hours_minutes"><xliff:g id="HOURS">%1$d</xliff:g> h <xliff:g id="MINUTES">%2$d</xliff:g> min</string>
-    <string name="clipboard_history_retention_time">Tiempo de retención del portapapeles</string>
+    <string name="clipboard_history_retention_time">Tiempo de retención del historial</string>
     <string name="key_shape">Forma de teclas</string>
     <string-array name="key_shape_entries">
         <item>Redondeadas</item>
@@ -118,8 +109,6 @@
     <string name="ime_not_enabled_summary">Toca para activarlo en los ajustes del sistema</string>
     <string name="ime_not_active_title">Simple Keyboard no está seleccionado</string>
     <string name="ime_not_active_summary">Toca para elegirlo como teclado activo</string>
-    <string name="version_summary_format">Versión %s</string>
-    <string name="check_for_updates_summary">Buscar nuevas versiones en GitHub</string>
     <string name="clipboard_enabled">Habilitar portapapeles</string>
     <string name="clipboard_enabled_summary">Mantener un historial de elementos copiados y sugerencias</string>
 </resources>

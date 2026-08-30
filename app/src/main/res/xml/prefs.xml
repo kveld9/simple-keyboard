@@ -75,17 +75,23 @@
         <Preference
             android:key="privacy_policy"
             android:title="@string/privacy_policy"
+            android:icon="@drawable/ic_policy"
+            app:iconTint="?attr/colorOnSurfaceVariant"
             app:widgetLayout="@layout/preference_external_link" />
 
         <Preference
             android:key="license"
             android:title="@string/license"
+            android:icon="@drawable/ic_description"
+            app:iconTint="?attr/colorOnSurfaceVariant"
             app:widgetLayout="@layout/preference_external_link" />
 
 
         <Preference
             android:key="version_info"
             android:title="@string/version"
+            android:icon="@drawable/ic_info"
+            app:iconTint="?attr/colorOnSurfaceVariant"
             app:widgetLayout="@layout/preference_external_link" />
 
     </PreferenceCategory>

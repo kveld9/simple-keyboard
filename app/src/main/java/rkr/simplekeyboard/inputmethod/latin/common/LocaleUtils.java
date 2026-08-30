@@ -146,28 +146,4 @@ public final class LocaleUtils {
         }
         return locales;
     }
-
-    /**
-     * Comparator for {@link Locale} to order them alphabetically
-     * first.
-     */
-    public static class LocaleComparator implements Comparator<Locale> {
-        @Override
-        public int compare(Locale a, Locale b) {
-            if (a.equals(b)) {
-                // ensure that this is consistent with equals
-                return 0;
-            }
-            final String aDisplay =
-                    LocaleResourceUtils.getLocaleDisplayNameInSystemLocale(getLocaleString(a));
-            final String bDisplay =
-                    LocaleResourceUtils.getLocaleDisplayNameInSystemLocale(getLocaleString(b));
-            final int result = aDisplay.compareToIgnoreCase(bDisplay);
-            if (result != 0) {
-                return result;
-            }
-            // ensure that non-equal objects are distinguished to be consistent with equals
-            return a.hashCode() > b.hashCode() ? 1 : -1;
-        }
-    }
 }

@@ -39,7 +39,6 @@ public final class ClipboardSettingsFragment extends SubScreenFragment {
 
     private PreferenceCategory mSuggestionsCategory;
     private PreferenceCategory mHistoryCategory;
-    private SwitchPreferenceCompat mHistoryEnabledPref;
     private Preference mScreenshotsPref;
     private SeekBarDialogPreference mRetentionPref;
 
@@ -62,7 +61,6 @@ public final class ClipboardSettingsFragment extends SubScreenFragment {
             });
         }
 
-        mHistoryEnabledPref = findPreference(Settings.PREF_CLIPBOARD_HISTORY_ENABLED);
         mScreenshotsPref = findPreference(Settings.PREF_SUGGEST_SCREENSHOTS);
         mRetentionPref = findPreference(Settings.PREF_CLIPBOARD_RETENTION_TIME);
 

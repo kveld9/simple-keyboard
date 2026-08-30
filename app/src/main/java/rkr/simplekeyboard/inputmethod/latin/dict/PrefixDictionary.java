@@ -135,10 +135,6 @@ public final class PrefixDictionary {
         this.mAutoCorrectionThreshold = threshold;
     }
 
-    public synchronized float getAutoCorrectionThreshold() {
-        return mAutoCorrectionThreshold;
-    }
-
     public synchronized void copyFrom(final PrefixDictionary other) {
         if (other != null) {
             synchronized (other) {
@@ -359,14 +355,6 @@ public final class PrefixDictionary {
         return 0;
     }
 
-    public synchronized List<CharSequence> getSuggestions(final String prefix, final int maxCount) {
-        return getSuggestions(prefix, maxCount, null, null);
-    }
-
-    public synchronized List<CharSequence> getSuggestions(final String prefix, final int maxCount, final String prevWord) {
-        return getSuggestions(prefix, maxCount, null, prevWord);
-    }
-
     public synchronized List<CharSequence> getSuggestions(final String prefix, final int maxCount, final String w1, final String w2) {
         if (prefix == null || prefix.trim().isEmpty() || maxCount <= 0) {
             return Collections.emptyList();
@@ -554,14 +542,6 @@ public final class PrefixDictionary {
         return null;
     }
 
-    public synchronized CharSequence getBestCorrection(final String word) {
-        return getBestCorrection(word, null, null);
-    }
-
-    public synchronized CharSequence getBestCorrection(final String word, final String prevWord) {
-        return getBestCorrection(word, null, prevWord);
-    }
-
     public synchronized CharSequence getBestCorrection(final String word, final String w1, final String w2) {
         if (isSkipCorrection(word)) {
             return null;
@@ -679,14 +659,6 @@ public final class PrefixDictionary {
         return bestScore >= selfScore + getValidWordDelta();
     }
 
-    public synchronized List<CharSequence> getFuzzySuggestions(final String word, final int maxCount) {
-        return getFuzzySuggestions(word, maxCount, null, null);
-    }
-
-    public synchronized List<CharSequence> getFuzzySuggestions(final String word, final int maxCount, final String prevWord) {
-        return getFuzzySuggestions(word, maxCount, null, prevWord);
-    }
-
     public synchronized List<CharSequence> getFuzzySuggestions(final String word, final int maxCount, final String w1, final String w2) {
         if (word == null || word.length() <= 1 || maxCount <= 0) {
             return Collections.emptyList();
@@ -773,10 +745,6 @@ public final class PrefixDictionary {
             return current.words[0];
         }
         return word;
-    }
-
-    public synchronized List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
-        return getNextWordPredictions(null, prevWord, limit);
     }
 
     public synchronized List<CharSequence> getNextWordPredictions(final String w1, final String w2, final int limit) {

@@ -45,8 +45,6 @@ public final class KeyboardCodesSet {
         "key_action_previous",
         "key_shift_enter",
         "key_language_switch",
-        "key_left",
-        "key_right",
         "key_unspecified",
     };
 

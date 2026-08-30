@@ -168,13 +168,6 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         return null;
     }
 
-    // TODO: Remove this method. Come up with a more comprehensive way to reset the keyboard layout
-    // when a keyboard layout set doesn't get reloaded in LatinIME.onStartInputViewInternal().
-    public void resetKeyboardStateToAlphabet(final int currentAutoCapsState,
-            final int currentRecapitalizeState) {
-        mState.onResetKeyboardStateToAlphabet(currentAutoCapsState, currentRecapitalizeState);
-    }
-
     public void onPressKey(final int code, final boolean isSinglePointer,
             final int currentAutoCapsState, final int currentRecapitalizeState) {
         mState.onPressKey(code, isSinglePointer, currentAutoCapsState, currentRecapitalizeState);

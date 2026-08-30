@@ -318,7 +318,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void onCreate() {
         mDisplayContext = createOrGetDisplayContext();
         Settings.init(this);
-        DebugFlags.init(PreferenceManagerCompat.getDeviceSharedPreferences(this));
         RichInputMethodManager.init(this);
         mRichImm = RichInputMethodManager.getInstance();
         mRichImm.setSubtypeChangeHandler(this);
@@ -1058,7 +1057,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private boolean displayClipboardChipIfAvailable() {
-        if (mClipboardHistoryManager == null || !mSettings.getCurrent().mClipboardHistoryEnabled) {
+        if (mClipboardHistoryManager == null || !mSettings.getCurrent().mClipboardEnabled) {
             return false;
         }
 
@@ -1171,7 +1170,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
 
         if (!predictions.isEmpty()) {
-            mTopBarView.setSuggestions(predictions, 0);
+            mTopBarView.setSuggestions(predictions, -1);
             return true;
         }
         return false;
@@ -1244,7 +1243,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
-    private int appendMatchingSuggestions(final java.util.List<CharSequence> suggestions,
+    private void appendMatchingSuggestions(final java.util.List<CharSequence> suggestions,
             final java.util.List<CharSequence> matches, final String word, final String w1, final String w2) {
         if (matches != null) {
             for (CharSequence m : matches) {
@@ -1273,7 +1272,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 }
             }
         }
-        return suggestions.size() > 1 ? 1 : -1;
     }
 
     private void displayComposingSuggestions(final String word, final String w1, final String w2) {
@@ -1288,7 +1286,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             appendCorrectionAndCandidates(suggestions, word, w1, w2, bestCorrection, matches);
             boldIndex = 1;
         } else {
-            boldIndex = appendMatchingSuggestions(suggestions, matches, word, w1, w2);
+            appendMatchingSuggestions(suggestions, matches, word, w1, w2);
+            boldIndex = -1;
         }
 
         mTopBarView.setSuggestions(suggestions, boldIndex);
@@ -1554,7 +1553,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (handleBackspaceRevert(event)) {
             return;
         }
-        handleSpaceAutoCorrect(event);
+        handleAutoCorrect(event);
 
         final InputTransaction completeInputTransaction =
                 mInputLogic.onCodeInput(mSettings.getCurrent(), event);
@@ -1571,7 +1570,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private boolean handleBackspaceRevert(final Event event) {
         if (!isBackspaceEvent(event)) {
-            if (isNonSpaceNormalKey(event)) {
+            if (isLetterOrDigitKey(event)) {
                 mCanRevertAutocorrect = false;
             }
             return false;
@@ -1588,8 +1587,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return event.isFunctionalKeyEvent() && event.mKeyCode == Constants.CODE_DELETE;
     }
 
-    private static boolean isNonSpaceNormalKey(final Event event) {
-        return !event.isFunctionalKeyEvent() && event.mCodePoint != Constants.CODE_SPACE;
+    private static boolean isLetterOrDigitKey(final Event event) {
+        return !event.isFunctionalKeyEvent() && Character.isLetterOrDigit(event.mCodePoint);
     }
 
     private boolean isAutocorrectRevertible() {
@@ -1601,15 +1600,21 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return false;
         }
         final String textBefore = mInputLogic.mConnection.getTextBeforeCursor(mAutocorrectedWord.length() + 2, 0);
-        if (textBefore == null || !textBefore.endsWith(mAutocorrectedWord + " ")) {
+        if (textBefore == null) {
             return false;
         }
-        executeBackspaceRevert(event);
-        return true;
+        if (textBefore.endsWith(mAutocorrectedWord + " ")) {
+            executeBackspaceRevert(event, true);
+            return true;
+        } else if (textBefore.endsWith(mAutocorrectedWord)) {
+            executeBackspaceRevert(event, false);
+            return true;
+        }
+        return false;
     }
 
-    private void executeBackspaceRevert(final Event event) {
-        mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + 1);
+    private void executeBackspaceRevert(final Event event, final boolean hasTrailingSpace) {
+        mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + (hasTrailingSpace ? 1 : 0));
         mInputLogic.mConnection.commitText(mOriginalTypedWordBeforeAutocorrect, 1);
 
         final String[] context = getEffectivePreviousWords();
@@ -1622,8 +1627,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         updateSuggestions();
     }
 
-    private static boolean isSpaceEvent(final Event event) {
-        return !event.isFunctionalKeyEvent() && event.mCodePoint == Constants.CODE_SPACE;
+    private boolean isAutoCorrectTriggerEvent(final Event event) {
+        if (event.isFunctionalKeyEvent()) {
+            return event.mKeyCode == Constants.CODE_ENTER;
+        }
+        final int codePoint = event.mCodePoint;
+        return codePoint == Constants.CODE_SPACE
+                || codePoint == '\n'
+                || mSettings.getCurrent().isWordSeparator(codePoint)
+                || (!Character.isLetterOrDigit(codePoint) && codePoint > 32);
     }
 
     private boolean shouldPerformAutoCorrection(final String word) {
@@ -1633,20 +1645,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return !isWordEmpty(word);
     }
 
-    private CharSequence getBestCorrection(final String word, final String w1, final String w2) {
-        final CharSequence decoderCorrection = getDecoderBestCorrection(word, w2);
-        if (decoderCorrection != null) {
-            return decoderCorrection;
-        }
-        return mPrefixDictionary.getBestCorrection(word, w1, w2);
-    }
-
-    private String applySpaceAutoCorrection(final String word, final String w1, final String w2) {
+    private String applyAutoCorrection(final String word, final String w1, final String w2) {
         if (!shouldPerformAutoCorrection(word)) {
             mCanRevertAutocorrect = false;
             return word;
         }
-        final CharSequence correction = getBestCorrection(word, w1, w2);
+        final java.util.List<CharSequence> matches = getSuggestionsForWord(word, w1, w2);
+        final CharSequence correction = resolveBestCorrection(word, w1, w2, !matches.isEmpty());
         if (correction != null) {
             mInputLogic.mConnection.deleteTextBeforeCursor(word.length());
             mInputLogic.mConnection.commitText(correction, 1);
@@ -1667,24 +1672,20 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         learnNgramAsync(w1, w2, cleanCommitted);
     }
 
-    private void handleSpaceAutoCorrect(final Event event) {
-        if (!isSpaceEvent(event)) {
+    private void handleAutoCorrect(final Event event) {
+        if (!isAutoCorrectTriggerEvent(event)) {
             return;
         }
         final String word = mInputLogic.mConnection.getWordBeforeCursor();
         final String[] context = getEffectivePreviousWords();
         final String w1 = context[0];
         final String w2 = context[1];
-        final String committedWord = applySpaceAutoCorrection(word, w1, w2);
+        final String committedWord = applyAutoCorrection(word, w1, w2);
         recordCommittedWord(committedWord, w1, w2);
     }
 
     private String[] getEffectivePreviousWords() {
         return mInputLogic.mConnection.getTwoPreviousWordsBeforeCursor();
-    }
-
-    private String getEffectivePreviousWord() {
-        return mInputLogic.mConnection.getPreviousWordBeforeCursor();
     }
 
     private static boolean isWordEmpty(final String word) {
@@ -1703,10 +1704,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 mPrefixDictionary.setTrigram(w1.trim(), w2.trim(), cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
             }
         }
-    }
-
-    public static String applyCasing(final String typed, final String suggestion) {
-        return PrefixDictionary.applyCasing(typed, suggestion);
     }
 
     // A helper method to split the code point and the key code. Ultimately, they should not be

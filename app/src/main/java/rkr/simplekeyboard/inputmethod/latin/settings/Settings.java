@@ -65,7 +65,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String PREF_SPACE_SWIPE = "pref_space_swipe";
     public static final String PREF_DELETE_SWIPE = "pref_delete_swipe";
     public static final String PREF_CLIPBOARD_ENABLED = "pref_clipboard_enabled";
-    public static final String PREF_CLIPBOARD_HISTORY_ENABLED = "pref_clipboard_history_enabled";
 
     public static final String PREF_CLIPBOARD_RETENTION_TIME = "pref_clipboard_retention_time";
     public static final int CLIPBOARD_RETENTION_TIME_MIN_MINUTES = 30;
@@ -79,7 +78,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String KEY_SHAPE_RECTANGULAR = "rectangular";
     public static final String KEY_SHAPE_BORDERLESS = "borderless";
     public static final String PREF_SHOW_SUGGESTIONS = "pref_show_suggestions";
-    public static final String PREF_AUTO_CORRECTION = "pref_auto_correction";
     public static final String PREF_AUTO_CORRECTION_THRESHOLD = "auto_correction_threshold";
     public static final String AUTO_CORRECTION_THRESHOLD_DEFAULT = "1";
     public static final float AUTO_CORRECTION_THRESHOLD_OFF = 0.0f;
@@ -274,8 +272,8 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         return prefs.getBoolean(PREF_DELETE_SWIPE, false);
     }
 
-    public static boolean readClipboardHistoryEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_CLIPBOARD_HISTORY_ENABLED, true);
+    public static boolean readClipboardEnabled(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_CLIPBOARD_ENABLED, true);
     }
 
     public static int readClipboardRetentionMinutes(final SharedPreferences prefs) {
@@ -319,10 +317,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         } catch (NumberFormatException | NullPointerException e) {
             return AUTO_CORRECTION_THRESHOLD_MODEST;
         }
-    }
-
-    public static int readAutoCorrectionThresholdInt(final SharedPreferences prefs) {
-        return Math.round(readAutoCorrectionThreshold(prefs));
     }
 
     public static boolean readAutoCorrectionEnabled(final SharedPreferences prefs) {

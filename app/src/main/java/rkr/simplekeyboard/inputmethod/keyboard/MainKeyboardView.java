@@ -230,18 +230,6 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         PointerTracker.setKeyboardActionListener(listener);
     }
 
-    // TODO: We should reconsider which coordinate system should be used to represent keyboard
-    // event.
-    public int getKeyX(final int x) {
-        return Constants.isValidCoordinate(x) ? mKeyDetector.getTouchX(x) : x;
-    }
-
-    // TODO: We should reconsider which coordinate system should be used to represent keyboard
-    // event.
-    public int getKeyY(final int y) {
-        return Constants.isValidCoordinate(y) ? mKeyDetector.getTouchY(y) : y;
-    }
-
     /**
      * Attaches a keyboard to this view. The keyboard can be switched at any time and the
      * view will re-layout itself to accommodate the keyboard.

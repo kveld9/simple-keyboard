@@ -51,12 +51,11 @@ public class SettingsValues {
     public final boolean mSpaceSwipeEnabled;
     public final boolean mDeleteSwipeEnabled;
     public final boolean mShowSuggestions;
-    public final boolean mClipboardHistoryEnabled;
+    public final boolean mClipboardEnabled;
     public final boolean mClipboardSuggestionsEnabled;
     public final boolean mSuggestScreenshots;
     public final boolean mAutoCorrectionEnabled;
     public final float mAutoCorrectionThreshold;
-    public final int mAutoCorrectionThresholdInt;
 
     // From the input box
     public final InputAttributes mInputAttributes;
@@ -101,11 +100,10 @@ public class SettingsValues {
         mSpaceSwipeEnabled = Settings.readSpaceSwipeEnabled(prefs);
         mDeleteSwipeEnabled = Settings.readDeleteSwipeEnabled(prefs);
         mShowSuggestions = Settings.readShowSuggestions(prefs);
-        mClipboardHistoryEnabled = Settings.readClipboardHistoryEnabled(prefs);
+        mClipboardEnabled = Settings.readClipboardEnabled(prefs);
         mClipboardSuggestionsEnabled = Settings.readClipboardSuggestionsEnabled(prefs);
         mSuggestScreenshots = Settings.readSuggestScreenshotsEnabled(prefs);
         mAutoCorrectionThreshold = Settings.readAutoCorrectionThreshold(prefs);
-        mAutoCorrectionThresholdInt = Settings.readAutoCorrectionThresholdInt(prefs);
         mAutoCorrectionEnabled = Settings.readAutoCorrectionEnabled(prefs);
     }
 

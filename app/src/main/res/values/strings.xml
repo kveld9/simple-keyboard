@@ -36,7 +36,6 @@
     <!-- Settings screen title for keyboard theme settings [CHAR LIMIT=33] -->
     <string name="settings_screen_theme">Theme</string>
     <string name="version">Version</string>
-    <string name="check_for_updates">Check for updates</string>
 
     <!-- Units abbreviation for the duration (milliseconds) [CHAR LIMIT=10] -->
     <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%s</xliff:g>ms</string>
@@ -74,11 +73,6 @@
     <string name="keyboard_theme_system">System Default</string>
     <string name="keyboard_theme_black">AMOLED Black</string>
 
-    <!-- Title of the button to add a language in the settings dialog [CHAR LIMIT=15] -->
-    <string name="add">Add</string>
-    <!-- Title of the button to remove a language in the settings dialog [CHAR LIMIT=15] -->
-    <string name="remove">Remove</string>
-
     <!-- Title of the settings for keypress vibration duration [CHAR LIMIT=35] -->
     <!-- Title of the settings for keypress sound volume [CHAR LIMIT=35] -->
     <string name="prefs_keypress_sound_volume_settings">Keypress sound volume</string>
@@ -102,11 +96,7 @@
     <string name="show_number_row">Show separate number row</string>
     <string name="space_swipe">Space swipe cursor move</string>
     <string name="delete_swipe">Delete swipe</string>
-    <string name="setup_message">Simple Keyboard is not enabled. Click OK to open Languages &amp; Input settings. You will need to select Simple Keyboard in your current keyboard to use it.</string>
     <string name="user_languages">Enabled keyboard languages</string>
-    <string name="add_language">Add language</string>
-    <string name="remove_language">Remove language</string>
-    <string name="generic_language_layouts"><xliff:g id="LANGUAGE_NAME" example="English (US)">%s</xliff:g> keyboard layouts</string>
     <string name="change_keyboard">Change keyboard</string>
     <string name="privacy_policy">Privacy Policy</string>
     <string name="license">License</string>
@@ -122,8 +112,6 @@
     <string name="suggest_screenshots">Show screenshots in clipboard</string>
     <string name="suggest_screenshots_summary">Show recently taken screenshots in clipboard suggestions and history</string>
     <string name="image_pasting_not_supported">This app does not support pasting images</string>
-    <string name="clipboard_history_enabled">Save clipboard history</string>
-    <string name="clipboard_history_enabled_summary">Store recently copied text and screenshots in clipboard history</string>
     <string name="retention_time_minutes"><xliff:g id="MINUTES">%d</xliff:g> min</string>
     <string name="retention_time_hours"><xliff:g id="HOURS">%d</xliff:g> h</string>
     <string name="retention_time_hours_minutes"><xliff:g id="HOURS">%1$d</xliff:g> h <xliff:g id="MINUTES">%2$d</xliff:g> min</string>
@@ -172,8 +160,6 @@
     <string name="ime_not_enabled_summary">Tap to enable it in system settings</string>
     <string name="ime_not_active_title">Simple Keyboard is not selected</string>
     <string name="ime_not_active_summary">Tap to choose it as your active keyboard</string>
-    <string name="version_summary_format">Version %s</string>
-    <string name="check_for_updates_summary">Check for new versions on GitHub</string>
     <string name="clipboard_enabled">Enable clipboard</string>
     <string name="clipboard_enabled_summary">Keep a history of copied items and suggestions</string>
 </resources>

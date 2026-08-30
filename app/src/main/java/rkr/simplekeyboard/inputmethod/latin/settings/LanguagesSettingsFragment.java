@@ -84,7 +84,7 @@ public final class LanguagesSettingsFragment extends SubScreenFragment {
             if (defaultSubtype == null) continue;
 
             final boolean isChecked = enabledLocales.contains(localeString);
-            final LanguageSwitchPreference pref = new LanguageSwitchPreference(context, localeString, defaultSubtype);
+            final LanguageSwitchPreference pref = new LanguageSwitchPreference(context, defaultSubtype);
             pref.setTitle(LocaleResourceUtils.getLocaleDisplayNameInSystemLocale(localeString));
             pref.setChecked(isChecked);
             pref.setEnabled(true);
@@ -118,22 +118,16 @@ public final class LanguagesSettingsFragment extends SubScreenFragment {
     }
 
     private static class LanguageSwitchPreference extends SwitchPreferenceCompat {
-        private final String mLocaleString;
         private final Subtype mSubtype;
 
-        public LanguageSwitchPreference(final Context context, final String localeString, final Subtype subtype) {
+        public LanguageSwitchPreference(final Context context, final Subtype subtype) {
             super(context);
-            mLocaleString = localeString;
             mSubtype = subtype;
             setPersistent(false);
         }
 
         public Subtype getSubtype() {
             return mSubtype;
-        }
-
-        public String getLocaleString() {
-            return mLocaleString;
         }
     }
 }

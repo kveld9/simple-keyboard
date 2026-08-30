@@ -39,12 +39,6 @@
         android:key="category_history"
         android:title="@string/settings_category_history">
 
-        <SwitchPreferenceCompat
-            android:key="pref_clipboard_history_enabled"
-            android:title="@string/clipboard_history_enabled"
-            android:summary="@string/clipboard_history_enabled_summary"
-            android:defaultValue="true" />
-
         <rkr.simplekeyboard.inputmethod.latin.settings.SeekBarDialogPreference
             android:key="pref_clipboard_retention_time"
             android:title="@string/clipboard_history_retention_time"

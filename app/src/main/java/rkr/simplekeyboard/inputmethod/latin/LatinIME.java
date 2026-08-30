@@ -145,7 +145,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private int mLastInlineFieldId = 0;
 
     private final java.util.List<CharSequence> mScratchSuggestions = new java.util.ArrayList<>(4);
-    private final java.util.List<CharSequence> mScratchPredictions = new java.util.ArrayList<>(3);
     private final java.util.List<CharSequence> mScratchMerged = new java.util.ArrayList<>(3);
     private final java.util.Set<String> mScratchDeduplicationSet = new java.util.HashSet<>();
 
@@ -901,7 +900,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     protected void deallocateMemory() {
         mScratchSuggestions.clear();
-        mScratchPredictions.clear();
         mScratchMerged.clear();
         mScratchDeduplicationSet.clear();
         if (mClipboardHistoryManager != null) {
@@ -1235,30 +1233,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         } catch (Exception e) {
             Log.e(TAG, "Failed to paste image", e);
         }
-    }
-
-    private boolean displayNextWordPredictionsIfAvailable(final String w1, final String w2) {
-        if (isWordEmpty(w2)) {
-            return false;
-        }
-        mScratchPredictions.clear();
-        mScratchDeduplicationSet.clear();
-
-        final java.util.List<CharSequence> nextWordPredictions = mPrefixDictionary.getNextWordPredictions(w1, w2, 3);
-        if (nextWordPredictions != null) {
-            for (CharSequence np : nextWordPredictions) {
-                if (mScratchPredictions.size() >= 3) break;
-                if (mScratchDeduplicationSet.add(np.toString().toLowerCase())) {
-                    mScratchPredictions.add(np);
-                }
-            }
-        }
-
-        if (!mScratchPredictions.isEmpty()) {
-            mTopBarView.setSuggestions(mScratchPredictions, -1);
-            return true;
-        }
-        return false;
     }
 
     private java.util.List<CharSequence> getSuggestionsForWord(final String word, final String w1, final String w2) {
@@ -1848,7 +1822,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private static boolean isWordEmpty(final String word) {
-        return word == null || word.trim().isEmpty();
+        return rkr.simplekeyboard.inputmethod.latin.common.StringUtils.isBlank(word);
     }
 
     private void learnNgramAsync(final String w1, final String w2, final String word) {

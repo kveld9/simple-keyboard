@@ -81,9 +81,9 @@ import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryManager;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryView;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPalettesView;
 import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
-import java.io.BufferedReader;
+import rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary;
 import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
@@ -918,12 +918,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // 1. Load secondary enabled languages first (with 85% relative frequency)
             for (String lang : enabledLangs) {
                 if (!lang.equals(currentLang)) {
-                    loadSingleLanguageDictionaryInto(newDict, lang, 0.85f);
+                    loadSingleLanguageBinaryDictionaryInto(newDict, lang, 0.85f);
                 }
             }
 
             // 2. Load primary active language with 100% frequency
-            loadSingleLanguageDictionaryInto(newDict, currentLang, 1.0f);
+            loadSingleLanguageBinaryDictionaryInto(newDict, currentLang, 1.0f);
 
             mHandler.post(() -> {
                 mPrefixDictionary.copyFrom(newDict);
@@ -934,12 +934,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private void loadBinaryDictionary(final String lang) {
         final String assetName = "es".equals(lang) ? "dict_es.bin" : "dict_en.bin";
-        try {
-            java.io.InputStream is = getAssets().open(assetName);
+        try (InputStream is = getAssets().open(assetName)) {
             byte[] bytes = new byte[is.available()];
             is.read(bytes);
-            is.close();
-            java.nio.ByteBuffer buffer = java.nio.ByteBuffer.wrap(bytes);
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
             mBinaryTrieDictionary = new rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary(buffer);
             mBeamSearchDecoder = new rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder(mBinaryTrieDictionary, mSpatialTouchModel);
         } catch (Exception e) {
@@ -947,32 +945,21 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
-    private void loadSingleLanguageDictionaryInto(final PrefixDictionary targetDict, final String lang, final float weightFactor) {
-        final String assetName = "es".equals(lang) ? "dict_es.txt" : "dict_en.txt";
+    private void loadSingleLanguageBinaryDictionaryInto(final PrefixDictionary targetDict, final String lang, final float weightFactor) {
+        final String assetName = "es".equals(lang) ? "dict_es.bin" : "dict_en.bin";
         boolean loaded = false;
-        try (InputStream is = getAssets().open(assetName);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) continue;
-                final int sep = line.indexOf(' ');
-                if (sep > 0) {
-                    final String word = line.substring(0, sep);
-                    try {
-                        int freq = Integer.parseInt(line.substring(sep + 1));
-                        int adjustedFreq = (int) (freq * weightFactor);
-                        targetDict.insert(word, Math.max(1, adjustedFreq));
-                    } catch (NumberFormatException e) {
-                        targetDict.insert(word, 1);
-                    }
-                } else {
-                    targetDict.insert(line, 1);
-                }
-            }
+        try (InputStream is = getAssets().open(assetName)) {
+            byte[] bytes = new byte[is.available()];
+            is.read(bytes);
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            BinaryTrieDictionary dict = new BinaryTrieDictionary(buffer);
+            dict.forEachWord((word, freq) -> {
+                int adjustedFreq = (int) (freq * weightFactor);
+                targetDict.insert(word, Math.max(1, adjustedFreq));
+            });
             loaded = true;
         } catch (Exception e) {
-            Log.w(TAG, "Could not load dictionary asset: " + assetName, e);
+            Log.w(TAG, "Could not load binary dictionary asset: " + assetName, e);
         }
         if (!loaded) {
             final String[] defaultWords = "es".equals(lang)

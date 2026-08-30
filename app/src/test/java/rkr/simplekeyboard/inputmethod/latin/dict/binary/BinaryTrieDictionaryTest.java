@@ -89,4 +89,18 @@ public class BinaryTrieDictionaryTest {
         int count = esDict.getChildren(childU, outChars, outOffsets);
         assertTrue(count > 0);
     }
+
+    @Test
+    public void testForEachWord() {
+        int[] count = new int[1];
+        boolean[] foundQue = new boolean[1];
+        esDict.forEachWord((word, freq) -> {
+            count[0]++;
+            if ("que".equals(word) && freq > 0) {
+                foundQue[0] = true;
+            }
+        });
+        assertTrue("Should traverse many words", count[0] > 10000);
+        assertTrue("Should find 'que'", foundQue[0]);
+    }
 }

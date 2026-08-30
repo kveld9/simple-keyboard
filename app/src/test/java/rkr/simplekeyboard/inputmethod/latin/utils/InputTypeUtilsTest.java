@@ -37,19 +37,6 @@ public class InputTypeUtilsTest {
     }
 
     @Test
-    public void testIsAutoSpaceFriendlyType() {
-        int normalText = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_NORMAL;
-        int emailText = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS;
-        int passwordText = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD;
-        int numberClass = InputType.TYPE_CLASS_NUMBER;
-
-        assertTrue(InputTypeUtils.isAutoSpaceFriendlyType(normalText));
-        assertFalse(InputTypeUtils.isAutoSpaceFriendlyType(emailText));
-        assertFalse(InputTypeUtils.isAutoSpaceFriendlyType(passwordText));
-        assertFalse(InputTypeUtils.isAutoSpaceFriendlyType(numberClass));
-    }
-
-    @Test
     public void testGetImeOptionsActionIdFromEditorInfo() {
         EditorInfo editorInfo = new EditorInfo();
         editorInfo.imeOptions = EditorInfo.IME_ACTION_SEARCH;

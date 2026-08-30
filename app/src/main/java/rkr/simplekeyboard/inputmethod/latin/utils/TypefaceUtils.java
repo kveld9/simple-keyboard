@@ -99,10 +99,6 @@ public final class TypefaceUtils {
         return paint.measureText(string);
     }
 
-    public static float computeScaleX(final String text, final Paint paint, final float maxWidth) {
-        return computeScaleX(text, paint, maxWidth, 0.0f);
-    }
-
     public static float computeScaleX(final String text, final Paint paint,
             final float maxWidth, final float minScaleX) {
         if (text == null || text.isEmpty() || maxWidth <= 0.0f) {

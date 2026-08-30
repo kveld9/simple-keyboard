@@ -704,34 +704,24 @@ public final class KeyboardTextsTable {
     };
 
     static {
+        final Integer[] indices = new Integer[NAMES.length];
+        for (int i = 0; i < NAMES.length; i++) {
+            indices[i] = i;
+        }
+        java.util.Arrays.sort(indices, (a, b) -> NAMES[a].compareTo(NAMES[b]));
+
         sSortedNames = new String[NAMES.length];
         sSortedIndexes = new int[NAMES.length];
         for (int i = 0; i < NAMES.length; i++) {
-            sSortedNames[i] = NAMES[i];
-            sSortedIndexes[i] = i;
-        }
-        for (int i = 0; i < NAMES.length - 1; i++) {
-            for (int j = i + 1; j < NAMES.length; j++) {
-                if (sSortedNames[i].compareTo(sSortedNames[j]) > 0) {
-                    String tempName = sSortedNames[i];
-                    sSortedNames[i] = sSortedNames[j];
-                    sSortedNames[j] = tempName;
-                    int tempIndex = sSortedIndexes[i];
-                    sSortedIndexes[i] = sSortedIndexes[j];
-                    sSortedIndexes[j] = tempIndex;
-                }
-            }
+            final int origIdx = indices[i];
+            sSortedNames[i] = NAMES[origIdx];
+            sSortedIndexes[i] = origIdx;
         }
 
         for (int i = 0; i < LOCALES_AND_TEXTS.length; i += 2) {
             final String locale = (String)LOCALES_AND_TEXTS[i];
             final String[] textsTable = (String[])LOCALES_AND_TEXTS[i + 1];
             sLocaleToTextsTableMap.put(locale, textsTable);
-
-            // Uncomment to log locales where text is in range
-            //int textToCheck = 95;
-            //if (textsTable.length > textToCheck)
-            //    Log.i("LocaleIndexCheck", textToCheck + " is used in " + locale + " total length: " + textsTable.length);
         }
     }
 }

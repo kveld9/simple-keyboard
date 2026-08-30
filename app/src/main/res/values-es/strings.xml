@@ -27,6 +27,7 @@
     <string name="settings_screen_appearance">Apariencia</string>
     <string name="settings_screen_theme">"Tema"</string>
     <string name="version">Versión</string>
+    <string name="check_for_updates">Buscar actualizaciones</string>
     <string name="settings_system_default">"Predeterminado"</string>
     <string name="auto_cap">"Mayúsculas automáticas"</string>
     <string name="auto_cap_summary">"Escribir la primera letra de cada frase en mayúscula"</string>

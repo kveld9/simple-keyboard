@@ -188,7 +188,7 @@ public class ClipboardHistoryView extends LinearLayout {
         mSearchClearButton.setOnClickListener(v -> {
             mSearchQuery = "";
             updateSearchTextDisplay();
-            reloadSearchClips();
+            executeDbTaskAndReload(null);
         });
         mSearchHeaderLayout.addView(mSearchClearButton);
 
@@ -278,7 +278,7 @@ public class ClipboardHistoryView extends LinearLayout {
         if (mListener != null) {
             mListener.onSearchStateChanged(true);
         }
-        reloadSearchClips();
+        executeDbTaskAndReload(null);
     }
 
     public void closeSearch() {
@@ -304,7 +304,7 @@ public class ClipboardHistoryView extends LinearLayout {
         if (!mIsSearchActive || text == null || text.isEmpty()) return;
         mSearchQuery += text;
         updateSearchTextDisplay();
-        reloadSearchClips();
+        executeDbTaskAndReload(null);
     }
 
     public void deleteSearchChar() {
@@ -314,7 +314,7 @@ public class ClipboardHistoryView extends LinearLayout {
             int charCount = Character.charCount(lastCodePoint);
             mSearchQuery = mSearchQuery.substring(0, mSearchQuery.length() - charCount);
             updateSearchTextDisplay();
-            reloadSearchClips();
+            executeDbTaskAndReload(null);
         }
     }
 
@@ -328,20 +328,6 @@ public class ClipboardHistoryView extends LinearLayout {
             mSearchQueryView.setText(mSearchQuery);
             if (mSearchClearButton != null) mSearchClearButton.setVisibility(VISIBLE);
         }
-    }
-
-    private void reloadSearchClips() {
-        if (mDatabase == null) return;
-        final long token = ++mCurrentQueryToken;
-        final String query = mSearchQuery;
-        mAsyncExecutor.execute(() -> {
-            final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips(query);
-            post(() -> {
-                if (token == mCurrentQueryToken) {
-                    displayClips(updatedClips);
-                }
-            });
-        });
     }
 
     private void executeDbTaskAndReload(final Runnable dbTask) {

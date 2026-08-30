@@ -371,13 +371,38 @@ public final class StringUtils {
         return sb.toString();
     }
 
+    public static String stripEnclosingQuotes(final CharSequence text) {
+        if (text == null) {
+            return "";
+        }
+        final String clean = text.toString().trim();
+        final int len = clean.length();
+        if (len >= 2 && clean.charAt(0) == '"' && clean.charAt(len - 1) == '"') {
+            return clean.substring(1, len - 1).trim();
+        }
+        return clean;
+    }
+
     public static String toNormalizedLower(final String s) {
         if (s == null) {
             return "";
         }
         final int len = s.length();
+        if (len == 0) {
+            return "";
+        }
+        int i = 0;
+        while (i < len && foldChar(s.charAt(i)) == s.charAt(i)) {
+            i++;
+        }
+        if (i == len) {
+            return s;
+        }
         final StringBuilder sb = new StringBuilder(len);
-        for (int i = 0; i < len; i++) {
+        if (i > 0) {
+            sb.append(s, 0, i);
+        }
+        for (; i < len; i++) {
             sb.append(foldChar(s.charAt(i)));
         }
         return sb.toString();
@@ -413,16 +438,16 @@ public final class StringUtils {
     }
 
     public static String applyCasing(final String typed, final String suggestion) {
-        if (typed == null || suggestion == null || suggestion.isEmpty()) {
+        if (typed == null || typed.isEmpty() || suggestion == null || suggestion.isEmpty()) {
             return suggestion;
         }
         if (isAllUpperCase(typed)) {
             return suggestion.toUpperCase();
         }
         if (Character.isUpperCase(typed.charAt(0))) {
-            return capitalizeFirst(suggestion);
+            return Character.toUpperCase(suggestion.charAt(0)) + suggestion.substring(1);
         }
-        return suggestion.toLowerCase();
+        return suggestion;
     }
 
     public static String capitalizeFirst(final String s) {

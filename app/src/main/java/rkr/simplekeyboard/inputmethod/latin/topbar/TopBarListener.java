@@ -6,6 +6,7 @@ public interface TopBarListener {
     void onClipboardClicked();
     void onEmojiClicked();
     void onSuggestionClicked(CharSequence text);
+    void onSuggestionLongClicked(CharSequence text);
     void onClipboardSuggestionClicked(String fullClipText);
     void onScreenshotSuggestionClicked(String imageUri);
 }

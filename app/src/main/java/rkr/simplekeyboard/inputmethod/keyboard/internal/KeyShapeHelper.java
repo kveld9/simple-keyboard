@@ -40,10 +40,8 @@ public final class KeyShapeHelper {
             final Context context, final String keyShape) {
         final android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
         gd.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
-        final int textColor = rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.getThemeColor(
-                context, R.attr.keyTextColor, android.graphics.Color.WHITE);
-        final boolean isDarkTheme = androidx.core.graphics.ColorUtils.calculateLuminance(textColor) > 0.4;
-        final int activeColor = isDarkTheme ? 0xDD101418 : 0x44000000;
+        final int activeColor = rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.getThemeColor(
+                context, R.attr.keyPressedBackgroundColor, 0);
         gd.setColor(activeColor);
         gd.setCornerRadius(getCornerRadius(context, keyShape));
         return gd;

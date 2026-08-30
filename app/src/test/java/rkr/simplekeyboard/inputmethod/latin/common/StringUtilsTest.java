@@ -25,6 +25,7 @@ import java.util.Locale;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(JUnit4.class)
@@ -128,6 +129,24 @@ public class StringUtilsTest {
         assertEquals("nino", StringUtils.toNormalizedLower("Niño"));
         assertEquals("facil", StringUtils.toNormalizedLower("FÁCIL"));
         assertEquals("hello world", StringUtils.toNormalizedLower("Hello World"));
+
+        // Fast path: already normalized lowercase ASCII strings return the same instance
+        final String lowercase = "already normalized 123!";
+        assertSame(lowercase, StringUtils.toNormalizedLower(lowercase));
+    }
+
+    @Test
+    public void testStripEnclosingQuotes() {
+        assertEquals("", StringUtils.stripEnclosingQuotes(null));
+        assertEquals("", StringUtils.stripEnclosingQuotes(""));
+        assertEquals("", StringUtils.stripEnclosingQuotes("\"\""));
+        assertEquals("hola", StringUtils.stripEnclosingQuotes("\"hola\""));
+        assertEquals("hello world", StringUtils.stripEnclosingQuotes("\"hello world\""));
+        assertEquals("hola", StringUtils.stripEnclosingQuotes("  \"hola\"  "));
+        assertEquals("hola", StringUtils.stripEnclosingQuotes("hola"));
+        assertEquals("\"", StringUtils.stripEnclosingQuotes("\""));
+        assertEquals("a", StringUtils.stripEnclosingQuotes("\"a\""));
+        assertEquals("abc", StringUtils.stripEnclosingQuotes("  abc  "));
     }
 
     @Test
@@ -169,5 +188,41 @@ public class StringUtilsTest {
         assertFalse(StringUtils.isWordCharacter('.'));
         assertFalse(StringUtils.isWordCharacter(','));
         assertFalse(StringUtils.isWordCharacter('1'));
+    }
+
+    @Test
+    public void testApplyCasing() {
+        // null or empty
+        assertEquals("hello", StringUtils.applyCasing(null, "hello"));
+        assertEquals("hello", StringUtils.applyCasing("", "hello"));
+        assertEquals(null, StringUtils.applyCasing("test", null));
+        assertEquals("", StringUtils.applyCasing("test", ""));
+
+        // All uppercase typed
+        assertEquals("ÁRBOL", StringUtils.applyCasing("ARBOL", "árbol"));
+        assertEquals("HELLO", StringUtils.applyCasing("HEL", "hello"));
+        assertEquals("CANCIÓN", StringUtils.applyCasing("CANCION", "canción"));
+
+        // First char uppercase typed
+        assertEquals("Árbol", StringUtils.applyCasing("Arbol", "árbol"));
+        assertEquals("Canción", StringUtils.applyCasing("Cancion", "canción"));
+        assertEquals("IPhone", StringUtils.applyCasing("Iphone", "iPhone"));
+        assertEquals("A", StringUtils.applyCasing("A", "a"));
+
+        // Lowercase / other typed preserves native dictionary casing
+        assertEquals("canción", StringUtils.applyCasing("cancion", "canción"));
+        assertEquals("Carlos", StringUtils.applyCasing("carlos", "Carlos"));
+        assertEquals("México", StringUtils.applyCasing("mexico", "México"));
+        assertEquals("NASA", StringUtils.applyCasing("nasa", "NASA"));
+        assertEquals("iPhone", StringUtils.applyCasing("iphone", "iPhone"));
+    }
+
+    @Test
+    public void testCapitalizeFirst() {
+        assertEquals(null, StringUtils.capitalizeFirst(null));
+        assertEquals("", StringUtils.capitalizeFirst(""));
+        assertEquals("A", StringUtils.capitalizeFirst("a"));
+        assertEquals("Hello", StringUtils.capitalizeFirst("hello"));
+        assertEquals("Hello", StringUtils.capitalizeFirst("HELLO"));
     }
 }

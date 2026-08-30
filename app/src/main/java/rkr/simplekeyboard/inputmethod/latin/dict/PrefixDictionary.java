@@ -83,6 +83,17 @@ public final class PrefixDictionary {
             return true;
         }
 
+        boolean blockWord(final String word) {
+            final String[] w = words;
+            for (int i = 0; i < w.length; i++) {
+                if (w[i].equalsIgnoreCase(word)) {
+                    freqs[i] = -1;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private void sortWords() {
             for (int i = 1; i < words.length; i++) {
                 final String w = words[i];
@@ -123,11 +134,16 @@ public final class PrefixDictionary {
     private TrieNode mRoot = new TrieNode();
     private int mWordCount = 0;
     private float mAutoCorrectionThreshold = 1.0f;
+    private final Set<String> mBlockedWords = new HashSet<>();
     private final Map<String, Map<String, Short>> mTrigrams = new HashMap<>();
     private final Map<String, Map<String, Short>> mBigrams = new HashMap<>();
     private final List<ScoredWord> mTopWords = new ArrayList<>();
+    private final List<ScoredWord> mScratchRawWords = new ArrayList<>(64);
+    private final List<ScoredWord> mScratchScoredWords = new ArrayList<>(64);
+    private final List<CharSequence> mScratchSuggestions = new ArrayList<>(16);
     private final List<CharSequence> mScratchPredictions = new ArrayList<>(4);
-    private final Set<String> mScratchPredictionsAdded = new HashSet<>(8);
+    private final Set<String> mScratchPredictionsAdded = new HashSet<>(16);
+    private final StringBuilder mScratchFuzzyPath = new StringBuilder(32);
     private volatile rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary mBinaryDict = null;
 
     public PrefixDictionary() {
@@ -149,6 +165,48 @@ public final class PrefixDictionary {
         return mAutoCorrectionThreshold;
     }
 
+    public synchronized boolean isBlocked(final String word) {
+        if (word == null || word.isEmpty() || mBlockedWords.isEmpty()) {
+            return false;
+        }
+        return mBlockedWords.contains(StringUtils.toNormalizedLower(word));
+    }
+
+    public synchronized void blockWord(final String word) {
+        if (word == null || word.isEmpty()) {
+            return;
+        }
+        final String norm = StringUtils.toNormalizedLower(word);
+        mBlockedWords.add(norm);
+
+        final TrieNode node = findPrefixNode(norm);
+        if (node != null) {
+            node.blockWord(word);
+        }
+
+        for (int i = mTopWords.size() - 1; i >= 0; i--) {
+            if (StringUtils.toNormalizedLower(mTopWords.get(i).word).equals(norm)) {
+                mTopWords.remove(i);
+            }
+        }
+
+        mBigrams.remove(norm);
+        for (Map<String, Short> nextMap : mBigrams.values()) {
+            nextMap.remove(norm);
+        }
+
+        final java.util.Iterator<Map.Entry<String, Map<String, Short>>> triIt = mTrigrams.entrySet().iterator();
+        while (triIt.hasNext()) {
+            final Map.Entry<String, Map<String, Short>> entry = triIt.next();
+            final String contextKey = entry.getKey();
+            if (contextKey.startsWith(norm + " ") || contextKey.endsWith(" " + norm) || contextKey.equals(norm)) {
+                triIt.remove();
+            } else {
+                entry.getValue().remove(norm);
+            }
+        }
+    }
+
     public synchronized void copyFrom(final PrefixDictionary other) {
         if (other != null) {
             synchronized (other) {
@@ -156,6 +214,8 @@ public final class PrefixDictionary {
                 this.mWordCount = other.mWordCount;
                 this.mAutoCorrectionThreshold = other.mAutoCorrectionThreshold;
                 this.mBinaryDict = other.mBinaryDict;
+                this.mBlockedWords.clear();
+                this.mBlockedWords.addAll(other.mBlockedWords);
                 this.mTrigrams.clear();
                 this.mTrigrams.putAll(other.mTrigrams);
                 this.mBigrams.clear();
@@ -289,7 +349,7 @@ public final class PrefixDictionary {
     }
 
     public synchronized void insert(final String word, final int frequency) {
-        if (word == null || word.isEmpty()) {
+        if (word == null || word.isEmpty() || isBlocked(word)) {
             return;
         }
         final String normalized = StringUtils.toNormalizedLower(word);
@@ -305,7 +365,7 @@ public final class PrefixDictionary {
     }
 
     private void updateTopWord(final String word, final int freq) {
-        if (word == null || word.isEmpty()) return;
+        if (word == null || word.isEmpty() || isBlocked(word) || freq <= 0) return;
         for (int i = 0; i < mTopWords.size(); i++) {
             if (mTopWords.get(i).word.equalsIgnoreCase(word)) {
                 if (freq > mTopWords.get(i).frequency) {
@@ -383,13 +443,14 @@ public final class PrefixDictionary {
     }
 
     public synchronized int getWordFrequency(final String word) {
-        if (word == null || word.isEmpty()) return 0;
+        if (word == null || word.isEmpty() || isBlocked(word)) return 0;
         final String norm = StringUtils.toNormalizedLower(word);
         final TrieNode current = findPrefixNode(norm);
         if (current != null) {
             for (int i = 0; i < current.words.length; i++) {
                 if (current.words[i].equalsIgnoreCase(word)) {
-                    return current.freqs[i] & 0xFFFF;
+                    final int freq = current.freqs[i] & 0xFFFF;
+                    return (current.freqs[i] > 0) ? freq : 0;
                 }
             }
         }
@@ -416,11 +477,11 @@ public final class PrefixDictionary {
 
         final String trimmed = prefix.trim();
         final String normPrefix = StringUtils.toNormalizedLower(trimmed);
-        final List<ScoredWord> rawWords = new ArrayList<>();
+        mScratchRawWords.clear();
 
         final TrieNode current = findPrefixNode(normPrefix);
         if (current != null) {
-            collectWords(current, rawWords, 40);
+            collectWords(current, mScratchRawWords, 40);
         }
 
         final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
@@ -429,18 +490,22 @@ public final class PrefixDictionary {
             if (binSuggestions != null) {
                 for (CharSequence s : binSuggestions) {
                     final String w = s.toString();
-                    final int freq = bin.getWordFrequency(w);
-                    rawWords.add(new ScoredWord(w, Math.max(1, freq), freq));
+                    if (!isBlocked(w)) {
+                        final int freq = bin.getWordFrequency(w);
+                        if (freq > 0) {
+                            mScratchRawWords.add(new ScoredWord(w, freq, freq));
+                        }
+                    }
                 }
             }
         }
 
-        if (rawWords.isEmpty()) {
+        if (mScratchRawWords.isEmpty()) {
             return Collections.emptyList();
         }
 
-        final List<ScoredWord> scoredWords = scorePrefixWords(rawWords, normPrefix, w1, w2);
-        return formatSuggestions(scoredWords, trimmed, maxCount);
+        scorePrefixWords(mScratchRawWords, normPrefix, w1, w2);
+        return formatSuggestions(mScratchScoredWords, trimmed, maxCount);
     }
 
     private TrieNode findPrefixNode(final String normPrefix) {
@@ -455,13 +520,14 @@ public final class PrefixDictionary {
     }
 
     private List<ScoredWord> scorePrefixWords(final List<ScoredWord> rawWords, final String normPrefix, final String w1, final String w2) {
-        final List<ScoredWord> scoredWords = new ArrayList<>(rawWords.size());
-        for (ScoredWord sw : rawWords) {
+        mScratchScoredWords.clear();
+        for (int i = 0; i < rawWords.size(); i++) {
+            final ScoredWord sw = rawWords.get(i);
             final float score = calcPrefixWordScore(sw, normPrefix, w1, w2);
-            scoredWords.add(new ScoredWord(sw.word, sw.frequency, score));
+            mScratchScoredWords.add(new ScoredWord(sw.word, sw.frequency, score));
         }
-        Collections.sort(scoredWords);
-        return scoredWords;
+        Collections.sort(mScratchScoredWords);
+        return mScratchScoredWords;
     }
 
     private float calcPrefixWordScore(final ScoredWord sw, final String normPrefix, final String w1, final String w2) {
@@ -490,25 +556,31 @@ public final class PrefixDictionary {
     }
 
     private List<CharSequence> formatSuggestions(final List<ScoredWord> scoredWords, final String originalPrefix, final int maxCount) {
-        final List<CharSequence> results = new ArrayList<>();
-        final Set<String> added = new HashSet<>();
-        for (ScoredWord sw : scoredWords) {
-            if (results.size() >= maxCount) {
+        mScratchSuggestions.clear();
+        mScratchPredictionsAdded.clear();
+        for (int i = 0; i < scoredWords.size(); i++) {
+            if (mScratchSuggestions.size() >= maxCount) {
                 break;
             }
+            final ScoredWord sw = scoredWords.get(i);
+            if (isBlocked(sw.word)) {
+                continue;
+            }
             final String formatted = StringUtils.applyCasing(originalPrefix, sw.word);
-            if (added.add(formatted.toLowerCase())) {
-                results.add(formatted);
+            if (mScratchPredictionsAdded.add(formatted.toLowerCase())) {
+                mScratchSuggestions.add(formatted);
             }
         }
-        return results;
+        return mScratchSuggestions;
     }
 
     private void collectWords(final TrieNode node, final List<ScoredWord> accumulator, final int maxLimit) {
         for (int i = 0; i < node.words.length; i++) {
-            accumulator.add(new ScoredWord(node.words[i], node.freqs[i], node.freqs[i]));
-            if (accumulator.size() >= maxLimit) {
-                return;
+            if (node.freqs[i] > 0 && !isBlocked(node.words[i])) {
+                accumulator.add(new ScoredWord(node.words[i], node.freqs[i], node.freqs[i]));
+                if (accumulator.size() >= maxLimit) {
+                    return;
+                }
             }
         }
         for (TrieNode child : node.children) {
@@ -566,15 +638,15 @@ public final class PrefixDictionary {
     }
 
     public synchronized boolean containsWord(final String word) {
-        if (word == null || word.isEmpty()) {
+        if (word == null || word.isEmpty() || isBlocked(word)) {
             return false;
         }
         final String norm = StringUtils.toNormalizedLower(word);
         final TrieNode current = findPrefixNode(norm);
         if (current != null) {
-            for (String w : current.words) {
-                if (w.equalsIgnoreCase(word)) {
-                    return true;
+            for (int i = 0; i < current.words.length; i++) {
+                if (current.words[i].equalsIgnoreCase(word)) {
+                    return current.freqs[i] > 0;
                 }
             }
         }
@@ -591,6 +663,9 @@ public final class PrefixDictionary {
     }
 
     private boolean isAcceptableExactMatch(final String word, final String candidate, final int candidateFreq) {
+        if (candidate == null || isBlocked(candidate) || candidateFreq <= 0) {
+            return false;
+        }
         if (losesAccent(word, candidate)) {
             return false;
         }
@@ -599,10 +674,10 @@ public final class PrefixDictionary {
     }
 
     private int findBestTrieWordIndex(final TrieNode node) {
-        int bestIdx = 0;
-        int bestFreq = node.freqs.length > 0 ? node.freqs[0] : 0;
-        for (int i = 1; i < node.words.length; i++) {
-            if (node.freqs[i] > bestFreq) {
+        int bestIdx = -1;
+        int bestFreq = 0;
+        for (int i = 0; i < node.words.length; i++) {
+            if (node.freqs[i] > bestFreq && !isBlocked(node.words[i])) {
                 bestFreq = node.freqs[i];
                 bestIdx = i;
             }
@@ -616,6 +691,9 @@ public final class PrefixDictionary {
             return null;
         }
         final int bestIdx = findBestTrieWordIndex(current);
+        if (bestIdx < 0) {
+            return null;
+        }
         final String bestWord = current.words[bestIdx];
         final int bestFreq = current.freqs.length > bestIdx ? current.freqs[bestIdx] : 0;
         if (isAcceptableExactMatch(word, bestWord, bestFreq)) {
@@ -630,11 +708,11 @@ public final class PrefixDictionary {
             return null;
         }
         final String canonical = bin.getCanonicalWord(word);
-        if (canonical == null || canonical.equalsIgnoreCase(word)) {
+        if (canonical == null || canonical.equalsIgnoreCase(word) || isBlocked(canonical)) {
             return null;
         }
         final int binFreq = bin.getWordFrequency(canonical);
-        if (isAcceptableExactMatch(word, canonical, binFreq)) {
+        if (binFreq > 0 && isAcceptableExactMatch(word, canonical, binFreq)) {
             return StringUtils.applyCasing(word, canonical);
         }
         return null;
@@ -730,18 +808,20 @@ public final class PrefixDictionary {
 
     private List<ScoredWord> searchAndScoreFuzzyCandidates(final String norm, final String w1, final String w2) {
         final int maxDistance = getMaxFuzzyDistance(norm.length());
-        final List<ScoredWord> rawCandidates = new ArrayList<>();
-        searchFuzzy(mRoot, new StringBuilder(), norm, 0, maxDistance, rawCandidates);
+        mScratchRawWords.clear();
+        mScratchFuzzyPath.setLength(0);
+        searchFuzzy(mRoot, mScratchFuzzyPath, norm, 0, maxDistance, mScratchRawWords);
 
         final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
         if (bin != null) {
-            bin.searchFuzzy(bin.getRootNode(), new StringBuilder(), norm, 0, maxDistance, rawCandidates);
+            mScratchFuzzyPath.setLength(0);
+            bin.searchFuzzy(bin.getRootNode(), mScratchFuzzyPath, norm, 0, maxDistance, mScratchRawWords);
         }
 
-        if (rawCandidates.isEmpty()) {
+        if (mScratchRawWords.isEmpty()) {
             return Collections.emptyList();
         }
-        return scoreFuzzyCandidates(rawCandidates, norm, w1, w2);
+        return scoreFuzzyCandidates(mScratchRawWords, norm, w1, w2);
     }
 
     private int getMaxFuzzyDistance(final int normLen) {
@@ -751,13 +831,17 @@ public final class PrefixDictionary {
     }
 
     private List<ScoredWord> scoreFuzzyCandidates(final List<ScoredWord> rawCandidates, final String norm, final String w1, final String w2) {
-        final List<ScoredWord> candidates = new ArrayList<>(rawCandidates.size());
-        for (ScoredWord cw : rawCandidates) {
+        mScratchScoredWords.clear();
+        for (int i = 0; i < rawCandidates.size(); i++) {
+            final ScoredWord cw = rawCandidates.get(i);
+            if (isBlocked(cw.word) || cw.frequency <= 0) {
+                continue;
+            }
             final float score = calcFuzzyCandidateScore(norm, cw.word, cw.frequency, w1, w2);
-            candidates.add(new ScoredWord(cw.word, cw.frequency, score));
+            mScratchScoredWords.add(new ScoredWord(cw.word, cw.frequency, score));
         }
-        Collections.sort(candidates);
-        return candidates;
+        Collections.sort(mScratchScoredWords);
+        return mScratchScoredWords;
     }
 
     private float calcFuzzyCandidateScore(final String norm, final String candidateWord, final int candidateFreq, final String w1, final String w2) {
@@ -843,7 +927,9 @@ public final class PrefixDictionary {
     private void recordExactLengthMatches(final TrieNode node, final String target, final int targetIdx, final List<ScoredWord> candidates) {
         if (targetIdx == target.length() && node.words.length > 0) {
             for (int i = 0; i < node.words.length; i++) {
-                candidates.add(new ScoredWord(node.words[i], node.freqs[i], node.freqs[i]));
+                if (node.freqs[i] > 0 && !isBlocked(node.words[i])) {
+                    candidates.add(new ScoredWord(node.words[i], node.freqs[i], node.freqs[i]));
+                }
             }
         }
     }
@@ -888,12 +974,14 @@ public final class PrefixDictionary {
     }
 
     public synchronized String getCanonicalWord(final String word) {
-        if (word == null || word.isEmpty()) return word;
+        if (word == null || word.isEmpty() || isBlocked(word)) return word;
         final String norm = StringUtils.toNormalizedLower(word);
         final TrieNode current = findPrefixNode(norm);
         if (current == null) return word;
-        if (current.words.length > 0) {
-            return current.words[0];
+        for (int i = 0; i < current.words.length; i++) {
+            if (current.freqs[i] > 0 && !isBlocked(current.words[i])) {
+                return current.words[i];
+            }
         }
         return word;
     }
@@ -905,8 +993,9 @@ public final class PrefixDictionary {
         final List<Map.Entry<String, Short>> sortedEntries = new ArrayList<>(nextMap.entrySet());
         Collections.sort(sortedEntries, (a, b) -> Integer.compare(b.getValue() & 0xFFFF, a.getValue() & 0xFFFF));
         for (Map.Entry<String, Short> entry : sortedEntries) {
+            if (isBlocked(entry.getKey())) continue;
             final String candidate = getCanonicalWord(entry.getKey());
-            if (added.add(candidate.toLowerCase())) {
+            if (candidate != null && !isBlocked(candidate) && added.add(candidate.toLowerCase())) {
                 results.add(candidate);
                 if (results.size() >= limit) {
                     return true;
@@ -958,9 +1047,15 @@ public final class PrefixDictionary {
     public synchronized void clear() {
         mRoot = new TrieNode();
         mWordCount = 0;
+        mBlockedWords.clear();
         mTrigrams.clear();
         mBigrams.clear();
         mTopWords.clear();
+        mScratchRawWords.clear();
+        mScratchScoredWords.clear();
+        mScratchSuggestions.clear();
+        mScratchPredictions.clear();
+        mScratchPredictionsAdded.clear();
     }
 }
 

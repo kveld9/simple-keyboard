@@ -25,8 +25,7 @@ import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 @RunWith(JUnit4.class)
 public class PrefixDictionaryTest {
@@ -346,7 +345,10 @@ public class PrefixDictionaryTest {
         assertEquals("canción", StringUtils.applyCasing("cancion", "canción"));
         assertEquals("HELLO", StringUtils.applyCasing("HEL", "hello"));
         assertEquals("Hello", StringUtils.applyCasing("He", "hello"));
-        assertEquals("hello", StringUtils.applyCasing("he", "HELLO"));
+        assertEquals("HELLO", StringUtils.applyCasing("he", "HELLO"));
+        assertEquals("Carlos", StringUtils.applyCasing("carlos", "Carlos"));
+        assertEquals("México", StringUtils.applyCasing("mexico", "México"));
+        assertEquals("NASA", StringUtils.applyCasing("nasa", "NASA"));
 
         mDict.insert("árbol", 100);
         mDict.insert("canción", 100);
@@ -458,5 +460,49 @@ public class PrefixDictionaryTest {
 
         mDict.clear();
         assertEquals(0, mDict.getWordCount());
+    }
+
+    @Test
+    public void testBlockWordAndIsBlocked() {
+        mDict.insert("hola", 100);
+        mDict.insert("mundo", 90);
+        mDict.insert("holgura", 80);
+        mDict.setBigram("hola", "mundo", 200);
+
+        assertTrue(mDict.containsWord("hola"));
+        assertTrue(mDict.getWordFrequency("hola") > 0);
+        assertFalse(mDict.isBlocked("hola"));
+
+        List<CharSequence> suggestions = mDict.getSuggestions("hol", 5);
+        assertTrue(suggestions.contains("hola"));
+
+        // Block "hola"
+        mDict.blockWord("hola");
+
+        assertTrue(mDict.isBlocked("hola"));
+        assertFalse(mDict.containsWord("hola"));
+        assertEquals(0, mDict.getWordFrequency("hola"));
+
+        suggestions = mDict.getSuggestions("hol", 5);
+        assertFalse(suggestions.contains("hola"));
+        assertTrue(suggestions.contains("holgura"));
+
+        // Exact and fuzzy corrections should not return blocked words
+        assertNull(mDict.getExactNormalizedCorrection("hola"));
+        CharSequence best = mDict.getBestCorrection("hola");
+        assertNotEquals("hola", best != null ? best.toString() : null);
+
+        // Bigrams should not predict blocked words
+        List<CharSequence> preds = mDict.getNextWordPredictions("hola", 3);
+        assertTrue(preds.isEmpty());
+
+        // Copy dictionary should retain blocked status
+        PrefixDictionary copied = new PrefixDictionary();
+        copied.copyFrom(mDict);
+        assertTrue(copied.isBlocked("hola"));
+
+        // Clear should reset blocked words
+        mDict.clear();
+        assertFalse(mDict.isBlocked("hola"));
     }
 }

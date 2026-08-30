@@ -32,6 +32,7 @@ public final class InputAttributes {
     public final String mTargetApplicationPackageName;
     public final boolean mIsPasswordField;
     public final boolean mShouldShowSuggestions;
+    public final boolean mIsUrlOrEmailField;
     public final boolean mNoPersonalizedLearning;
     private final int mInputType;
 
@@ -47,15 +48,16 @@ public final class InputAttributes {
 
         if (inputClass != InputType.TYPE_CLASS_TEXT) {
             mShouldShowSuggestions = false;
+            mIsUrlOrEmailField = false;
             return;
         }
 
         final int variation = inputType & InputType.TYPE_MASK_VARIATION;
+        mIsUrlOrEmailField = InputTypeUtils.isEmailVariation(variation)
+                || InputType.TYPE_TEXT_VARIATION_URI == variation;
 
         // Suppress suggestions only for password fields, email addresses, or direct URLs
-        final boolean shouldSuppressSuggestions = mIsPasswordField
-                || InputTypeUtils.isEmailVariation(variation)
-                || InputType.TYPE_TEXT_VARIATION_URI == variation;
+        final boolean shouldSuppressSuggestions = mIsPasswordField || mIsUrlOrEmailField;
         mShouldShowSuggestions = !shouldSuppressSuggestions;
     }
 

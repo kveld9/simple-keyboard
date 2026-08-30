@@ -181,6 +181,10 @@
     <string name="ime_not_active_summary">Tap to choose it as your active keyboard</string>
     <string name="clipboard_enabled">Enable clipboard</string>
     <string name="clipboard_enabled_summary">Keep a history of copied items and suggestions</string>
+    <string name="suggestions_in_urls">Show suggestions in URLs and emails</string>
+    <string name="suggestions_in_urls_summary">Display word suggestions in address bars and email fields</string>
+    <string name="forget_word_title">Forget word</string>
+    <string name="forget_word_message">Do you want to forget \"%s\"?</string>
 </resources>
 
 

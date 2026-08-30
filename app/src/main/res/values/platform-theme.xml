@@ -1,26 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-/*
-**
-** Copyright 2014, The Android Open Source Project
-**
-** Licensed under the Apache License, Version 2.0 (the "License");
-** you may not use this file except in compliance with the License.
-** You may obtain a copy of the License at
-**
-**     http://www.apache.org/licenses/LICENSE-2.0
-**
-** Unless required by applicable law or agreed to in writing, software
-** distributed under the License is distributed on an "AS IS" BASIS,
-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-** See the License for the specific language governing permissions and
-** limitations under the License.
-*/
--->
-
-<resources>
-    <style name="platformSettingsTheme" parent="@android:style/Theme.Material.Light.LightStatusBar">
-        <item name="android:alertDialogTheme">@style/platformDialogTheme</item>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="platformSettingsTheme" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="preferenceTheme">@style/M3PreferenceThemeOverlay</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <item name="materialAlertDialogTheme">@style/platformDialogTheme</item>
+        <item name="alertDialogTheme">@style/platformDialogTheme</item>
     </style>
-    <style name="platformDialogTheme" parent="@android:style/Theme.DeviceDefault.Light.Dialog" />
+
+    <style name="platformDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:listPreferredItemHeight">48dp</item>
+        <item name="android:listPreferredItemHeightSmall">48dp</item>
+        <item name="listPreferredItemHeight">48dp</item>
+        <item name="listPreferredItemHeightSmall">48dp</item>
+    </style>
+
+    <style name="M3PreferenceThemeOverlay" parent="PreferenceThemeOverlay">
+        <item name="preferenceCategoryStyle">@style/M3PreferenceCategory</item>
+        <item name="preferenceStyle">@style/M3Preference</item>
+        <item name="switchPreferenceCompatStyle">@style/M3SwitchPreferenceCompat</item>
+        <item name="dialogPreferenceStyle">@style/M3DialogPreference</item>
+    </style>
+
+    <style name="M3PreferenceCategory" parent="Preference.Category.Material">
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+        <item name="android:layout">@layout/m3_preference_category</item>
+    </style>
+
+    <style name="M3Preference" parent="Preference.Material">
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+        <item name="singleLineTitle">false</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:layout">@layout/m3_preference</item>
+    </style>
+
+    <style name="M3SwitchPreferenceCompat" parent="Preference.SwitchPreferenceCompat.Material">
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+        <item name="singleLineTitle">false</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:layout">@layout/m3_preference</item>
+        <item name="android:widgetLayout">@layout/m3_preference_widget_switch</item>
+        <item name="widgetLayout">@layout/m3_preference_widget_switch</item>
+    </style>
+
+    <style name="M3DialogPreference" parent="Preference.DialogPreference.Material">
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+        <item name="singleLineTitle">false</item>
+        <item name="android:singleLine">false</item>
+        <item name="android:layout">@layout/m3_preference</item>
+    </style>
 </resources>

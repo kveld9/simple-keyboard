@@ -20,8 +20,10 @@ package rkr.simplekeyboard.inputmethod.latin.settings;
 import android.content.Context;
 import android.content.res.Resources;
 import android.os.Bundle;
-import android.preference.Preference;
-import android.preference.PreferenceScreen;
+
+import androidx.annotation.Nullable;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceScreen;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardTheme;
@@ -45,6 +47,7 @@ public final class ThemeSettingsFragment extends SubScreenFragment
     }
 
     static void updateKeyboardThemeSummary(final Preference pref) {
+        if (pref == null) return;
         final Context context = pref.getContext();
         final Resources res = context.getResources();
         final KeyboardTheme keyboardTheme = KeyboardTheme.getKeyboardTheme(context);
@@ -59,11 +62,11 @@ public final class ThemeSettingsFragment extends SubScreenFragment
     }
 
     @Override
-    public void onCreate(final Bundle icicle) {
-        super.onCreate(icicle);
-        addPreferencesFromResource(R.xml.prefs_screen_theme);
+    public void onCreatePreferences(@Nullable final Bundle savedInstanceState, @Nullable final String rootKey) {
+        super.onCreatePreferences(savedInstanceState, rootKey);
+        setPreferencesFromResource(R.xml.prefs_screen_theme, rootKey);
         final PreferenceScreen screen = getPreferenceScreen();
-        final Context context = getActivity();
+        final Context context = requireContext();
         final Resources res = getResources();
         final String[] keyboardThemeNames = res.getStringArray(R.array.keyboard_theme_names);
         final int[] keyboardThemeIds = res.getIntArray(R.array.keyboard_theme_ids);
@@ -100,6 +103,7 @@ public final class ThemeSettingsFragment extends SubScreenFragment
 
     private void updateSelected() {
         final PreferenceScreen screen = getPreferenceScreen();
+        if (screen == null) return;
         final int count = screen.getPreferenceCount();
         for (int index = 0; index < count; index++) {
             final Preference preference = screen.getPreference(index);

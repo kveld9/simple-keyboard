@@ -474,9 +474,15 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         return Settings.readClipboardRetentionMinutes(prefs);
     }
 
+    public boolean isClipboardEnabled() {
+        android.content.SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(mContext);
+        return prefs.getBoolean(Settings.PREF_CLIPBOARD_ENABLED, true);
+    }
+
     @Override
     public void onPrimaryClipChanged() {
-        if (mClipboardManager == null || !isHistoryEnabled()) return;
+        if (mClipboardManager == null || !isClipboardEnabled() || !isHistoryEnabled()) return;
+
 
         try {
             if (mClipboardManager.hasPrimaryClip()) {
@@ -487,3 +493,4 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         }
     }
 }
+

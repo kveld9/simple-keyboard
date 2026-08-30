@@ -18,7 +18,7 @@ package rkr.simplekeyboard.inputmethod.compat;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.preference.PreferenceManager;
+import androidx.preference.PreferenceManager;
 
 public class PreferenceManagerCompat {
     public static Context getDeviceContext(Context context) {
@@ -29,3 +29,4 @@ public class PreferenceManagerCompat {
         return PreferenceManager.getDefaultSharedPreferences(getDeviceContext(context));
     }
 }
+

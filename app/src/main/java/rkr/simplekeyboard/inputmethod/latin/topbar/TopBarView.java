@@ -17,6 +17,7 @@ import android.widget.TextView;
 import java.util.List;
 
 import rkr.simplekeyboard.inputmethod.R;
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils;
 
 public class TopBarView extends FrameLayout {
@@ -159,6 +160,7 @@ public class TopBarView extends FrameLayout {
         int paddingH = ViewUtils.dpToPx(context, 4);
         tv.setPadding(paddingH, 0, paddingH, 0);
         tv.setClickable(true);
+        tv.setLongClickable(true);
         tv.setFocusable(false);
         tv.setVisibility(View.INVISIBLE);
         ViewUtils.applySelectableItemBackground(tv, false);
@@ -345,6 +347,7 @@ public class TopBarView extends FrameLayout {
         slot.setAlpha(0.85f);
         slot.setVisibility(View.INVISIBLE);
         slot.setOnClickListener(null);
+        slot.setOnLongClickListener(null);
     }
 
     private void applySlotStyle(TextView slot, boolean isHighlighted) {
@@ -352,17 +355,9 @@ public class TopBarView extends FrameLayout {
         slot.setAlpha(isHighlighted ? 1.0f : 0.85f);
     }
 
-    private String stripEnclosingQuotes(CharSequence text) {
-        String clean = text.toString();
-        if (clean.length() > 2 && clean.startsWith("\"") && clean.endsWith("\"")) {
-            return clean.substring(1, clean.length() - 1);
-        }
-        return clean;
-    }
-
     private void handleSuggestionClick(CharSequence text) {
         if (mListener != null) {
-            mListener.onSuggestionClicked(stripEnclosingQuotes(text));
+            mListener.onSuggestionClicked(StringUtils.stripEnclosingQuotes(text));
         }
     }
 
@@ -376,6 +371,12 @@ public class TopBarView extends FrameLayout {
         slot.setVisibility(View.VISIBLE);
         applySlotStyle(slot, isHighlighted);
         slot.setOnClickListener(v -> handleSuggestionClick(text));
+        slot.setOnLongClickListener(v -> {
+            if (mListener != null) {
+                mListener.onSuggestionLongClicked(StringUtils.stripEnclosingQuotes(text));
+            }
+            return true;
+        });
     }
     
     public void setExternalView(View view) {

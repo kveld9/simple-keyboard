@@ -125,4 +125,8 @@
     <string name="ime_not_active_summary">Нажмите, чтобы выбрать её в качестве активной клавиатуры</string>
     <string name="clipboard_enabled">Включить буфер обмена</string>
     <string name="clipboard_enabled_summary">Сохранять историю скопированных элементов и подсказки</string>
+    <string name="suggestions_in_urls">Подсказки в URL и эл. почте</string>
+    <string name="suggestions_in_urls_summary">Показывать варианты слов в адресных строках и полях эл. почты</string>
+    <string name="forget_word_title">Забыть слово</string>
+    <string name="forget_word_message">Удалить «%s» из словаря?</string>
 </resources>

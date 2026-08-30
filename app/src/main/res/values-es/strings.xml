@@ -125,6 +125,10 @@
     <string name="ime_not_active_summary">Toca para elegirlo como teclado activo</string>
     <string name="clipboard_enabled">Habilitar portapapeles</string>
     <string name="clipboard_enabled_summary">Mantener un historial de elementos copiados y sugerencias</string>
+    <string name="suggestions_in_urls">Sugerencias en URLs y correos</string>
+    <string name="suggestions_in_urls_summary">Mostrar sugerencias de palabras en barras de direcciones y correos</string>
+    <string name="forget_word_title">Olvidar palabra</string>
+    <string name="forget_word_message">¿Deseas olvidar «%s»?</string>
 </resources>
 
 

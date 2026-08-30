@@ -49,6 +49,12 @@
             android:summary="@string/disable_landscape_fullscreen_summary"
             android:defaultValue="false" />
 
+        <SwitchPreferenceCompat
+            android:key="pref_suggestions_in_urls"
+            android:title="@string/suggestions_in_urls"
+            android:summary="@string/suggestions_in_urls_summary"
+            android:defaultValue="false" />
+
     </PreferenceCategory>
 
     <PreferenceCategory

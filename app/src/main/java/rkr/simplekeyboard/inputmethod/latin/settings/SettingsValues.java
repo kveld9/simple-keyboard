@@ -52,6 +52,7 @@ public class SettingsValues {
     public final float mSwipeSensitivity;
     public final boolean mDisableLandscapeFullscreen;
     public final boolean mShowSuggestions;
+    public final boolean mSuggestionsInUrls;
     public final boolean mClipboardEnabled;
     public final boolean mClipboardSuggestionsEnabled;
     public final boolean mSuggestScreenshots;
@@ -103,6 +104,7 @@ public class SettingsValues {
         mSwipeSensitivity = Settings.readSwipeSensitivity(prefs);
         mDisableLandscapeFullscreen = prefs.getBoolean(Settings.PREF_DISABLE_LANDSCAPE_FULLSCREEN, false);
         mShowSuggestions = prefs.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, true);
+        mSuggestionsInUrls = prefs.getBoolean(Settings.PREF_SUGGESTIONS_IN_URLS, false);
         mClipboardEnabled = prefs.getBoolean(Settings.PREF_CLIPBOARD_ENABLED, true);
         mClipboardSuggestionsEnabled = prefs.getBoolean(Settings.PREF_CLIPBOARD_SUGGESTIONS, false);
         mSuggestScreenshots = prefs.getBoolean(Settings.PREF_SUGGEST_SCREENSHOTS, false);

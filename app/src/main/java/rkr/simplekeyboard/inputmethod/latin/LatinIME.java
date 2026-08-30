@@ -80,6 +80,7 @@ import rkr.simplekeyboard.inputmethod.keyboard.KeyboardSwitcher;
 import rkr.simplekeyboard.inputmethod.keyboard.MainKeyboardView;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryManager;
 import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryView;
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPalettesView;
 import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary;
@@ -96,6 +97,7 @@ import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 import rkr.simplekeyboard.inputmethod.latin.topbar.TopBarListener;
 import rkr.simplekeyboard.inputmethod.latin.topbar.TopBarView;
 import rkr.simplekeyboard.inputmethod.latin.utils.ApplicationUtils;
+import rkr.simplekeyboard.inputmethod.latin.utils.DialogUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.LeakGuardHandlerWrapper;
 import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ViewLayoutUtils;
@@ -453,16 +455,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
                     @Override
                     public void onSuggestionClicked(CharSequence text) {
-                        String cleanWord = "";
-                        if (text != null && text.length() > 0) {
-                            cleanWord = text.toString().trim();
-                            if (cleanWord.startsWith("\"") && cleanWord.endsWith("\"") && cleanWord.length() >= 2) {
-                                cleanWord = cleanWord.substring(1, cleanWord.length() - 1).trim();
-                            }
-                            if (cleanWord.length() > 0) {
-                                final String[] context = getEffectivePreviousWords();
-                                recordCommittedWord(cleanWord, context[0], context[1]);
-                            }
+                        final String cleanWord = StringUtils.stripEnclosingQuotes(text);
+                        if (cleanWord.length() > 0) {
+                            final String[] context = getEffectivePreviousWords();
+                            recordCommittedWord(cleanWord, context[0], context[1]);
                         }
                         final String currentWord = mInputLogic.mConnection.getWordBeforeCursor();
                         if (currentWord == null || currentWord.isEmpty()) {
@@ -471,6 +467,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                             mInputLogic.mConnection.commitSuggestion(text);
                         }
                         updateSuggestions();
+                    }
+
+                    @Override
+                    public void onSuggestionLongClicked(CharSequence text) {
+                        if (text == null || text.length() == 0 || mInputView == null) {
+                            return;
+                        }
+                        final String cleanWord = StringUtils.stripEnclosingQuotes(text);
+                        if (cleanWord.isEmpty()) {
+                            return;
+                        }
+                        showForgetWordDialog(cleanWord);
                     }
 
                     @Override
@@ -1103,10 +1111,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private boolean shouldSuppressSuggestions() {
         final SettingsValues currentSettings = mSettings.getCurrent();
-        if (currentSettings != null && currentSettings.mInputAttributes != null) {
-            return !currentSettings.mInputAttributes.mShouldShowSuggestions;
+        if (currentSettings == null || currentSettings.mInputAttributes == null) {
+            return false;
         }
-        return false;
+        if (currentSettings.mInputAttributes.mIsPasswordField) {
+            return true;
+        }
+        if (currentSettings.mInputAttributes.mShouldShowSuggestions) {
+            return false;
+        }
+        if (currentSettings.mInputAttributes.mIsUrlOrEmailField && currentSettings.mSuggestionsInUrls) {
+            return false;
+        }
+        return true;
     }
 
     private void displayEmptyWordSuggestions(final String w1, final String w2) {
@@ -1528,6 +1545,48 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mOptionsDialog = mRichImm.showSubtypePicker(this,
                 mKeyboardSwitcher.getMainKeyboardView().getWindowToken(), this);
         return mOptionsDialog != null;
+    }
+
+    private void showForgetWordDialog(final String word) {
+        if (mInputView == null) {
+            return;
+        }
+        final android.os.IBinder windowToken = mInputView.getWindowToken();
+        if (windowToken == null) {
+            return;
+        }
+
+        if (mOptionsDialog != null && mOptionsDialog.isShowing()) {
+            mOptionsDialog.dismiss();
+            mOptionsDialog = null;
+        }
+
+        final AlertDialog.Builder builder = new AlertDialog.Builder(
+                DialogUtils.getPlatformDialogThemeContext(this));
+        builder.setTitle(R.string.forget_word_title);
+        builder.setMessage(getString(R.string.forget_word_message, word));
+        builder.setPositiveButton(android.R.string.ok, (dialog, which) -> {
+            mPrefixDictionary.blockWord(word);
+            updateSuggestions();
+            dialog.dismiss();
+        });
+        builder.setNegativeButton(android.R.string.cancel, (dialog, which) -> dialog.dismiss());
+
+        final AlertDialog dialog = builder.create();
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+
+        final Window window = dialog.getWindow();
+        if (window != null) {
+            final WindowManager.LayoutParams lp = window.getAttributes();
+            lp.token = windowToken;
+            lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
+            window.setAttributes(lp);
+            window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+        }
+
+        mOptionsDialog = dialog;
+        dialog.show();
     }
 
     public Locale getCurrentLayoutLocale() {

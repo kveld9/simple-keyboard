@@ -84,6 +84,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String KEY_SHAPE_RECTANGULAR = "rectangular";
     public static final String KEY_SHAPE_BORDERLESS = "borderless";
     public static final String PREF_SHOW_SUGGESTIONS = "pref_show_suggestions";
+    public static final String PREF_SUGGESTIONS_IN_URLS = "pref_suggestions_in_urls";
     public static final String PREF_AUTO_CORRECTION_THRESHOLD = "auto_correction_threshold";
     public static final String AUTO_CORRECTION_THRESHOLD_DEFAULT = "1";
     public static final float AUTO_CORRECTION_THRESHOLD_OFF = 0.0f;
@@ -224,6 +225,8 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         map.put(PREF_SPACE_SWIPE, boolApplier);
         map.put(PREF_DISABLE_LANDSCAPE_FULLSCREEN, boolApplier);
         map.put(PREF_SWIPE_SENSITIVITY, stringApplier);
+        map.put(PREF_SHOW_SUGGESTIONS, boolApplier);
+        map.put(PREF_SUGGESTIONS_IN_URLS, boolApplier);
         map.put(PREF_VIBRATE_ON, boolApplier);
         map.put(PREF_SOUND_ON, boolApplier);
         map.put(PREF_POPUP_ON, boolApplier);

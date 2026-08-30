@@ -325,6 +325,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
         mClipboardHistoryManager.setOnScreenshotChangeListener(this::updateSuggestions);
+        mClipboardHistoryManager.setOnPrimaryClipChangeListener(this::updateSuggestions);
         mClipboardHistoryManager.start();
 
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
@@ -1038,24 +1039,41 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (mClipboardHistoryManager == null || !mSettings.getCurrent().mClipboardHistoryEnabled) {
             return false;
         }
-        if (mSettings.getCurrent().mSuggestScreenshots) {
-            final ClipboardHistoryManager.ScreenshotInfo screenshotInfo =
-                    mClipboardHistoryManager.getRecentScreenshotForSuggestion();
-            if (screenshotInfo != null) {
+
+        final ClipboardHistoryManager.ScreenshotInfo screenshotInfo =
+                mSettings.getCurrent().mSuggestScreenshots
+                        ? mClipboardHistoryManager.getRecentScreenshotForSuggestion()
+                        : null;
+
+        final String recentClip =
+                mSettings.getCurrent().mClipboardSuggestionsEnabled
+                        ? mClipboardHistoryManager.getRecentClipForSuggestion()
+                        : null;
+
+        if (screenshotInfo != null && recentClip != null) {
+            final long clipTime = mClipboardHistoryManager.getLastTextTime();
+            final long screenshotTime = screenshotInfo.dateAdded;
+
+            // If the clipboard text is newer or equal to the screenshot, show text chip
+            if (clipTime >= screenshotTime) {
+                mTopBarView.setClipboardSuggestion(recentClip);
+                return true;
+            } else {
                 final Bitmap thumb = mClipboardHistoryManager.getScreenshotThumbnail(screenshotInfo);
                 final String uriString = screenshotInfo.fullPath != null ? screenshotInfo.fullPath : screenshotInfo.uri.toString();
                 mTopBarView.setScreenshotSuggestion(uriString, thumb);
                 return true;
             }
-        }
-        if (!mSettings.getCurrent().mClipboardSuggestionsEnabled) {
-            return false;
-        }
-        final String recentClip = mClipboardHistoryManager.getRecentClipForSuggestion();
-        if (recentClip != null) {
+        } else if (screenshotInfo != null) {
+            final Bitmap thumb = mClipboardHistoryManager.getScreenshotThumbnail(screenshotInfo);
+            final String uriString = screenshotInfo.fullPath != null ? screenshotInfo.fullPath : screenshotInfo.uri.toString();
+            mTopBarView.setScreenshotSuggestion(uriString, thumb);
+            return true;
+        } else if (recentClip != null) {
             mTopBarView.setClipboardSuggestion(recentClip);
             return true;
         }
+
         return false;
     }
 

@@ -934,7 +934,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             // 1. Construct binary trie dictionary and beam search decoder in background
             BinaryTrieDictionary newBinaryDict = null;
             BeamSearchDecoder newDecoder = null;
-            final String primaryAssetName = "es".equals(currentLang) ? "dict_es.bin" : "dict_en.bin";
+            final String primaryAssetName = getDictionaryAssetForLanguage(currentLang);
             try (InputStream is = getAssets().open(primaryAssetName)) {
                 byte[] bytes = new byte[is.available()];
                 is.read(bytes);
@@ -979,8 +979,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         });
     }
 
+    private String getDictionaryAssetForLanguage(final String lang) {
+        if ("es".equals(lang)) return "dict_es.bin";
+        if ("ru".equals(lang)) return "dict_ru.bin";
+        return "dict_en.bin";
+    }
+
     private void loadSingleLanguageBinaryDictionaryInto(final PrefixDictionary targetDict, final String lang, final float weightFactor) {
-        final String assetName = "es".equals(lang) ? "dict_es.bin" : "dict_en.bin";
+        final String assetName = getDictionaryAssetForLanguage(lang);
         boolean loaded = false;
         try (InputStream is = getAssets().open(assetName)) {
             byte[] bytes = new byte[is.available()];

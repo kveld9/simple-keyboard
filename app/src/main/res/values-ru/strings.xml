@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+/*
+**
+** Copyright 2008, The Android Open Source Project
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**     http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+ -->
+
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="vibrate_on_keypress">Вибрация при нажатии клавиш</string>
+    <string name="sound_on_keypress">Звук при нажатии клавиш</string>
+    <string name="popup_on_keypress">Всплывающее окно при нажатии</string>
+    <string name="settings_screen_preferences">Настройки</string>
+    <string name="settings_screen_key_press">Нажатие клавиш</string>
+    <string name="settings_screen_appearance">Внешний вид</string>
+    <string name="settings_screen_theme">Тема</string>
+    <string name="version">Версия</string>
+    <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%d</xliff:g> мс</string>
+    <string name="settings_system_default">По умолчанию</string>
+    <string name="auto_cap">Автоматические заглавные</string>
+    <string name="auto_cap_summary">Писать первое слово каждого предложения с заглавной буквы</string>
+    <string name="select_language">Языки</string>
+    <string name="locale_name_en_GB">Английский (Великобритания)</string>
+    <string name="locale_name_en_US">Английский (США)</string>
+    <string name="locale_name_es_US">Испанский (США)</string>
+    <string name="locale_name_hi_ZZ">Хинглиш</string>
+    <string name="locale_name_sr_ZZ">Сербский (латиница)</string>
+    <string name="subtype_generic_layout"><xliff:g id="LANGUAGE_NAME" example="Русский">%1$s</xliff:g> (<xliff:g id="LAYOUT" example="ЙЦУКЕН">%2$s</xliff:g>)</string>
+    <string name="keyboard_theme_dark">Тёмная Material</string>
+    <string name="keyboard_theme_light">Светлая Material</string>
+    <string name="keyboard_theme_system">Системная по умолчанию</string>
+    <string name="keyboard_theme_black">AMOLED Чёрная</string>
+    <string name="prefs_keypress_sound_volume_settings">Громкость звука клавиш</string>
+    <string name="prefs_key_longpress_timeout_settings">Задержка долгого нажатия</string>
+    <string name="button_default">По умолчанию</string>
+    <string name="prefs_keyboard_height_settings">Высота клавиатуры</string>
+    <string name="prefs_bottom_offset_portrait_settings">Нижнее смещение</string>
+    <string name="show_special_chars">Показать специальные символы</string>
+    <string name="show_language_switch_key">Показать кнопку переключения языка</string>
+    <string name="show_language_on_spacebar">Показывать язык на пробеле</string>
+    <string name="pref_use_on_screen">Показывать экранную клавиатуру</string>
+    <string name="pref_use_on_screen_summary">Показывать экранную клавиатуру при использовании физической клавиатуры</string>
+    <string name="pref_enable_ime_switch">Переключение на другие клавиатуры</string>
+    <string name="show_number_row">Отдельный цифровой ряд</string>
+    <string name="space_swipe">Свайп по пробелу для перемещения курсора</string>
+    <string name="delete_swipe">Свайп для удаления</string>
+    <string name="user_languages">Включённые языки клавиатуры</string>
+    <string name="change_keyboard">Сменить клавиатуру</string>
+    <string name="privacy_policy">Политика конфиденциальности</string>
+    <string name="license">Лицензия</string>
+    <string name="clipboard">Буфер обмена</string>
+    <string name="clipboard_empty">Буфер обмена пуст</string>
+    <string name="clipboard_empty_description">Скопированные элементы будут отображаться здесь</string>
+    <string name="clipboard_clear_all">Очистить незакреплённые</string>
+    <string name="clipboard_delete">Удалить</string>
+    <string name="clipboard_pin">Закрепить</string>
+    <string name="clipboard_unpin">Открепить</string>
+    <string name="clipboard_suggestions">Подсказки из буфера обмена</string>
+    <string name="clipboard_suggestions_summary">Показывать недавние скопированные элементы в строке подсказок</string>
+    <string name="suggest_screenshots">Показывать скриншоты в буфере обмена</string>
+    <string name="suggest_screenshots_summary">Показывать недавние скриншоты в подсказках и истории буфера обмена</string>
+    <string name="image_pasting_not_supported">Это приложение не поддерживает вставку изображений</string>
+    <string name="retention_time_minutes"><xliff:g id="MINUTES">%d</xliff:g> мин</string>
+    <string name="retention_time_hours"><xliff:g id="HOURS">%d</xliff:g> ч</string>
+    <string name="retention_time_hours_minutes"><xliff:g id="HOURS">%1$d</xliff:g> ч <xliff:g id="MINUTES">%2$d</xliff:g> мин</string>
+    <string name="clipboard_history_retention_time">Время хранения истории</string>
+    <string name="key_shape">Форма клавиш</string>
+    <string-array name="key_shape_entries">
+        <item>Закруглённые</item>
+        <item>Прямоугольные</item>
+        <item>Без границ</item>
+    </string-array>
+    <string name="show_suggestions">Показывать текстовые подсказки</string>
+    <string name="auto_correction_threshold">Чувствительность автоисправления</string>
+    <string name="auto_correction_threshold_summary">Пробел исправляет опечатки в зависимости от выбранного уровня</string>
+    <string-array name="auto_correction_threshold_entries">
+        <item>Выкл</item>
+        <item>Умеренная</item>
+        <item>Агрессивная</item>
+        <item>Очень агрессивная</item>
+    </string-array>
+    <string name="settings_screen_autocorrect">Исправление текста</string>
+    <string name="settings_screen_clipboard">Буфер обмена</string>
+    <string name="settings_category_general">Основные</string>
+    <string name="settings_category_about_legal">О приложении и правовая информация</string>
+    <string name="settings_category_keys_layout">Клавиши и раскладка</string>
+    <string name="settings_category_gestures">Жесты</string>
+    <string name="settings_category_typing">Ввод текста</string>
+    <string name="settings_category_correction">Исправление</string>
+    <string name="settings_category_theme_style">Тема и стиль</string>
+    <string name="settings_category_dimensions">Размеры</string>
+    <string name="settings_category_feedback">Вибрация и звук</string>
+    <string name="settings_category_visual_timing">Визуализация и тайминги</string>
+    <string name="settings_category_suggestions">Подсказки</string>
+    <string name="settings_category_history">История</string>
+    <string name="ime_not_enabled_title">Simple Keyboard не включена</string>
+    <string name="ime_not_enabled_summary">Нажмите, чтобы включить клавиатуру в системных настройках</string>
+    <string name="ime_not_active_title">Simple Keyboard не выбрана</string>
+    <string name="ime_not_active_summary">Нажмите, чтобы выбрать её в качестве активной клавиатуры</string>
+    <string name="clipboard_enabled">Включить буфер обмена</string>
+    <string name="clipboard_enabled_summary">Сохранять историю скопированных элементов и подсказки</string>
+</resources>

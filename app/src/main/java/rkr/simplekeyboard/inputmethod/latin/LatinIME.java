@@ -586,6 +586,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         hideClipboardHistory();
+        mEmojiPalettesView.reloadRecentEmojis();
         final int topBarHeight = (mTopBarView != null && mTopBarView.getVisibility() == View.VISIBLE) ? mTopBarView.getHeight() : 0;
         final View visibleKeyboardView = mKeyboardSwitcher.getVisibleKeyboardView();
         final int keyboardHeight = (visibleKeyboardView != null && visibleKeyboardView.getVisibility() == View.VISIBLE) ? visibleKeyboardView.getHeight() : 0;

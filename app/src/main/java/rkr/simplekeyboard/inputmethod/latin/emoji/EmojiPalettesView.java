@@ -241,6 +241,13 @@ public class EmojiPalettesView extends LinearLayout {
         addView(mContentContainer);
     }
 
+    public void reloadRecentEmojis() {
+        loadRecentEmojis(getContext());
+        if (mCurrentCategoryIndex == 0) {
+            selectCategory(0);
+        }
+    }
+
     public void selectCategory(int index) {
         mCurrentCategoryIndex = index;
         for (int i = 0; i < mCategoryTabViews.size(); i++) {
@@ -250,6 +257,7 @@ public class EmojiPalettesView extends LinearLayout {
 
         List<String> items;
         if (index == 0) {
+            loadRecentEmojis(getContext());
             items = mRecentEmojis;
             mEmptyRecentView.setVisibility(items.isEmpty() ? VISIBLE : GONE);
             mEmojiGridView.setVisibility(items.isEmpty() ? GONE : VISIBLE);
@@ -264,20 +272,22 @@ public class EmojiPalettesView extends LinearLayout {
     }
 
     private void loadRecentEmojis(Context context) {
+        if (context == null) return;
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         String raw = prefs.getString(PREF_RECENT_EMOJIS, "");
         mRecentEmojis.clear();
         if (!TextUtils.isEmpty(raw)) {
             String[] split = raw.split(",");
             for (String s : split) {
-                if (!s.isEmpty()) {
-                    mRecentEmojis.add(s);
+                if (!s.trim().isEmpty()) {
+                    mRecentEmojis.add(s.trim());
                 }
             }
         }
     }
 
     private void recordRecentEmoji(String emoji) {
+        loadRecentEmojis(getContext());
         mRecentEmojis.remove(emoji);
         mRecentEmojis.add(0, emoji);
         if (mRecentEmojis.size() > MAX_RECENT_EMOJIS) {

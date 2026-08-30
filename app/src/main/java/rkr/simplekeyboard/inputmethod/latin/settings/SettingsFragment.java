@@ -61,6 +61,13 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
         final Preference versionPref = findPreference("version_info");
         if (versionPref != null) {
             versionPref.setSummary(rkr.simplekeyboard.inputmethod.BuildConfig.VERSION_NAME);
+            versionPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    openUrl(res.getString(R.string.check_for_updates_url));
+                    return true;
+                }
+            });
         }
     }
 

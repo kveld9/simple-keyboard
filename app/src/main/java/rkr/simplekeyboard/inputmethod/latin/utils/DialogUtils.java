@@ -19,7 +19,12 @@ package rkr.simplekeyboard.inputmethod.latin.utils;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.os.IBinder;
 import android.view.ContextThemeWrapper;
+import android.view.Window;
+import android.view.WindowManager;
+
+import androidx.appcompat.app.AlertDialog;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
@@ -63,5 +68,26 @@ public final class DialogUtils {
 
     public static MaterialAlertDialogBuilder createMaterialDialogBuilder(final Context context) {
         return new MaterialAlertDialogBuilder(getPlatformDialogThemeContext(context));
+    }
+
+    public static void setupAndShowDialog(final AlertDialog dialog, final IBinder windowToken) {
+        if (dialog == null) {
+            return;
+        }
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        setupDialogWindow(dialog.getWindow(), windowToken);
+        dialog.show();
+    }
+
+    public static void setupDialogWindow(final Window window, final IBinder windowToken) {
+        if (window == null) {
+            return;
+        }
+        final WindowManager.LayoutParams lp = window.getAttributes();
+        lp.token = windowToken;
+        lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
+        window.setAttributes(lp);
+        window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
     }
 }

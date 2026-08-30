@@ -570,17 +570,6 @@ public class RichInputMethodManager {
         }
     }
 
-    private static void setupDialogWindow(final Window window, final IBinder windowToken) {
-        if (window == null) {
-            return;
-        }
-        final WindowManager.LayoutParams lp = window.getAttributes();
-        lp.token = windowToken;
-        lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
-        window.setAttributes(lp);
-        window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-    }
-
     /**
      * Show a popup to pick the current subtype.
      * @param context the context for this application.
@@ -609,15 +598,11 @@ public class RichInputMethodManager {
             }
         };
 
-        final androidx.appcompat.app.AlertDialog.Builder builder = DialogUtils.createMaterialDialogBuilder(context);
+        final AlertDialog.Builder builder = DialogUtils.createMaterialDialogBuilder(context);
         builder.setSingleChoiceItems(items, currentSubtypeIndex, listener)
                 .setTitle(context.getString(R.string.change_keyboard));
         final AlertDialog dialog = builder.create();
-        dialog.setCancelable(true);
-        dialog.setCanceledOnTouchOutside(true);
-
-        setupDialogWindow(dialog.getWindow(), windowToken);
-        dialog.show();
+        DialogUtils.setupAndShowDialog(dialog, windowToken);
         return dialog;
     }
 

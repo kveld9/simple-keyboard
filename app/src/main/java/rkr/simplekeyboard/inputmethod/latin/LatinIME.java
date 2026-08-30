@@ -471,7 +471,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
                     @Override
                     public void onSuggestionLongClicked(CharSequence text) {
-                        if (text == null || text.length() == 0 || mInputView == null) {
+                        if (mInputView == null) {
                             return;
                         }
                         final String cleanWord = StringUtils.stripEnclosingQuotes(text);
@@ -1374,10 +1374,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mKeyboardSwitcher.onHideWindow();
 
         if (TRACE) Debug.stopMethodTracing();
-        if (isShowingOptionDialog()) {
-            mOptionsDialog.dismiss();
-            mOptionsDialog = null;
-        }
+        dismissOptionDialog();
         super.hideWindow();
     }
 
@@ -1547,6 +1544,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return mOptionsDialog != null;
     }
 
+    private void dismissOptionDialog() {
+        if (mOptionsDialog != null) {
+            if (mOptionsDialog.isShowing()) {
+                mOptionsDialog.dismiss();
+            }
+            mOptionsDialog = null;
+        }
+    }
+
     private void showForgetWordDialog(final String word) {
         if (mInputView == null) {
             return;
@@ -1556,10 +1562,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
 
-        if (mOptionsDialog != null && mOptionsDialog.isShowing()) {
-            mOptionsDialog.dismiss();
-            mOptionsDialog = null;
-        }
+        dismissOptionDialog();
 
         final AlertDialog.Builder builder = DialogUtils.createMaterialDialogBuilder(this);
         builder.setTitle(R.string.forget_word_title);
@@ -1572,20 +1575,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         builder.setNegativeButton(android.R.string.cancel, (dialog, which) -> dialog.dismiss());
 
         final AlertDialog dialog = builder.create();
-        dialog.setCancelable(true);
-        dialog.setCanceledOnTouchOutside(true);
-
-        final Window window = dialog.getWindow();
-        if (window != null) {
-            final WindowManager.LayoutParams lp = window.getAttributes();
-            lp.token = windowToken;
-            lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
-            window.setAttributes(lp);
-            window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-        }
-
         mOptionsDialog = dialog;
-        dialog.show();
+        DialogUtils.setupAndShowDialog(dialog, windowToken);
     }
 
     public Locale getCurrentLayoutLocale() {

@@ -67,6 +67,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     private volatile ScreenshotInfo mCachedScreenshotInfo = null;
     private volatile boolean mLatestScreenshotUsed = false;
     private Runnable mOnScreenshotChangeListener = null;
+    private Runnable mOnPrimaryClipChangeListener = null;
 
     public ClipboardHistoryManager(Context context) {
         mContext = context;
@@ -76,6 +77,14 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
     public void setOnScreenshotChangeListener(Runnable listener) {
         mOnScreenshotChangeListener = listener;
+    }
+
+    public void setOnPrimaryClipChangeListener(Runnable listener) {
+        mOnPrimaryClipChangeListener = listener;
+    }
+
+    public long getLastTextTime() {
+        return mLastTextTime;
     }
 
     public void start() {
@@ -204,6 +213,9 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
                     mDatabase.insertClip(currentText, false, clipTimestamp);
                 }
             });
+            if (mOnPrimaryClipChangeListener != null) {
+                mMainHandler.post(mOnPrimaryClipChangeListener);
+            }
         } else if (mLastTextTime <= 0) {
             mLastTextTime = clipTimestamp;
         }

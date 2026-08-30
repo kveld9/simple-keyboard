@@ -288,26 +288,30 @@ public class ClipboardHistoryView extends LinearLayout {
         textContainer.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1.0f));
 
         if (entry.uri != null && !entry.uri.isEmpty()) {
-            ImageView imageView = new ImageView(context);
-            int imgSize = dpToPx(48);
+            final ImageView imageView = new ImageView(context);
+            final int imgSize = dpToPx(48);
             LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams(imgSize, imgSize);
             imgLp.setMargins(0, 0, dpToPx(10), 0);
             imageView.setLayoutParams(imgLp);
             imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            imageView.setImageResource(R.drawable.sym_keyboard_paste);
 
-            java.io.File imgFile = new java.io.File(entry.uri);
-            if (imgFile.exists()) {
-                android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
-                options.inSampleSize = 4;
-                android.graphics.Bitmap bm = android.graphics.BitmapFactory.decodeFile(imgFile.getAbsolutePath(), options);
+            final String targetTag = entry.id + ":" + entry.uri;
+            imageView.setTag(targetTag);
+
+            final java.lang.ref.WeakReference<ImageView> imageViewRef = new java.lang.ref.WeakReference<>(imageView);
+            final String imagePath = entry.uri;
+            mAsyncExecutor.execute(() -> {
+                final android.graphics.Bitmap bm = decodeSampledBitmapFromFile(imagePath, imgSize, imgSize);
                 if (bm != null) {
-                    imageView.setImageBitmap(bm);
-                } else {
-                    imageView.setImageResource(R.drawable.sym_keyboard_paste);
+                    post(() -> {
+                        final ImageView iv = imageViewRef.get();
+                        if (iv != null && targetTag.equals(iv.getTag())) {
+                            iv.setImageBitmap(bm);
+                        }
+                    });
                 }
-            } else {
-                imageView.setImageResource(R.drawable.sym_keyboard_paste);
-            }
+            });
             textContainer.addView(imageView);
         }
 
@@ -466,6 +470,43 @@ public class ClipboardHistoryView extends LinearLayout {
 
     private int dpToPx(int dp) {
         return ViewUtils.dpToPx(getContext(), dp);
+    }
+
+    private static android.graphics.Bitmap decodeSampledBitmapFromFile(String path, int reqWidth, int reqHeight) {
+        if (path == null || path.isEmpty()) {
+            return null;
+        }
+        java.io.File file = new java.io.File(path);
+        if (!file.exists()) {
+            return null;
+        }
+        try {
+            android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            android.graphics.BitmapFactory.decodeFile(path, options);
+            if (options.outWidth <= 0 || options.outHeight <= 0) {
+                return null;
+            }
+            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+            options.inJustDecodeBounds = false;
+            return android.graphics.BitmapFactory.decodeFile(path, options);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static int calculateInSampleSize(android.graphics.BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+        if (height > reqHeight || width > reqWidth) {
+            final int halfHeight = height / 2;
+            final int halfWidth = width / 2;
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2;
+            }
+        }
+        return Math.max(1, inSampleSize);
     }
 
     @Override

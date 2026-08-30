@@ -939,7 +939,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final int loadGeneration = ++mDictLoadGeneration;
 
         mDictExecutor.execute(() -> {
-            // 1. Construct binary trie dictionary and beam search decoder in background
             BinaryTrieDictionary newBinaryDict = null;
             BeamSearchDecoder newDecoder = null;
             final String primaryAssetName = getDictionaryAssetForLanguage(currentLang);
@@ -953,35 +952,22 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 Log.w(TAG, "Could not load binary trie dictionary asset: " + primaryAssetName, e);
             }
 
-            // 2. Populate PrefixDictionary in background
-            final PrefixDictionary newDict = new PrefixDictionary();
-            final SettingsValues currentSettings = mSettings.getCurrent();
-            if (currentSettings != null) {
-                newDict.setAutoCorrectionThreshold(currentSettings.mAutoCorrectionThreshold);
-            }
-            // Load secondary enabled languages first (with 85% relative frequency)
-            for (String lang : enabledLangs) {
-                if (!lang.equals(currentLang)) {
-                    loadSingleLanguageBinaryDictionaryInto(newDict, lang, 0.85f);
-                }
-            }
-
-            // Load primary active language with 100% frequency
-            loadSingleLanguageBinaryDictionaryInto(newDict, currentLang, 1.0f);
-
             final BinaryTrieDictionary finalBinaryDict = newBinaryDict;
             final BeamSearchDecoder finalDecoder = newDecoder;
 
             mHandler.post(() -> {
                 if (loadGeneration != mDictLoadGeneration) {
-                    // Stale load generation, ignore obsolete dictionary
                     return;
                 }
-                if (finalBinaryDict != null && finalDecoder != null) {
+                if (finalBinaryDict != null) {
                     mBinaryTrieDictionary = finalBinaryDict;
                     mBeamSearchDecoder = finalDecoder;
+                    mPrefixDictionary.setBinaryDictionary(finalBinaryDict);
                 }
-                mPrefixDictionary.copyFrom(newDict);
+                final SettingsValues currentSettings = mSettings.getCurrent();
+                if (currentSettings != null) {
+                    mPrefixDictionary.setAutoCorrectionThreshold(currentSettings.mAutoCorrectionThreshold);
+                }
                 updateSuggestions();
             });
         });
@@ -991,33 +977,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if ("es".equals(lang)) return "dict_es.bin";
         if ("ru".equals(lang)) return "dict_ru.bin";
         return "dict_en.bin";
-    }
-
-    private void loadSingleLanguageBinaryDictionaryInto(final PrefixDictionary targetDict, final String lang, final float weightFactor) {
-        final String assetName = getDictionaryAssetForLanguage(lang);
-        boolean loaded = false;
-        try (InputStream is = getAssets().open(assetName)) {
-            byte[] bytes = new byte[is.available()];
-            is.read(bytes);
-            ByteBuffer buffer = ByteBuffer.wrap(bytes);
-            BinaryTrieDictionary dict = new BinaryTrieDictionary(buffer);
-            dict.forEachWord((word, freq) -> {
-                int adjustedFreq = (int) (freq * weightFactor);
-                targetDict.insert(word, Math.max(1, adjustedFreq));
-            });
-            loaded = true;
-        } catch (Exception e) {
-            Log.w(TAG, "Could not load binary dictionary asset: " + assetName, e);
-        }
-        if (!loaded) {
-            final String[] defaultWords = "es".equals(lang)
-                ? new String[]{"que", "de", "no", "a", "la", "el", "es", "y", "en", "lo", "un", "por", "qué", "me", "una", "te", "los", "se", "con", "para", "mi", "está", "si", "bien", "pero", "yo", "eso", "las", "sí", "hola", "teclado", "gracias", "tiempo", "donde", "cuando", "hacer", "todo", "puede", "ahora", "mucho", "nuevo", "día", "vida", "casa", "mundo"}
-                : new String[]{"the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not", "on", "with", "he", "as", "you", "do", "at", "this", "but", "his", "by", "from", "they", "we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would", "there", "their", "what", "so", "up", "out", "if", "about", "who", "get", "which", "go", "me", "when", "make", "can", "like", "time", "no", "just", "him", "know", "take", "people", "into", "year", "your", "good", "some", "could", "them", "see", "other", "than", "then", "now", "look", "only", "come", "its", "over", "think", "also", "back", "after", "use", "two", "how", "our", "work", "first", "well", "way", "even", "new", "want", "because", "any", "these", "give", "day", "most", "us", "keyboard", "simple", "great", "need", "feel", "high", "place", "thing", "things", "case", "call", "hand", "right", "world"};
-            int freq = defaultWords.length * 10;
-            for (String w : defaultWords) {
-                targetDict.insert(w, (int) (freq-- * weightFactor));
-            }
-        }
     }
 
     public void updateSuggestions() {

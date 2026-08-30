@@ -47,6 +47,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         public final String fileName;
         public final String fullPath;
         public final long dateAdded;
+        public volatile Bitmap cachedThumbnail = null;
 
         public ScreenshotInfo(Uri uri, String fileName, String fullPath, long dateAdded) {
             this.uri = uri;
@@ -457,19 +458,24 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
     public Bitmap getScreenshotThumbnail(ScreenshotInfo info) {
         if (info == null) return null;
+        if (info.cachedThumbnail != null && !info.cachedThumbnail.isRecycled()) {
+            return info.cachedThumbnail;
+        }
+        Bitmap bitmap = null;
         if (info.fullPath != null && info.fullPath.startsWith("/")) {
             try {
                 BitmapFactory.Options options = new BitmapFactory.Options();
                 options.inSampleSize = 8;
-                return BitmapFactory.decodeFile(info.fullPath, options);
+                bitmap = BitmapFactory.decodeFile(info.fullPath, options);
             } catch (Throwable ignored) {}
         }
-        if (BuildCompatUtils.isAtLeastQ() && info.uri != null) {
+        if (bitmap == null && BuildCompatUtils.isAtLeastQ() && info.uri != null) {
             try {
-                return mContext.getContentResolver().loadThumbnail(info.uri, new Size(120, 120), null);
+                bitmap = mContext.getContentResolver().loadThumbnail(info.uri, new Size(120, 120), null);
             } catch (Throwable ignored) {}
         }
-        return null;
+        info.cachedThumbnail = bitmap;
+        return bitmap;
     }
 
     private long getRetentionMinutes() {

@@ -48,9 +48,8 @@ public final class Constants {
     public static final int NOT_A_CODE = -1;
     public static final int NOT_A_COORDINATE = -1;
 
-    // A hint on how many characters to cache from the TextView. A good value of this is given by
-    // how many characters we need to be able to almost always find the caps mode.
-    public static final int EDITOR_CONTENTS_CACHE_SIZE = 1024;
+    // A hint on how many characters to cache from the TextView.
+    public static final int EDITOR_CONTENTS_CACHE_SIZE = 256;
     // How many characters we accept for the recapitalization functionality. This needs to be
     // large enough for all reasonable purposes, but avoid purposeful attacks. 100k sounds about
     // right for this.

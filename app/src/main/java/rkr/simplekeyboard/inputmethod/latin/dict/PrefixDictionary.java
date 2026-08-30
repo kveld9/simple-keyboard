@@ -109,6 +109,10 @@ public final class PrefixDictionary {
         public final int frequency;
         public final float score;
 
+        public ScoredWord(String word, int frequency) {
+            this(word, frequency, frequency);
+        }
+
         public ScoredWord(String word, int frequency, float score) {
             this.word = word;
             this.frequency = frequency;
@@ -127,8 +131,17 @@ public final class PrefixDictionary {
     private final Map<String, Map<String, Short>> mTrigrams = new HashMap<>();
     private final Map<String, Map<String, Short>> mBigrams = new HashMap<>();
     private final List<ScoredWord> mTopWords = new ArrayList<>();
+    private volatile rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary mBinaryDict = null;
 
     public PrefixDictionary() {
+    }
+
+    public synchronized void setBinaryDictionary(final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary binaryDict) {
+        this.mBinaryDict = binaryDict;
+    }
+
+    public rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary getBinaryDictionary() {
+        return mBinaryDict;
     }
 
     public synchronized void setAutoCorrectionThreshold(final float threshold) {
@@ -145,6 +158,7 @@ public final class PrefixDictionary {
                 this.mRoot = other.mRoot;
                 this.mWordCount = other.mWordCount;
                 this.mAutoCorrectionThreshold = other.mAutoCorrectionThreshold;
+                this.mBinaryDict = other.mBinaryDict;
                 this.mTrigrams.clear();
                 for (Map.Entry<String, Map<String, Short>> entry : other.mTrigrams.entrySet()) {
                     this.mTrigrams.put(entry.getKey(), new HashMap<>(entry.getValue()));
@@ -348,11 +362,17 @@ public final class PrefixDictionary {
         if (word == null || word.isEmpty()) return 0;
         final String norm = StringUtils.toNormalizedLower(word);
         final TrieNode current = findPrefixNode(norm);
-        if (current == null) return 0;
-        for (int i = 0; i < current.words.length; i++) {
-            if (current.words[i].equalsIgnoreCase(word)) {
-                return current.freqs[i] & 0xFFFF;
+        if (current != null) {
+            for (int i = 0; i < current.words.length; i++) {
+                if (current.words[i].equalsIgnoreCase(word)) {
+                    return current.freqs[i] & 0xFFFF;
+                }
             }
+        }
+        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+        if (bin != null) {
+            final int binFreq = bin.getWordFrequency(word);
+            if (binFreq > 0) return binFreq;
         }
         return 0;
     }
@@ -372,13 +392,28 @@ public final class PrefixDictionary {
 
         final String trimmed = prefix.trim();
         final String normPrefix = StringUtils.toNormalizedLower(trimmed);
+        final List<ScoredWord> rawWords = new ArrayList<>();
+
         final TrieNode current = findPrefixNode(normPrefix);
-        if (current == null) {
-            return Collections.emptyList();
+        if (current != null) {
+            collectWords(current, rawWords, 40);
         }
 
-        final List<ScoredWord> rawWords = new ArrayList<>();
-        collectWords(current, rawWords, 40);
+        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+        if (bin != null) {
+            final List<CharSequence> binSuggestions = bin.getPrefixSuggestions(trimmed, 40);
+            if (binSuggestions != null) {
+                for (CharSequence s : binSuggestions) {
+                    final String w = s.toString();
+                    final int freq = bin.getWordFrequency(w);
+                    rawWords.add(new ScoredWord(w, Math.max(1, freq), freq));
+                }
+            }
+        }
+
+        if (rawWords.isEmpty()) {
+            return Collections.emptyList();
+        }
 
         final List<ScoredWord> scoredWords = scorePrefixWords(rawWords, normPrefix, w1, w2);
         return formatSuggestions(scoredWords, trimmed, maxCount);
@@ -512,15 +547,15 @@ public final class PrefixDictionary {
         }
         final String norm = StringUtils.toNormalizedLower(word);
         final TrieNode current = findPrefixNode(norm);
-        if (current == null) {
-            return false;
-        }
-        for (String w : current.words) {
-            if (w.equalsIgnoreCase(word)) {
-                return true;
+        if (current != null) {
+            for (String w : current.words) {
+                if (w.equalsIgnoreCase(word)) {
+                    return true;
+                }
             }
         }
-        return false;
+        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+        return bin != null && bin.containsWord(word);
     }
 
     public synchronized CharSequence getExactNormalizedCorrection(final String word) {
@@ -529,33 +564,40 @@ public final class PrefixDictionary {
         }
         final String norm = StringUtils.toNormalizedLower(word);
         final TrieNode current = findPrefixNode(norm);
-        if (current == null || current.words.length == 0) {
-            return null;
-        }
+        if (current != null && current.words.length > 0) {
+            String bestWord = current.words[0];
+            int bestFreq = current.freqs.length > 0 ? current.freqs[0] : 0;
+            for (int i = 1; i < current.words.length; i++) {
+                if (current.freqs[i] > bestFreq) {
+                    bestFreq = current.freqs[i];
+                    bestWord = current.words[i];
+                }
+            }
 
-        // Find the canonical word with the highest frequency for this normalized form
-        String bestWord = current.words[0];
-        int bestFreq = current.freqs.length > 0 ? current.freqs[0] : 0;
-        for (int i = 1; i < current.words.length; i++) {
-            if (current.freqs[i] > bestFreq) {
-                bestFreq = current.freqs[i];
-                bestWord = current.words[i];
+            if (!(StringUtils.hasAccents(word) && !StringUtils.hasAccents(bestWord))) {
+                final int typedFreq = getWordFrequency(word);
+                if (typedFreq <= 0 || bestFreq >= (typedFreq * 1.5f) || Character.isUpperCase(bestWord.charAt(0))) {
+                    return StringUtils.applyCasing(word, bestWord);
+                }
             }
         }
 
-        // If the user explicitly typed an accented word (e.g. "él", "está", "más"), never strip the accent
-        if (StringUtils.hasAccents(word) && !StringUtils.hasAccents(bestWord)) {
-            return null;
+        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+        if (bin != null) {
+            final String canonical = bin.getCanonicalWord(word);
+            if (canonical != null && !canonical.equalsIgnoreCase(word)) {
+                if (StringUtils.hasAccents(word) && !StringUtils.hasAccents(canonical)) {
+                    return null;
+                }
+                final int typedFreq = getWordFrequency(word);
+                final int binFreq = bin.getWordFrequency(canonical);
+                if (typedFreq <= 0 || binFreq >= (typedFreq * 1.5f) || Character.isUpperCase(canonical.charAt(0))) {
+                    return StringUtils.applyCasing(word, canonical);
+                }
+            }
         }
 
-        // If typed word exists verbatim in dictionary, only correct if bestWord has higher frequency
-        // (e.g. "más" (255) vs "mas" (30), "está" vs "esta") or if bestWord is capitalized (e.g. "España")
-        final int typedFreq = getWordFrequency(word);
-        if (typedFreq > 0 && bestFreq < (typedFreq * 1.5f) && !Character.isUpperCase(bestWord.charAt(0))) {
-            return null;
-        }
-
-        return StringUtils.applyCasing(word, bestWord);
+        return null;
     }
 
     public synchronized CharSequence getBestCorrection(final String word) {
@@ -625,6 +667,12 @@ public final class PrefixDictionary {
         final int maxDistance = getMaxFuzzyDistance(norm.length());
         final List<ScoredWord> rawCandidates = new ArrayList<>();
         searchFuzzy(mRoot, new StringBuilder(), norm, 0, maxDistance, rawCandidates);
+
+        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+        if (bin != null) {
+            bin.searchFuzzy(bin.getRootNode(), new StringBuilder(), norm, 0, maxDistance, rawCandidates);
+        }
+
         if (rawCandidates.isEmpty()) {
             return Collections.emptyList();
         }

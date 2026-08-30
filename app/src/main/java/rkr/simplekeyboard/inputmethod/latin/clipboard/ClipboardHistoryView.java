@@ -664,6 +664,7 @@ public class ClipboardHistoryView extends LinearLayout {
             }
             options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
             options.inJustDecodeBounds = false;
+            options.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
             return android.graphics.BitmapFactory.decodeFile(path, options);
         } catch (Throwable t) {
             return null;

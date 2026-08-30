@@ -203,36 +203,50 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
         mIndent--;
     }
 
+    private void handleKeyboardTag(final XmlPullParser parser, final boolean skip)
+            throws XmlPullParserException, IOException {
+        if (DEBUG) startTag("<%s> %s%s", TAG_KEYBOARD, mParams.mId, skip ? " skipped" : "");
+        if (!skip) {
+            if (mKeyboardDefined) {
+                throw new XmlParseUtils.ParseException("Only one " + TAG_KEYBOARD
+                        + " tag can be defined", parser);
+            }
+            mKeyboardDefined = true;
+            parseKeyboardAttributes(parser);
+        }
+        parseKeyboardContent(parser, skip);
+    }
+
+    private void handleKeyboardStartTag(final XmlPullParser parser, final boolean skip)
+            throws XmlPullParserException, IOException {
+        final String tag = parser.getName();
+        if (TAG_KEYBOARD.equals(tag)) {
+            handleKeyboardTag(parser, skip);
+        } else if (TAG_SWITCH.equals(tag)) {
+            parseSwitchKeyboard(parser, skip);
+        } else {
+            throw new XmlParseUtils.IllegalStartTag(parser, tag, TAG_KEYBOARD);
+        }
+    }
+
+    private boolean handleKeyboardEndTag(final XmlPullParser parser)
+            throws XmlParseUtils.ParseException {
+        final String tag = parser.getName();
+        if (DEBUG) endTag("</%s>", tag);
+        if (TAG_CASE.equals(tag) || TAG_DEFAULT.equals(tag)) {
+            return true;
+        }
+        throw new XmlParseUtils.IllegalEndTag(parser, tag, TAG_ROW);
+    }
+
     private void parseKeyboard(final XmlPullParser parser, final boolean skip)
             throws XmlPullParserException, IOException {
         while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
             final int event = parser.next();
             if (event == XmlPullParser.START_TAG) {
-                final String tag = parser.getName();
-                if (TAG_KEYBOARD.equals(tag)) {
-                    if (DEBUG) startTag("<%s> %s%s", TAG_KEYBOARD, mParams.mId,
-                            skip ? " skipped" : "");
-                    if (!skip) {
-                        if (mKeyboardDefined) {
-                            throw new XmlParseUtils.ParseException("Only one " + TAG_KEYBOARD
-                                    + " tag can be defined", parser);
-                        }
-                        mKeyboardDefined = true;
-                        parseKeyboardAttributes(parser);
-                    }
-                    parseKeyboardContent(parser, skip);
-                } else if (TAG_SWITCH.equals(tag)) {
-                    parseSwitchKeyboard(parser, skip);
-                } else {
-                    throw new XmlParseUtils.IllegalStartTag(parser, tag, TAG_KEYBOARD);
-                }
-            } else if (event == XmlPullParser.END_TAG) {
-                final String tag = parser.getName();
-                if (DEBUG) endTag("</%s>", tag);
-                if (TAG_CASE.equals(tag) || TAG_DEFAULT.equals(tag)) {
-                    return;
-                }
-                throw new XmlParseUtils.IllegalEndTag(parser, tag, TAG_ROW);
+                handleKeyboardStartTag(parser, skip);
+            } else if (event == XmlPullParser.END_TAG && handleKeyboardEndTag(parser)) {
+                return;
             }
         }
     }
@@ -296,39 +310,58 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
         }
     }
 
+    private void handleRowTagInKeyboardContent(final XmlPullParser parser, final boolean skip)
+            throws XmlPullParserException, IOException {
+        final KeyboardRow row = parseRowAttributes(parser);
+        if (DEBUG) startTag("<%s>%s", TAG_ROW, skip ? " skipped" : "");
+        if (!skip) {
+            startRow(row);
+        }
+        parseRowContent(parser, row, skip);
+    }
+
+    private void handleKeyboardContentStartTag(final XmlPullParser parser, final boolean skip)
+            throws XmlPullParserException, IOException {
+        final String tag = parser.getName();
+        if (TAG_ROW.equals(tag)) {
+            handleRowTagInKeyboardContent(parser, skip);
+        } else if (TAG_INCLUDE.equals(tag)) {
+            parseIncludeKeyboardContent(parser, skip);
+        } else if (TAG_SWITCH.equals(tag)) {
+            parseSwitchKeyboardContent(parser, skip);
+        } else if (TAG_KEY_STYLE.equals(tag)) {
+            parseKeyStyle(parser, skip);
+        } else {
+            throw new XmlParseUtils.IllegalStartTag(parser, tag, TAG_ROW);
+        }
+    }
+
+    private static boolean isIgnorableContentEndTag(final String tag) {
+        return TAG_CASE.equals(tag) || TAG_DEFAULT.equals(tag) || TAG_MERGE.equals(tag);
+    }
+
+    private boolean handleKeyboardContentEndTag(final XmlPullParser parser)
+            throws XmlParseUtils.ParseException {
+        final String tag = parser.getName();
+        if (DEBUG) endTag("</%s>", tag);
+        if (TAG_KEYBOARD.equals(tag)) {
+            endKeyboard();
+            return true;
+        }
+        if (isIgnorableContentEndTag(tag)) {
+            return true;
+        }
+        throw new XmlParseUtils.IllegalEndTag(parser, tag, TAG_ROW);
+    }
+
     private void parseKeyboardContent(final XmlPullParser parser, final boolean skip)
             throws XmlPullParserException, IOException {
         while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
             final int event = parser.next();
             if (event == XmlPullParser.START_TAG) {
-                final String tag = parser.getName();
-                if (TAG_ROW.equals(tag)) {
-                    final KeyboardRow row = parseRowAttributes(parser);
-                    if (DEBUG) startTag("<%s>%s", TAG_ROW, skip ? " skipped" : "");
-                    if (!skip) {
-                        startRow(row);
-                    }
-                    parseRowContent(parser, row, skip);
-                } else if (TAG_INCLUDE.equals(tag)) {
-                    parseIncludeKeyboardContent(parser, skip);
-                } else if (TAG_SWITCH.equals(tag)) {
-                    parseSwitchKeyboardContent(parser, skip);
-                } else if (TAG_KEY_STYLE.equals(tag)) {
-                    parseKeyStyle(parser, skip);
-                } else {
-                    throw new XmlParseUtils.IllegalStartTag(parser, tag, TAG_ROW);
-                }
-            } else if (event == XmlPullParser.END_TAG) {
-                final String tag = parser.getName();
-                if (DEBUG) endTag("</%s>", tag);
-                if (TAG_KEYBOARD.equals(tag)) {
-                    endKeyboard();
-                    return;
-                }
-                if (TAG_CASE.equals(tag) || TAG_DEFAULT.equals(tag) || TAG_MERGE.equals(tag)) {
-                    return;
-                }
-                throw new XmlParseUtils.IllegalEndTag(parser, tag, TAG_ROW);
+                handleKeyboardContentStartTag(parser, skip);
+            } else if (event == XmlPullParser.END_TAG && handleKeyboardContentEndTag(parser)) {
+                return;
             }
         }
     }
@@ -350,38 +383,60 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
         }
     }
 
+    private boolean parseKeyOrSpacer(final XmlPullParser parser, final KeyboardRow row,
+            final boolean skip, final String tag) throws XmlPullParserException, IOException {
+        if (TAG_KEY.equals(tag)) {
+            parseKey(parser, row, skip);
+            return true;
+        }
+        if (TAG_SPACER.equals(tag)) {
+            parseSpacer(parser, row, skip);
+            return true;
+        }
+        return false;
+    }
+
+    private void handleRowContentStartTag(final XmlPullParser parser, final KeyboardRow row,
+            final boolean skip) throws XmlPullParserException, IOException {
+        final String tag = parser.getName();
+        if (parseKeyOrSpacer(parser, row, skip, tag)) {
+            return;
+        }
+        if (TAG_INCLUDE.equals(tag)) {
+            parseIncludeRowContent(parser, row, skip);
+        } else if (TAG_SWITCH.equals(tag)) {
+            parseSwitchRowContent(parser, row, skip);
+        } else if (TAG_KEY_STYLE.equals(tag)) {
+            parseKeyStyle(parser, skip);
+        } else {
+            throw new XmlParseUtils.IllegalStartTag(parser, tag, TAG_ROW);
+        }
+    }
+
+    private boolean handleRowContentEndTag(final XmlPullParser parser, final KeyboardRow row,
+            final boolean skip) throws XmlParseUtils.ParseException {
+        final String tag = parser.getName();
+        if (DEBUG) endTag("</%s>", tag);
+        if (TAG_ROW.equals(tag)) {
+            if (!skip) {
+                endRow(row);
+            }
+            return true;
+        }
+        if (isIgnorableContentEndTag(tag)) {
+            return true;
+        }
+        throw new XmlParseUtils.IllegalEndTag(parser, tag, TAG_ROW);
+    }
+
     private void parseRowContent(final XmlPullParser parser, final KeyboardRow row,
             final boolean skip) throws XmlPullParserException, IOException {
         while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
             final int event = parser.next();
             if (event == XmlPullParser.START_TAG) {
-                final String tag = parser.getName();
-                if (TAG_KEY.equals(tag)) {
-                    parseKey(parser, row, skip);
-                } else if (TAG_SPACER.equals(tag)) {
-                    parseSpacer(parser, row, skip);
-                } else if (TAG_INCLUDE.equals(tag)) {
-                    parseIncludeRowContent(parser, row, skip);
-                } else if (TAG_SWITCH.equals(tag)) {
-                    parseSwitchRowContent(parser, row, skip);
-                } else if (TAG_KEY_STYLE.equals(tag)) {
-                    parseKeyStyle(parser, skip);
-                } else {
-                    throw new XmlParseUtils.IllegalStartTag(parser, tag, TAG_ROW);
-                }
-            } else if (event == XmlPullParser.END_TAG) {
-                final String tag = parser.getName();
-                if (DEBUG) endTag("</%s>", tag);
-                if (TAG_ROW.equals(tag)) {
-                    if (!skip) {
-                        endRow(row);
-                    }
-                    return;
-                }
-                if (TAG_CASE.equals(tag) || TAG_DEFAULT.equals(tag) || TAG_MERGE.equals(tag)) {
-                    return;
-                }
-                throw new XmlParseUtils.IllegalEndTag(parser, tag, TAG_ROW);
+                handleRowContentStartTag(parser, row, skip);
+            } else if (event == XmlPullParser.END_TAG && handleRowContentEndTag(parser, row, skip)) {
+                return;
             }
         }
     }
@@ -454,13 +509,8 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
         parseIncludeInternal(parser, row, skip);
     }
 
-    private void parseIncludeInternal(final XmlPullParser parser, final KeyboardRow row,
-            final boolean skip) throws XmlPullParserException, IOException {
-        if (skip) {
-            XmlParseUtils.checkEndTag(TAG_INCLUDE, parser);
-            if (DEBUG) startEndTag("</%s> skipped", TAG_INCLUDE);
-            return;
-        }
+    private int obtainIncludeLayoutAndAttributes(final XmlPullParser parser,
+            final KeyboardRow row) throws XmlParseUtils.ParseException, XmlPullParserException {
         final AttributeSet attr = Xml.asAttributeSet(parser);
         final TypedArray keyboardAttr = mResources.obtainAttributes(
                 attr, R.styleable.Keyboard_Include);
@@ -470,28 +520,28 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
                 R.styleable.Keyboard_rowHeight, mParams.mBaseHeight, mParams.mDefaultRowHeight);
 
         final TypedArray keyAttr = mResources.obtainAttributes(attr, R.styleable.Keyboard_Key);
-        int keyboardLayout = 0;
         try {
             XmlParseUtils.checkAttributeExists(
                     keyboardAttr, R.styleable.Keyboard_Include_keyboardLayout, "keyboardLayout",
                     TAG_INCLUDE, parser);
-            keyboardLayout = keyboardAttr.getResourceId(
+            final int keyboardLayout = keyboardAttr.getResourceId(
                     R.styleable.Keyboard_Include_keyboardLayout, 0);
             if (row != null) {
-                // Override current x coordinate.
                 row.updateXPos(keyAttr);
-                // Push current Row attributes and update with new attributes.
                 row.pushRowAttributes(keyAttr);
             }
+            return keyboardLayout;
         } finally {
             keyboardAttr.recycle();
             keyAttr.recycle();
             includeAttr.recycle();
         }
+    }
 
-        XmlParseUtils.checkEndTag(TAG_INCLUDE, parser);
+    private void parseIncludedLayout(final int keyboardLayout, final KeyboardRow row,
+            final boolean skip) throws XmlPullParserException, IOException {
         if (DEBUG) {
-            startEndTag("<%s keyboardLayout=%s />",TAG_INCLUDE,
+            startEndTag("<%s keyboardLayout=%s />", TAG_INCLUDE,
                     mResources.getResourceEntryName(keyboardLayout));
         }
         final XmlResourceParser parserForInclude = mResources.getXml(keyboardLayout);
@@ -499,10 +549,30 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
             parseMerge(parserForInclude, row, skip);
         } finally {
             if (row != null) {
-                // Restore Row attributes.
                 row.popRowAttributes();
             }
             parserForInclude.close();
+        }
+    }
+
+    private void parseIncludeInternal(final XmlPullParser parser, final KeyboardRow row,
+            final boolean skip) throws XmlPullParserException, IOException {
+        if (skip) {
+            XmlParseUtils.checkEndTag(TAG_INCLUDE, parser);
+            if (DEBUG) startEndTag("</%s> skipped", TAG_INCLUDE);
+            return;
+        }
+        final int keyboardLayout = obtainIncludeLayoutAndAttributes(parser, row);
+        XmlParseUtils.checkEndTag(TAG_INCLUDE, parser);
+        parseIncludedLayout(keyboardLayout, row, skip);
+    }
+
+    private void parseMergeContent(final XmlPullParser parser, final KeyboardRow row,
+            final boolean skip) throws XmlPullParserException, IOException {
+        if (row == null) {
+            parseKeyboardContent(parser, skip);
+        } else {
+            parseRowContent(parser, row, skip);
         }
     }
 
@@ -514,11 +584,7 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
             if (event == XmlPullParser.START_TAG) {
                 final String tag = parser.getName();
                 if (TAG_MERGE.equals(tag)) {
-                    if (row == null) {
-                        parseKeyboardContent(parser, skip);
-                    } else {
-                        parseRowContent(parser, row, skip);
-                    }
+                    parseMergeContent(parser, row, skip);
                     return;
                 }
                 throw new XmlParseUtils.ParseException(
@@ -542,6 +608,30 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
         parseSwitchInternal(parser, false, row, skip);
     }
 
+    private boolean handleSwitchStartTag(final XmlPullParser parser, final boolean parseKeyboard,
+            final KeyboardRow row, final boolean skip, final boolean selected)
+            throws XmlPullParserException, IOException {
+        final String tag = parser.getName();
+        final boolean currentSkip = selected || skip;
+        if (TAG_CASE.equals(tag)) {
+            return selected | parseCase(parser, parseKeyboard, row, currentSkip);
+        }
+        if (TAG_DEFAULT.equals(tag)) {
+            return selected | parseDefault(parser, parseKeyboard, row, currentSkip);
+        }
+        throw new XmlParseUtils.IllegalStartTag(parser, tag, TAG_SWITCH);
+    }
+
+    private void handleSwitchEndTag(final XmlPullParser parser)
+            throws XmlParseUtils.ParseException {
+        final String tag = parser.getName();
+        if (TAG_SWITCH.equals(tag)) {
+            if (DEBUG) endTag("</%s>", TAG_SWITCH);
+            return;
+        }
+        throw new XmlParseUtils.IllegalEndTag(parser, tag, TAG_SWITCH);
+    }
+
     private void parseSwitchInternal(final XmlPullParser parser, final boolean parseKeyboard,
             final KeyboardRow row, final boolean skip) throws XmlPullParserException, IOException {
         if (DEBUG) startTag("<%s> %s", TAG_SWITCH, mParams.mId);
@@ -549,38 +639,31 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
         while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
             final int event = parser.next();
             if (event == XmlPullParser.START_TAG) {
-                final String tag = parser.getName();
-                if (TAG_CASE.equals(tag)) {
-                    selected |= parseCase(parser, parseKeyboard, row, selected || skip);
-                } else if (TAG_DEFAULT.equals(tag)) {
-                    selected |= parseDefault(parser, parseKeyboard, row, selected || skip);
-                } else {
-                    throw new XmlParseUtils.IllegalStartTag(parser, tag, TAG_SWITCH);
-                }
+                selected = handleSwitchStartTag(parser, parseKeyboard, row, skip, selected);
             } else if (event == XmlPullParser.END_TAG) {
-                final String tag = parser.getName();
-                if (TAG_SWITCH.equals(tag)) {
-                    if (DEBUG) endTag("</%s>", TAG_SWITCH);
-                    return;
-                }
-                throw new XmlParseUtils.IllegalEndTag(parser, tag, TAG_SWITCH);
+                handleSwitchEndTag(parser);
+                return;
             }
+        }
+    }
+
+    private void parseCaseContent(final XmlPullParser parser, final boolean parseKeyboard,
+            final KeyboardRow row, final boolean skipCase)
+            throws XmlPullParserException, IOException {
+        if (parseKeyboard) {
+            parseKeyboard(parser, skipCase);
+        } else if (row == null) {
+            parseKeyboardContent(parser, skipCase);
+        } else {
+            parseRowContent(parser, row, skipCase);
         }
     }
 
     private boolean parseCase(final XmlPullParser parser, final boolean parseKeyboard,
             final KeyboardRow row, final boolean skip) throws XmlPullParserException, IOException {
         final boolean selected = parseCaseCondition(parser);
-        if (parseKeyboard) {
-            // Processing Keyboard root.
-            parseKeyboard(parser, !selected || skip);
-        } else if (row == null) {
-            // Processing Rows.
-            parseKeyboardContent(parser, !selected || skip);
-        } else {
-            // Processing Keys.
-            parseRowContent(parser, row, !selected || skip);
-        }
+        final boolean skipCase = !selected || skip;
+        parseCaseContent(parser, parseKeyboard, row, skipCase);
         return selected;
     }
 
@@ -738,13 +821,7 @@ public class KeyboardBuilder<KP extends KeyboardParams> {
     private boolean parseDefault(final XmlPullParser parser, final boolean parseKeyboard,
             final KeyboardRow row, final boolean skip) throws XmlPullParserException, IOException {
         if (DEBUG) startTag("<%s>", TAG_DEFAULT);
-        if (parseKeyboard) {
-            parseKeyboard(parser, skip);
-        } else if (row == null) {
-            parseKeyboardContent(parser, skip);
-        } else {
-            parseRowContent(parser, row, skip);
-        }
+        parseCaseContent(parser, parseKeyboard, row, skip);
         return true;
     }
 

@@ -357,55 +357,61 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
     }
 
     // Implements {@link DrawingProxy@showMoreKeysKeyboard(Key,PointerTracker)}.
-    //@Override
     public MoreKeysPanel showMoreKeysKeyboard(final Key key,
             final PointerTracker tracker) {
         final MoreKeySpec[] moreKeys = key.getMoreKeys();
         if (moreKeys == null) {
             return null;
         }
-        Keyboard moreKeysKeyboard = mMoreKeysKeyboardCache.get(key);
-        if (moreKeysKeyboard == null) {
-            // {@link KeyPreviewDrawParams#mPreviewVisibleWidth} should have been set at
-            // {@link KeyPreviewChoreographer#placeKeyPreview(Key,TextView,KeyboardIconsSet,KeyDrawParams,int,int[]},
-            // though there may be some chances that the value is zero. <code>width == 0</code>
-            // will cause zero-division error at
-            // {@link MoreKeysKeyboardParams#setParameters(int,int,int,int,int,int,boolean,int)}.
-            final boolean isSingleMoreKeyWithPreview = mKeyPreviewDrawParams.isPopupEnabled()
-                    && !key.noKeyPreview() && moreKeys.length == 1
-                    && mKeyPreviewDrawParams.getVisibleWidth() > 0;
-            final MoreKeysKeyboard.Builder builder = new MoreKeysKeyboard.Builder(
-                    getContext(), key, getKeyboard(), isSingleMoreKeyWithPreview,
-                    mKeyPreviewDrawParams.getVisibleWidth(),
-                    mKeyPreviewDrawParams.getVisibleHeight(), newLabelPaint(key));
-            moreKeysKeyboard = builder.build();
-            mMoreKeysKeyboardCache.put(key, moreKeysKeyboard);
-        }
+        final Keyboard moreKeysKeyboard = getOrCreateMoreKeysKeyboard(key, moreKeys);
 
         final MoreKeysKeyboardView moreKeysKeyboardView =
                 mMoreKeysKeyboardContainer.findViewById(R.id.more_keys_keyboard_view);
         moreKeysKeyboardView.setKeyboard(moreKeysKeyboard);
         mMoreKeysKeyboardContainer.measure(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 
-        final int[] lastCoords = CoordinateUtils.newInstance();
-        tracker.getLastCoordinates(lastCoords);
-        final boolean keyPreviewEnabled = mKeyPreviewDrawParams.isPopupEnabled()
-                && !key.noKeyPreview();
-        // The more keys keyboard is usually horizontally aligned with the center of the parent key.
-        // If showMoreKeysKeyboardAtTouchedPoint is true and the key preview is disabled, the more
-        // keys keyboard is placed at the touch point of the parent key.
-        final int pointX = (mConfigShowMoreKeysKeyboardAtTouchedPoint && !keyPreviewEnabled)
-                ? CoordinateUtils.x(lastCoords)
-                : key.getX() + key.getWidth() / 2;
-        // The more keys keyboard is usually vertically aligned with the top edge of the parent key
-        // (plus vertical gap). If the key preview is enabled, the more keys keyboard is vertically
-        // aligned with the bottom edge of the visible part of the key preview.
-        // {@code mPreviewVisibleOffset} has been set appropriately in
-        // {@link KeyboardView#showKeyPreview(PointerTracker)}.
-        final int pointY = key.getY() + mKeyPreviewDrawParams.getVisibleOffset()
-                + Math.round(moreKeysKeyboard.mBottomPadding);
+        final int pointX = calculateMoreKeysPointX(key, tracker);
+        final int pointY = calculateMoreKeysPointY(key, moreKeysKeyboard);
         moreKeysKeyboardView.showMoreKeysPanel(this, this, pointX, pointY, mKeyboardActionListener);
         return moreKeysKeyboardView;
+    }
+
+    private Keyboard getOrCreateMoreKeysKeyboard(final Key key, final MoreKeySpec[] moreKeys) {
+        Keyboard moreKeysKeyboard = mMoreKeysKeyboardCache.get(key);
+        if (moreKeysKeyboard != null) {
+            return moreKeysKeyboard;
+        }
+        final boolean isSingleWithPreview = isSingleMoreKeyWithPreview(key, moreKeys);
+        final MoreKeysKeyboard.Builder builder = new MoreKeysKeyboard.Builder(
+                getContext(), key, getKeyboard(), isSingleWithPreview,
+                mKeyPreviewDrawParams.getVisibleWidth(),
+                mKeyPreviewDrawParams.getVisibleHeight(), newLabelPaint(key));
+        moreKeysKeyboard = builder.build();
+        mMoreKeysKeyboardCache.put(key, moreKeysKeyboard);
+        return moreKeysKeyboard;
+    }
+
+    private boolean isSingleMoreKeyWithPreview(final Key key, final MoreKeySpec[] moreKeys) {
+        return mKeyPreviewDrawParams.isPopupEnabled()
+                && !key.noKeyPreview()
+                && moreKeys.length == 1
+                && mKeyPreviewDrawParams.getVisibleWidth() > 0;
+    }
+
+    private int calculateMoreKeysPointX(final Key key, final PointerTracker tracker) {
+        final boolean keyPreviewEnabled = mKeyPreviewDrawParams.isPopupEnabled()
+                && !key.noKeyPreview();
+        if (mConfigShowMoreKeysKeyboardAtTouchedPoint && !keyPreviewEnabled) {
+            final int[] lastCoords = CoordinateUtils.newInstance();
+            tracker.getLastCoordinates(lastCoords);
+            return CoordinateUtils.x(lastCoords);
+        }
+        return key.getX() + key.getWidth() / 2;
+    }
+
+    private int calculateMoreKeysPointY(final Key key, final Keyboard moreKeysKeyboard) {
+        return key.getY() + mKeyPreviewDrawParams.getVisibleOffset()
+                + Math.round(moreKeysKeyboard.mBottomPadding);
     }
 
     public boolean isInDraggingFinger() {
@@ -532,16 +538,18 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
             params.mAnimAlpha = mAltCodeKeyWhileTypingAnimAlpha;
         }
         super.onDrawKeyTopVisuals(key, canvas, paint, params);
-        final int code = key.getCode();
-        if (code == Constants.CODE_SPACE) {
-            // If more than one language is enabled in current input method
-            final RichInputMethodManager imm = RichInputMethodManager.getInstance();
-            final SettingsValues settingsValues = Settings.getInstance().getCurrent();
-            final boolean showLanguageOnSpacebar = settingsValues == null || settingsValues.mShowLanguageOnSpacebar;
-            if (showLanguageOnSpacebar && imm.hasMultipleEnabledSubtypes()) {
-                drawLanguageOnSpacebar(key, canvas, paint);
-            }
+        if (shouldDrawLanguageOnSpacebar(key)) {
+            drawLanguageOnSpacebar(key, canvas, paint);
         }
+    }
+
+    private boolean shouldDrawLanguageOnSpacebar(final Key key) {
+        if (key.getCode() != Constants.CODE_SPACE) {
+            return false;
+        }
+        final SettingsValues settingsValues = Settings.getInstance().getCurrent();
+        final boolean showLanguageOnSpacebar = settingsValues == null || settingsValues.mShowLanguageOnSpacebar;
+        return showLanguageOnSpacebar && RichInputMethodManager.getInstance().hasMultipleEnabledSubtypes();
     }
 
     private boolean fitsTextIntoWidth(final int width, final String text, final Paint paint) {

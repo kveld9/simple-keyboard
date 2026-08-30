@@ -311,7 +311,7 @@ public class Key implements Comparable<Key> {
             return params.mId.mCustomActionLabel;
         }
         if (code >= Character.MIN_SUPPLEMENTARY_CODE_POINT) {
-            return new StringBuilder().appendCodePoint(code).toString();
+            return StringUtils.newSingleCodePointString(code);
         }
         final String label = KeySpecParser.getLabel(keySpec);
         return needsToUpcase ? StringUtils.toTitleCaseOfKeyLabel(label, localeForUpcasing) : label;
@@ -474,16 +474,29 @@ public class Key implements Comparable<Key> {
 
     private boolean equalsInternal(final Key o) {
         if (this == o) return true;
+        if (o == null) return false;
+        return equalsGeometry(o)
+                && equalsVisuals(o)
+                && equalsFlags(o);
+    }
+
+    private boolean equalsGeometry(final Key o) {
         return o.mX == mX
                 && o.mY == mY
                 && o.mWidth == mWidth
-                && o.mHeight == mHeight
-                && o.mCode == mCode
+                && o.mHeight == mHeight;
+    }
+
+    private boolean equalsVisuals(final Key o) {
+        return o.mCode == mCode
                 && TextUtils.equals(o.mLabel, mLabel)
                 && TextUtils.equals(o.mHintLabel, mHintLabel)
                 && o.mIconId == mIconId
-                && o.mBackgroundType == mBackgroundType
-                && Arrays.equals(o.mMoreKeys, mMoreKeys)
+                && o.mBackgroundType == mBackgroundType;
+    }
+
+    private boolean equalsFlags(final Key o) {
+        return Arrays.equals(o.mMoreKeys, mMoreKeys)
                 && TextUtils.equals(o.getOutputText(), getOutputText())
                 && o.mActionFlags == mActionFlags
                 && o.mLabelFlags == mLabelFlags;
@@ -587,7 +600,15 @@ public class Key implements Comparable<Key> {
     }
 
     public final int selectTextSize(final KeyDrawParams params) {
-        switch (mLabelFlags & LABEL_FLAGS_FOLLOW_KEY_TEXT_RATIO_MASK) {
+        final int followKeyRatio = mLabelFlags & LABEL_FLAGS_FOLLOW_KEY_TEXT_RATIO_MASK;
+        if (followKeyRatio != 0) {
+            return selectRatioTextSize(followKeyRatio, params);
+        }
+        return getDefaultTextSize(params);
+    }
+
+    private static int selectRatioTextSize(final int followKeyRatio, final KeyDrawParams params) {
+        switch (followKeyRatio) {
         case LABEL_FLAGS_FOLLOW_KEY_LETTER_RATIO:
             return params.mLetterSize;
         case LABEL_FLAGS_FOLLOW_KEY_LARGE_LETTER_RATIO:
@@ -596,9 +617,13 @@ public class Key implements Comparable<Key> {
             return params.mLabelSize;
         case LABEL_FLAGS_FOLLOW_KEY_HINT_LABEL_RATIO:
             return params.mHintLabelSize;
-        default: // No follow key ratio flag specified.
-            return StringUtils.codePointCount(mLabel) == 1 ? params.mLetterSize : params.mLabelSize;
+        default:
+            return params.mLabelSize;
         }
+    }
+
+    private int getDefaultTextSize(final KeyDrawParams params) {
+        return StringUtils.codePointCount(mLabel) == 1 ? params.mLetterSize : params.mLabelSize;
     }
 
     public final int selectTextColor(final KeyDrawParams params) {

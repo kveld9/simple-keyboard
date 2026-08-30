@@ -160,13 +160,9 @@ public final class PrefixDictionary {
                 this.mAutoCorrectionThreshold = other.mAutoCorrectionThreshold;
                 this.mBinaryDict = other.mBinaryDict;
                 this.mTrigrams.clear();
-                for (Map.Entry<String, Map<String, Short>> entry : other.mTrigrams.entrySet()) {
-                    this.mTrigrams.put(entry.getKey(), new HashMap<>(entry.getValue()));
-                }
+                this.mTrigrams.putAll(other.mTrigrams);
                 this.mBigrams.clear();
-                for (Map.Entry<String, Map<String, Short>> entry : other.mBigrams.entrySet()) {
-                    this.mBigrams.put(entry.getKey(), new HashMap<>(entry.getValue()));
-                }
+                this.mBigrams.putAll(other.mBigrams);
                 this.mTopWords.clear();
                 this.mTopWords.addAll(other.mTopWords);
             }
@@ -175,23 +171,64 @@ public final class PrefixDictionary {
 
     private static final ThreadLocal<float[][]> DIST_BUFFERS = ThreadLocal.withInitial(() -> new float[3][64]);
 
-    /**
-     * Calculates the weighted Damerau-Levenshtein distance between two strings,
-     * incorporating physical keyboard key proximity without memory allocations.
-     */
-    public static float computeWeightedDistance(final String s1, final String s2) {
-        if (s1 == null && s2 == null) return 0.0f;
-        if (s1 == null || s1.isEmpty()) return s2 == null ? 0.0f : s2.length();
-        if (s2 == null || s2.isEmpty()) return s1.length();
+    // Distance helper buffers for zero-allocation Damerau-Levenshtein calculation
+    private static float getTrivialDistance(final String s1, final String s2) {
+        if (s1 == null || s1.isEmpty()) {
+            return (s2 == null) ? 0.0f : s2.length();
+        }
+        if (s2 == null || s2.isEmpty()) {
+            return s1.length();
+        }
+        return -1.0f;
+    }
 
-        final int n = s1.length();
-        final int m = s2.length();
-
+    private static float[][] getDistanceBuffers(final int m) {
         float[][] buffers = DIST_BUFFERS.get();
         if (m + 1 > buffers[0].length) {
             buffers = new float[3][Math.max(m + 1, 64)];
             DIST_BUFFERS.set(buffers);
         }
+        return buffers;
+    }
+
+    private static boolean isTransposition(final String s1, final String s2, final int i, final int j, final char c1, final char c2) {
+        return i > 1 && j > 1 && c1 == s2.charAt(j - 2) && s1.charAt(i - 2) == c2;
+    }
+
+    private static float calculateCellDistance(final String s1, final String s2, final int i, final int j, final float[] dPrevPrev, final float[] dPrev, final float[] dCurr) {
+        final char c1 = s1.charAt(i - 1);
+        final char c2 = s2.charAt(j - 1);
+        final float cost = (c1 == c2) ? 0.0f : ProximityKeyMap.getDistanceWeight(c1, c2);
+
+        float min = Math.min(dPrev[j] + 1.0f, dCurr[j - 1] + 1.0f);
+        min = Math.min(min, dPrev[j - 1] + cost);
+
+        if (isTransposition(s1, s2, i, j, c1, c2)) {
+            min = Math.min(min, dPrevPrev[j - 2] + 0.5f);
+        }
+        return min;
+    }
+
+    private static void computeDistanceRow(final String s1, final String s2, final int i, final int m, final float[] dPrevPrev, final float[] dPrev, final float[] dCurr) {
+        dCurr[0] = i;
+        for (int j = 1; j <= m; j++) {
+            dCurr[j] = calculateCellDistance(s1, s2, i, j, dPrevPrev, dPrev, dCurr);
+        }
+    }
+
+    /**
+     * Calculates the weighted Damerau-Levenshtein distance between two strings,
+     * incorporating physical keyboard key proximity without memory allocations.
+     */
+    public static float computeWeightedDistance(final String s1, final String s2) {
+        final float trivialDist = getTrivialDistance(s1, s2);
+        if (trivialDist >= 0.0f) {
+            return trivialDist;
+        }
+
+        final int n = s1.length();
+        final int m = s2.length();
+        final float[][] buffers = getDistanceBuffers(m);
 
         float[] dPrevPrev = buffers[0];
         float[] dPrev = buffers[1];
@@ -202,22 +239,7 @@ public final class PrefixDictionary {
         }
 
         for (int i = 1; i <= n; i++) {
-            final char c1 = s1.charAt(i - 1);
-            dCurr[0] = i;
-
-            for (int j = 1; j <= m; j++) {
-                final char c2 = s2.charAt(j - 1);
-                final float cost = (c1 == c2) ? 0.0f : ProximityKeyMap.getDistanceWeight(c1, c2);
-
-                float min = Math.min(dPrev[j] + 1.0f, dCurr[j - 1] + 1.0f);
-                min = Math.min(min, dPrev[j - 1] + cost);
-
-                if (i > 1 && j > 1 && c1 == s2.charAt(j - 2) && s1.charAt(i - 2) == c2) {
-                    min = Math.min(min, dPrevPrev[j - 2] + 0.5f);
-                }
-                dCurr[j] = min;
-            }
-
+            computeDistanceRow(s1, s2, i, m, dPrevPrev, dPrev, dCurr);
             final float[] temp = dPrevPrev;
             dPrevPrev = dPrev;
             dPrev = dCurr;
@@ -558,46 +580,74 @@ public final class PrefixDictionary {
         return bin != null && bin.containsWord(word);
     }
 
+    private boolean isValidForExactCorrection(final String word) {
+        return word != null && word.length() > 1 && !shouldSkipAutoCorrection(word);
+    }
+
+    private boolean losesAccent(final String word, final String candidate) {
+        return StringUtils.hasAccents(word) && !StringUtils.hasAccents(candidate);
+    }
+
+    private boolean isAcceptableExactMatch(final String word, final String candidate, final int candidateFreq) {
+        if (losesAccent(word, candidate)) {
+            return false;
+        }
+        final int typedFreq = getWordFrequency(word);
+        return typedFreq <= 0 || candidateFreq >= (typedFreq * 1.5f) || Character.isUpperCase(candidate.charAt(0));
+    }
+
+    private int findBestTrieWordIndex(final TrieNode node) {
+        int bestIdx = 0;
+        int bestFreq = node.freqs.length > 0 ? node.freqs[0] : 0;
+        for (int i = 1; i < node.words.length; i++) {
+            if (node.freqs[i] > bestFreq) {
+                bestFreq = node.freqs[i];
+                bestIdx = i;
+            }
+        }
+        return bestIdx;
+    }
+
+    private CharSequence getCorrectionFromTrie(final String word, final String norm) {
+        final TrieNode current = findPrefixNode(norm);
+        if (current == null || current.words.length == 0) {
+            return null;
+        }
+        final int bestIdx = findBestTrieWordIndex(current);
+        final String bestWord = current.words[bestIdx];
+        final int bestFreq = current.freqs.length > bestIdx ? current.freqs[bestIdx] : 0;
+        if (isAcceptableExactMatch(word, bestWord, bestFreq)) {
+            return StringUtils.applyCasing(word, bestWord);
+        }
+        return null;
+    }
+
+    private CharSequence getCorrectionFromBinary(final String word) {
+        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+        if (bin == null) {
+            return null;
+        }
+        final String canonical = bin.getCanonicalWord(word);
+        if (canonical == null || canonical.equalsIgnoreCase(word)) {
+            return null;
+        }
+        final int binFreq = bin.getWordFrequency(canonical);
+        if (isAcceptableExactMatch(word, canonical, binFreq)) {
+            return StringUtils.applyCasing(word, canonical);
+        }
+        return null;
+    }
+
     public synchronized CharSequence getExactNormalizedCorrection(final String word) {
-        if (word == null || word.length() <= 1 || shouldSkipAutoCorrection(word)) {
+        if (!isValidForExactCorrection(word)) {
             return null;
         }
         final String norm = StringUtils.toNormalizedLower(word);
-        final TrieNode current = findPrefixNode(norm);
-        if (current != null && current.words.length > 0) {
-            String bestWord = current.words[0];
-            int bestFreq = current.freqs.length > 0 ? current.freqs[0] : 0;
-            for (int i = 1; i < current.words.length; i++) {
-                if (current.freqs[i] > bestFreq) {
-                    bestFreq = current.freqs[i];
-                    bestWord = current.words[i];
-                }
-            }
-
-            if (!(StringUtils.hasAccents(word) && !StringUtils.hasAccents(bestWord))) {
-                final int typedFreq = getWordFrequency(word);
-                if (typedFreq <= 0 || bestFreq >= (typedFreq * 1.5f) || Character.isUpperCase(bestWord.charAt(0))) {
-                    return StringUtils.applyCasing(word, bestWord);
-                }
-            }
+        final CharSequence trieCorr = getCorrectionFromTrie(word, norm);
+        if (trieCorr != null) {
+            return trieCorr;
         }
-
-        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
-        if (bin != null) {
-            final String canonical = bin.getCanonicalWord(word);
-            if (canonical != null && !canonical.equalsIgnoreCase(word)) {
-                if (StringUtils.hasAccents(word) && !StringUtils.hasAccents(canonical)) {
-                    return null;
-                }
-                final int typedFreq = getWordFrequency(word);
-                final int binFreq = bin.getWordFrequency(canonical);
-                if (typedFreq <= 0 || binFreq >= (typedFreq * 1.5f) || Character.isUpperCase(canonical.charAt(0))) {
-                    return StringUtils.applyCasing(word, canonical);
-                }
-            }
-        }
-
-        return null;
+        return getCorrectionFromBinary(word);
     }
 
     public synchronized CharSequence getBestCorrection(final String word) {
@@ -620,37 +670,50 @@ public final class PrefixDictionary {
         }
 
         final int typedFreq = getWordFrequency(word);
-        final boolean isHighFreqValidWord = typedFreq >= 70;
         final String norm = StringUtils.toNormalizedLower(word);
 
         // 2. Search fuzzy corrections (Levenshtein + keyboard proximity)
         final ScoredWord bestFuzzy = findBestFuzzyCandidate(norm, w1, w2);
-
-        if (bestFuzzy != null) {
-            final float dist = computeWeightedDistance(norm, StringUtils.toNormalizedLower(bestFuzzy.word));
-
-            // If the typed word is not in dictionary, or if typed word is a low-frequency obscure word (e.g. "esra" freq 25, "mierd" freq 40)
-            // and the fuzzy candidate is a high-frequency common word (e.g. "esta" freq 235, "mierda" freq 210) with adjacent key distance:
-            if (typedFreq == 0) {
-                if (bestFuzzy.score >= getMinCandidateScore()) {
-                    return StringUtils.applyCasing(word, bestFuzzy.word);
-                }
-            } else if (!isHighFreqValidWord && bestFuzzy.frequency >= (typedFreq * 2) && dist <= 1.0f) {
-                return StringUtils.applyCasing(word, bestFuzzy.word);
-            } else if (isValidCorrection(bestFuzzy, word, norm, w1, w2, true)) {
-                return StringUtils.applyCasing(word, bestFuzzy.word);
-            }
+        final CharSequence fuzzyCorr = evaluateFuzzyCorrection(bestFuzzy, word, norm, typedFreq, w1, w2);
+        if (fuzzyCorr != null) {
+            return fuzzyCorr;
         }
 
         // 3. Multi-word space segmentation (only if no close fuzzy match was found!)
         // e.g. "notengo" -> "no tengo", "delos" -> "de los", "comoteva" -> "cómo te va"
-        if (typedFreq == 0) {
-            final MultiWordSplitter.SplitResult split = MultiWordSplitter.findBestSplit(this, word, w2);
-            if (split != null && split.score >= 80.0f) {
-                return split.combined;
-            }
-        }
+        return evaluateMultiWordSplit(word, w2, typedFreq);
+    }
 
+    private CharSequence evaluateFuzzyCorrection(final ScoredWord bestFuzzy, final String word, final String norm, final int typedFreq, final String w1, final String w2) {
+        if (bestFuzzy == null) {
+            return null;
+        }
+        if (isFuzzyCandidateAccepted(bestFuzzy, word, norm, typedFreq, w1, w2)) {
+            return StringUtils.applyCasing(word, bestFuzzy.word);
+        }
+        return null;
+    }
+
+    private boolean isFuzzyCandidateAccepted(final ScoredWord bestFuzzy, final String word, final String norm, final int typedFreq, final String w1, final String w2) {
+        if (typedFreq == 0) {
+            return bestFuzzy.score >= getMinCandidateScore();
+        }
+        final float dist = computeWeightedDistance(norm, StringUtils.toNormalizedLower(bestFuzzy.word));
+        final boolean isHighFreqValidWord = typedFreq >= 70;
+        if (!isHighFreqValidWord && bestFuzzy.frequency >= (typedFreq * 2) && dist <= 1.0f) {
+            return true;
+        }
+        return isValidCorrection(bestFuzzy, word, norm, w1, w2, true);
+    }
+
+    private CharSequence evaluateMultiWordSplit(final String word, final String w2, final int typedFreq) {
+        if (typedFreq != 0) {
+            return null;
+        }
+        final MultiWordSplitter.SplitResult split = MultiWordSplitter.findBestSplit(this, word, w2);
+        if (split != null && split.score >= 80.0f) {
+            return split.combined;
+        }
         return null;
     }
 
@@ -851,6 +914,61 @@ public final class PrefixDictionary {
         return false;
     }
 
+    private static final String[] DEFAULT_FALLBACK_PREDICTIONS = {
+            "the", "to", "and", "a", "in", "is", "it", "you", "that", "he",
+            "que", "de", "no", "la", "el", "es", "en"
+    };
+
+    private boolean predictTrigrams(final String w1, final String w2, final List<CharSequence> results, final Set<String> added, final int limit) {
+        if (isNonEmptyText(w1) && isNonEmptyText(w2)) {
+            final String key = StringUtils.toNormalizedLower(w1.trim()) + " " + StringUtils.toNormalizedLower(w2.trim());
+            return collectTopNGramWords(mTrigrams.get(key), results, added, limit);
+        }
+        return false;
+    }
+
+    private boolean predictBigrams(final String w2, final List<CharSequence> results, final Set<String> added, final int limit) {
+        if (isNonEmptyText(w2)) {
+            final String key = StringUtils.toNormalizedLower(w2.trim());
+            return collectTopNGramWords(mBigrams.get(key), results, added, limit);
+        }
+        return false;
+    }
+
+    private boolean isNonEmptyText(final String text) {
+        return text != null && !text.trim().isEmpty();
+    }
+
+    private void collectTopDictionaryWords(final List<CharSequence> results, final Set<String> added, final int limit) {
+        if (results.size() >= limit) {
+            return;
+        }
+        for (ScoredWord sw : mTopWords) {
+            if (addPredictionIfAbsent(sw.word, results, added, limit)) {
+                return;
+            }
+        }
+    }
+
+    private void collectDefaultFallbackWords(final List<CharSequence> results, final Set<String> added, final int limit) {
+        if (results.size() >= limit) {
+            return;
+        }
+        for (String w : DEFAULT_FALLBACK_PREDICTIONS) {
+            if (addPredictionIfAbsent(w, results, added, limit)) {
+                return;
+            }
+        }
+    }
+
+    private boolean addPredictionIfAbsent(final String word, final List<CharSequence> results, final Set<String> added, final int limit) {
+        if (added.add(word.toLowerCase())) {
+            results.add(word);
+            return results.size() >= limit;
+        }
+        return false;
+    }
+
     public synchronized List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
         return getNextWordPredictions(null, prevWord, limit);
     }
@@ -862,47 +980,12 @@ public final class PrefixDictionary {
         final List<CharSequence> results = new ArrayList<>(limit);
         final Set<String> added = new HashSet<>();
 
-        // 1. Trigram Lookup (w1 + w2 -> w3)
-        if (w1 != null && !w1.trim().isEmpty() && w2 != null && !w2.trim().isEmpty()) {
-            final String key = StringUtils.toNormalizedLower(w1.trim()) + " " + StringUtils.toNormalizedLower(w2.trim());
-            if (collectTopNGramWords(mTrigrams.get(key), results, added, limit)) {
-                return results;
-            }
+        if (predictTrigrams(w1, w2, results, added, limit) || predictBigrams(w2, results, added, limit)) {
+            return results;
         }
 
-        // 2. Bigram Lookup Backoff (w2 -> w3)
-        if (w2 != null && !w2.trim().isEmpty()) {
-            final String key = StringUtils.toNormalizedLower(w2.trim());
-            if (collectTopNGramWords(mBigrams.get(key), results, added, limit)) {
-                return results;
-            }
-        }
-
-        // 3. Fallback to top frequent words from dictionary if not enough n-grams
-        if (results.size() < limit) {
-            for (ScoredWord sw : mTopWords) {
-                final String candidate = sw.word;
-                if (added.add(candidate.toLowerCase())) {
-                    results.add(candidate);
-                    if (results.size() >= limit) {
-                        break;
-                    }
-                }
-            }
-        }
-
-        // 4. Final fallback to common frequent words if dictionary is small/empty
-        if (results.size() < limit) {
-            final String[] defaultFallback = {"the", "to", "and", "a", "in", "is", "it", "you", "that", "he", "que", "de", "no", "la", "el", "es", "en"};
-            for (String w : defaultFallback) {
-                if (added.add(w.toLowerCase())) {
-                    results.add(w);
-                    if (results.size() >= limit) {
-                        break;
-                    }
-                }
-            }
-        }
+        collectTopDictionaryWords(results, added, limit);
+        collectDefaultFallbackWords(results, added, limit);
 
         return results;
     }

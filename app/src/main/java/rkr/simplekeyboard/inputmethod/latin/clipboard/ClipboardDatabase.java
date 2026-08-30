@@ -66,55 +66,96 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         insertClip(text, pinned, timestamp, null);
     }
 
+    private boolean isEmptyString(final String str) {
+        return str == null || str.trim().isEmpty();
+    }
+
+    private boolean isInvalidClipInput(final String text, final String uri) {
+        return isEmptyString(text) && isEmptyString(uri);
+    }
+
+    private String sanitizeClipText(final String text) {
+        if (text != null && text.length() > MAX_TEXT_LENGTH) {
+            return text.substring(0, MAX_TEXT_LENGTH);
+        }
+        return text;
+    }
+
+    private String getClipQueryKey(final String text, final String uri) {
+        return (uri != null && !uri.isEmpty()) ? uri : text;
+    }
+
+    private String getClipWhereClause(final String uri) {
+        return (uri != null && !uri.isEmpty()) ? (COL_URI + "=?") : (COL_TEXT + "=?");
+    }
+
+    private boolean isClipAlreadyPinned(final SQLiteDatabase db, final String whereClause, final String queryKey) {
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_NAME, new String[]{COL_PINNED}, whereClause,
+                    new String[]{queryKey}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getInt(0) == 1;
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        return false;
+    }
+
+    private ContentValues buildClipContentValues(final String text, final boolean pinned, final long timestamp, final String uri) {
+        final ContentValues values = new ContentValues();
+        values.put(COL_TEXT, text != null ? text : "[Screenshot]");
+        values.put(COL_TIMESTAMP, timestamp);
+        values.put(COL_PINNED, pinned ? 1 : 0);
+        if (uri != null) {
+            values.put(COL_URI, uri);
+        }
+        return values;
+    }
+
+    private void executeInsertClipTransaction(final SQLiteDatabase db, final String text, final boolean pinned, final long timestamp, final String uri) {
+        final String whereClause = getClipWhereClause(uri);
+        final String queryKey = getClipQueryKey(text, uri);
+        final boolean isPinned = pinned || isClipAlreadyPinned(db, whereClause, queryKey);
+
+        // Remove existing row to refresh timestamp and position
+        db.delete(TABLE_NAME, whereClause, new String[]{queryKey});
+
+        final ContentValues values = buildClipContentValues(text, isPinned, timestamp, uri);
+        db.insert(TABLE_NAME, null, values);
+
+        cleanupOldClips(db);
+        db.setTransactionSuccessful();
+    }
+
+    private void safeEndTransaction(final SQLiteDatabase db) {
+        if (db != null) {
+            try {
+                db.endTransaction();
+            } catch (Throwable ignored) {}
+        }
+    }
+
     public synchronized void insertClip(String text, boolean pinned, long timestamp, String uri) {
-        if ((text == null || text.trim().isEmpty()) && (uri == null || uri.trim().isEmpty())) {
+        if (isInvalidClipInput(text, uri)) {
             return;
         }
-        if (text != null && text.length() > MAX_TEXT_LENGTH) {
-            text = text.substring(0, MAX_TEXT_LENGTH);
-        }
-        if (timestamp <= 0) {
-            timestamp = System.currentTimeMillis();
-        }
+        final String sanitizedText = sanitizeClipText(text);
+        final long validTimestamp = timestamp <= 0 ? System.currentTimeMillis() : timestamp;
+
         SQLiteDatabase db = null;
         try {
             db = getWritableDatabase();
             db.beginTransaction();
-            // Check if exists and whether it was pinned
-            boolean isPinned = pinned;
-            String queryKey = (uri != null && !uri.isEmpty()) ? uri : text;
-            String whereClause = (uri != null && !uri.isEmpty()) ? (COL_URI + "=?") : (COL_TEXT + "=?");
-            Cursor cursor = db.query(TABLE_NAME, new String[]{COL_PINNED}, whereClause,
-                    new String[]{queryKey}, null, null, null);
-            if (cursor != null) {
-                if (cursor.moveToFirst()) {
-                    isPinned = isPinned || (cursor.getInt(0) == 1);
-                }
-                cursor.close();
-            }
-
-            // Remove existing row to refresh timestamp and position
-            db.delete(TABLE_NAME, whereClause, new String[]{queryKey});
-
-            ContentValues values = new ContentValues();
-            values.put(COL_TEXT, text != null ? text : "[Screenshot]");
-            values.put(COL_TIMESTAMP, timestamp);
-            values.put(COL_PINNED, isPinned ? 1 : 0);
-            if (uri != null) {
-                values.put(COL_URI, uri);
-            }
-            db.insert(TABLE_NAME, null, values);
-
-            cleanupOldClips(db);
-            db.setTransactionSuccessful();
+            executeInsertClipTransaction(db, sanitizedText, pinned, validTimestamp, uri);
         } catch (Throwable e) {
             Log.e(TAG, "Error inserting clip", e);
         } finally {
-            if (db != null) {
-                try {
-                    db.endTransaction();
-                } catch (Throwable ignored) {}
-            }
+            safeEndTransaction(db);
         }
     }
 

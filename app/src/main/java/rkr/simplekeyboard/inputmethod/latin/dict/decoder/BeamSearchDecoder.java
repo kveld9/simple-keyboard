@@ -185,22 +185,37 @@ public class BeamSearchDecoder {
         }
     }
 
-    public String getBestCorrection(String typedWord, float threshold, String prevWord) {
-        if (typedWord == null || typedWord.isEmpty() || states.size() <= 1 || dictionary == null) return null;
-        if ((states.size() - 1) != typedWord.length()) return null;
-        List<BeamHypothesis> current = states.peek();
-        if (current == null || current.isEmpty() || current.get(0).word.isEmpty()) return null;
-        
-        BeamHypothesis best = current.get(0);
-        if (best.totalScore < threshold) {
+    private boolean isValidForCorrection(final String typedWord) {
+        return typedWord != null && !typedWord.isEmpty() && dictionary != null
+                && states.size() > 1 && (states.size() - 1) == typedWord.length();
+    }
+
+    private BeamHypothesis getBestHypothesis() {
+        final List<BeamHypothesis> current = states.peek();
+        if (current == null || current.isEmpty() || current.get(0).word.isEmpty()) {
             return null;
         }
+        return current.get(0);
+    }
+
+    private String getTerminalCorrection(final BeamHypothesis best, final String typedWord) {
         if (best.nodeOffset > 0 && dictionary.isTerminal(best.nodeOffset)) {
-            String word = dictionary.getNodeWord(best.nodeOffset);
+            final String word = dictionary.getNodeWord(best.nodeOffset);
             if (word != null && !word.equalsIgnoreCase(typedWord)) {
                 return StringUtils.applyCasing(typedWord, word);
             }
         }
         return null;
+    }
+
+    public String getBestCorrection(String typedWord, float threshold, String prevWord) {
+        if (!isValidForCorrection(typedWord)) {
+            return null;
+        }
+        final BeamHypothesis best = getBestHypothesis();
+        if (best == null || best.totalScore < threshold) {
+            return null;
+        }
+        return getTerminalCorrection(best, typedWord);
     }
 }

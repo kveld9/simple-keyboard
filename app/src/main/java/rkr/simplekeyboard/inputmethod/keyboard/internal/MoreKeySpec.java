@@ -48,27 +48,36 @@ public final class MoreKeySpec {
     public final String mOutputText;
     public final int mIconId;
 
+    private static String resolveLabel(final String moreKeySpec, final boolean needsToUpperCase,
+            final Locale locale) {
+        final String label = KeySpecParser.getLabel(moreKeySpec);
+        return needsToUpperCase ? StringUtils.toTitleCaseOfKeyLabel(label, locale) : label;
+    }
+
+    private static int resolveCode(final String moreKeySpec, final boolean needsToUpperCase,
+            final Locale locale) {
+        final int codeInSpec = KeySpecParser.getCode(moreKeySpec);
+        return needsToUpperCase ? StringUtils.toTitleCaseOfKeyCode(codeInSpec, locale) : codeInSpec;
+    }
+
+    private static String resolveOutputText(final String moreKeySpec, final int code,
+            final String label, final boolean needsToUpperCase, final Locale locale) {
+        if (code == Constants.CODE_UNSPECIFIED) {
+            return label;
+        }
+        final String outputText = KeySpecParser.getOutputText(moreKeySpec);
+        return needsToUpperCase ? StringUtils.toTitleCaseOfKeyLabel(outputText, locale) : outputText;
+    }
+
     public MoreKeySpec(final String moreKeySpec, boolean needsToUpperCase,
             final Locale locale) {
         if (moreKeySpec.isEmpty()) {
             throw new KeySpecParser.KeySpecParserError("Empty more key spec");
         }
-        final String label = KeySpecParser.getLabel(moreKeySpec);
-        mLabel = needsToUpperCase ? StringUtils.toTitleCaseOfKeyLabel(label, locale) : label;
-        final int codeInSpec = KeySpecParser.getCode(moreKeySpec);
-        final int code = needsToUpperCase ? StringUtils.toTitleCaseOfKeyCode(codeInSpec, locale)
-                : codeInSpec;
-        if (code == Constants.CODE_UNSPECIFIED) {
-            // Some letter, for example German Eszett (U+00DF: "ß"), has multiple characters
-            // upper case representation ("SS").
-            mCode = Constants.CODE_OUTPUT_TEXT;
-            mOutputText = mLabel;
-        } else {
-            mCode = code;
-            final String outputText = KeySpecParser.getOutputText(moreKeySpec);
-            mOutputText = needsToUpperCase
-                    ? StringUtils.toTitleCaseOfKeyLabel(outputText, locale) : outputText;
-        }
+        mLabel = resolveLabel(moreKeySpec, needsToUpperCase, locale);
+        final int code = resolveCode(moreKeySpec, needsToUpperCase, locale);
+        mCode = (code == Constants.CODE_UNSPECIFIED) ? Constants.CODE_OUTPUT_TEXT : code;
+        mOutputText = resolveOutputText(moreKeySpec, code, mLabel, needsToUpperCase, locale);
         mIconId = KeySpecParser.getIconId(moreKeySpec);
     }
 
@@ -91,19 +100,25 @@ public final class MoreKeySpec {
         return hashCode;
     }
 
+    private boolean hasSameCodes(final MoreKeySpec other) {
+        return mCode == other.mCode && mIconId == other.mIconId;
+    }
+
+    private boolean hasSameTexts(final MoreKeySpec other) {
+        return TextUtils.equals(mLabel, other.mLabel)
+                && TextUtils.equals(mOutputText, other.mOutputText);
+    }
+
     @Override
     public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
-        if (o instanceof MoreKeySpec) {
-            final MoreKeySpec other = (MoreKeySpec)o;
-            return mCode == other.mCode
-                    && mIconId == other.mIconId
-                    && TextUtils.equals(mLabel, other.mLabel)
-                    && TextUtils.equals(mOutputText, other.mOutputText);
+        if (!(o instanceof MoreKeySpec)) {
+            return false;
         }
-        return false;
+        final MoreKeySpec other = (MoreKeySpec)o;
+        return hasSameCodes(other) && hasSameTexts(other);
     }
 
     @Override
@@ -133,13 +148,25 @@ public final class MoreKeySpec {
 
         public boolean contains(final MoreKeySpec moreKey) {
             final int code = moreKey.mCode;
-            if (Character.isAlphabetic(code) && mCodes.indexOfKey(code) >= 0) {
-                return true;
-            } else if (code == Constants.CODE_OUTPUT_TEXT && mTexts.contains(moreKey.mOutputText)) {
-                return true;
+            if (Character.isAlphabetic(code)) {
+                return mCodes.indexOfKey(code) >= 0;
+            }
+            if (code == Constants.CODE_OUTPUT_TEXT) {
+                return mTexts.contains(moreKey.mOutputText);
             }
             return false;
         }
+    }
+
+    private static ArrayList<MoreKeySpec> filterRedundantKeys(final MoreKeySpec[] moreKeys,
+            final LettersOnBaseLayout lettersOnBaseLayout) {
+        final ArrayList<MoreKeySpec> filtered = new ArrayList<>();
+        for (final MoreKeySpec moreKey : moreKeys) {
+            if (!lettersOnBaseLayout.contains(moreKey)) {
+                filtered.add(moreKey);
+            }
+        }
+        return filtered;
     }
 
     public static MoreKeySpec[] removeRedundantMoreKeys(final MoreKeySpec[] moreKeys,
@@ -147,20 +174,12 @@ public final class MoreKeySpec {
         if (moreKeys == null) {
             return null;
         }
-        final ArrayList<MoreKeySpec> filteredMoreKeys = new ArrayList<>();
-        for (final MoreKeySpec moreKey : moreKeys) {
-            if (!lettersOnBaseLayout.contains(moreKey)) {
-                filteredMoreKeys.add(moreKey);
-            }
-        }
-        final int size = filteredMoreKeys.size();
+        final ArrayList<MoreKeySpec> filtered = filterRedundantKeys(moreKeys, lettersOnBaseLayout);
+        final int size = filtered.size();
         if (size == moreKeys.length) {
             return moreKeys;
         }
-        if (size == 0) {
-            return null;
-        }
-        return filteredMoreKeys.toArray(new MoreKeySpec[size]);
+        return size == 0 ? null : filtered.toArray(new MoreKeySpec[size]);
     }
 
     // Constants for parsing.
@@ -168,6 +187,47 @@ public final class MoreKeySpec {
     private static final char BACKSLASH = Constants.CODE_BACKSLASH;
     private static final String ADDITIONAL_MORE_KEY_MARKER =
             StringUtils.newSingleCodePointString(Constants.CODE_PERCENT);
+
+    private static String[] handleSingleCharKeySpec(final String text) {
+        return text.charAt(0) == COMMA ? null : new String[] { text };
+    }
+
+    private static ArrayList<String> addKeySpecToken(ArrayList<String> list, final String text,
+            final int start, final int end) {
+        if (end > start) {
+            if (list == null) {
+                list = new ArrayList<>();
+            }
+            list.add(text.substring(start, end));
+        }
+        return list;
+    }
+
+    private static ArrayList<String> appendRemain(ArrayList<String> list, final String remain) {
+        if (remain != null) {
+            if (list == null) {
+                list = new ArrayList<>();
+            }
+            list.add(remain);
+        }
+        return list;
+    }
+
+    private static ArrayList<String> tokenizeKeySpecs(final String text, final int size) {
+        ArrayList<String> list = null;
+        int start = 0;
+        for (int pos = 0; pos < size; pos++) {
+            final char c = text.charAt(pos);
+            if (c == COMMA) {
+                list = addKeySpecToken(list, text, start, pos);
+                start = pos + 1;
+            } else if (c == BACKSLASH) {
+                pos++;
+            }
+        }
+        final String remain = (size > start) ? text.substring(start) : null;
+        return appendRemain(list, remain);
+    }
 
     /**
      * Split the text containing multiple key specifications separated by commas into an array of
@@ -184,50 +244,16 @@ public final class MoreKeySpec {
         if (TextUtils.isEmpty(text)) {
             return null;
         }
-        final int size = text.length();
-        // Optimization for one-letter key specification.
-        if (size == 1) {
-            return text.charAt(0) == COMMA ? null : new String[] { text };
+        if (text.length() == 1) {
+            return handleSingleCharKeySpec(text);
         }
-
-        ArrayList<String> list = null;
-        int start = 0;
-        // The characters in question in this loop are COMMA and BACKSLASH. These characters never
-        // match any high or low surrogate character. So it is OK to iterate through with char
-        // index.
-        for (int pos = 0; pos < size; pos++) {
-            final char c = text.charAt(pos);
-            if (c == COMMA) {
-                // Skip empty entry.
-                if (pos - start > 0) {
-                    if (list == null) {
-                        list = new ArrayList<>();
-                    }
-                    list.add(text.substring(start, pos));
-                }
-                // Skip comma
-                start = pos + 1;
-            } else if (c == BACKSLASH) {
-                // Skip escape character and escaped character.
-                pos++;
-            }
-        }
-        final String remain = (size - start > 0) ? text.substring(start) : null;
-        if (list == null) {
-            return remain != null ? new String[] { remain } : null;
-        }
-        if (remain != null) {
-            list.add(remain);
-        }
-        return list.toArray(new String[list.size()]);
+        final ArrayList<String> list = tokenizeKeySpecs(text, text.length());
+        return list != null ? list.toArray(new String[list.size()]) : null;
     }
 
     private static final String[] EMPTY_STRING_ARRAY = new String[0];
 
-    private static String[] filterOutEmptyString(final String[] array) {
-        if (array == null) {
-            return EMPTY_STRING_ARRAY;
-        }
+    private static ArrayList<String> collectNonEmptyStrings(final String[] array) {
         ArrayList<String> out = null;
         for (int i = 0; i < array.length; i++) {
             final String entry = array[i];
@@ -239,65 +265,131 @@ public final class MoreKeySpec {
                 out.add(entry);
             }
         }
-        if (out == null) {
-            return array;
+        return out;
+    }
+
+    private static String[] filterOutEmptyString(final String[] array) {
+        if (array == null) {
+            return EMPTY_STRING_ARRAY;
         }
-        return out.toArray(new String[out.size()]);
+        final ArrayList<String> out = collectNonEmptyStrings(array);
+        return out == null ? array : out.toArray(new String[out.size()]);
+    }
+
+    private static int countMarkers(final String[] moreKeys) {
+        int count = 0;
+        for (final String key : moreKeys) {
+            if (ADDITIONAL_MORE_KEY_MARKER.equals(key)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static ArrayList<String> processMarkerKey(final String[] moreKeys, final int index,
+            final String[] additionalMoreKeys, final int additionalIndex,
+            ArrayList<String> out) {
+        if (additionalIndex < additionalMoreKeys.length) {
+            final String additionalKey = additionalMoreKeys[additionalIndex];
+            if (out != null) {
+                out.add(additionalKey);
+            } else {
+                moreKeys[index] = additionalKey;
+            }
+        } else if (out == null) {
+            out = CollectionUtils.arrayAsList(moreKeys, 0, index);
+        }
+        return out;
+    }
+
+    private static void processNonMarkerKey(final String key, final ArrayList<String> out) {
+        if (out != null) {
+            out.add(key);
+        }
+    }
+
+    private static ArrayList<String> substituteMarkers(final String[] moreKeys,
+            final String[] additionalMoreKeys) {
+        ArrayList<String> out = null;
+        int additionalIndex = 0;
+        for (int i = 0; i < moreKeys.length; i++) {
+            final String key = moreKeys[i];
+            if (ADDITIONAL_MORE_KEY_MARKER.equals(key)) {
+                out = processMarkerKey(moreKeys, i, additionalMoreKeys, additionalIndex, out);
+                if (additionalIndex < additionalMoreKeys.length) {
+                    additionalIndex++;
+                }
+            } else {
+                processNonMarkerKey(key, out);
+            }
+        }
+        return out;
+    }
+
+    private static ArrayList<String> prependAdditionalKeys(final String[] additionalMoreKeys,
+            final String[] moreKeys) {
+        final ArrayList<String> out = CollectionUtils.arrayAsList(additionalMoreKeys, 0,
+                additionalMoreKeys.length);
+        for (final String moreKey : moreKeys) {
+            out.add(moreKey);
+        }
+        return out;
+    }
+
+    private static ArrayList<String> appendRemainingKeys(final String[] moreKeys,
+            final String[] additionalMoreKeys, final int fromIndex) {
+        final ArrayList<String> out = CollectionUtils.arrayAsList(moreKeys, 0, moreKeys.length);
+        for (int i = fromIndex; i < additionalMoreKeys.length; i++) {
+            out.add(additionalMoreKeys[i]);
+        }
+        return out;
+    }
+
+    private static ArrayList<String> combineUnmatchedKeys(final String[] moreKeys,
+            final String[] additionalMoreKeys, final int additionalIndex,
+            final ArrayList<String> currentOut) {
+        final int additionalCount = additionalMoreKeys.length;
+        if (additionalCount > 0 && additionalIndex == 0) {
+            return prependAdditionalKeys(additionalMoreKeys, moreKeys);
+        }
+        if (additionalIndex < additionalCount) {
+            return appendRemainingKeys(moreKeys, additionalMoreKeys, additionalIndex);
+        }
+        return currentOut;
+    }
+
+    private static String[] toMoreKeysResult(final String[] moreKeys, final ArrayList<String> out) {
+        if (out == null && moreKeys.length > 0) {
+            return moreKeys;
+        }
+        if (out != null && !out.isEmpty()) {
+            return out.toArray(new String[out.size()]);
+        }
+        return null;
     }
 
     public static String[] insertAdditionalMoreKeys(final String[] moreKeySpecs,
             final String[] additionalMoreKeySpecs) {
         final String[] moreKeys = filterOutEmptyString(moreKeySpecs);
         final String[] additionalMoreKeys = filterOutEmptyString(additionalMoreKeySpecs);
-        final int moreKeysCount = moreKeys.length;
-        final int additionalCount = additionalMoreKeys.length;
-        ArrayList<String> out = null;
-        int additionalIndex = 0;
-        for (int moreKeyIndex = 0; moreKeyIndex < moreKeysCount; moreKeyIndex++) {
-            final String moreKeySpec = moreKeys[moreKeyIndex];
-            if (moreKeySpec.equals(ADDITIONAL_MORE_KEY_MARKER)) {
-                if (additionalIndex < additionalCount) {
-                    // Replace '%' marker with additional more key specification.
-                    final String additionalMoreKey = additionalMoreKeys[additionalIndex];
-                    if (out != null) {
-                        out.add(additionalMoreKey);
-                    } else {
-                        moreKeys[moreKeyIndex] = additionalMoreKey;
-                    }
-                    additionalIndex++;
-                } else {
-                    // Filter out excessive '%' marker.
-                    if (out == null) {
-                        out = CollectionUtils.arrayAsList(moreKeys, 0, moreKeyIndex);
-                    }
-                }
-            } else {
-                if (out != null) {
-                    out.add(moreKeySpec);
-                }
-            }
-        }
-        if (additionalCount > 0 && additionalIndex == 0) {
-            // No '%' marker is found in more keys.
-            // Insert all additional more keys to the head of more keys.
-            out = CollectionUtils.arrayAsList(additionalMoreKeys, additionalIndex, additionalCount);
-            for (int i = 0; i < moreKeysCount; i++) {
-                out.add(moreKeys[i]);
-            }
-        } else if (additionalIndex < additionalCount) {
-            // The number of '%' markers are less than additional more keys.
-            // Append remained additional more keys to the tail of more keys.
-            out = CollectionUtils.arrayAsList(moreKeys, 0, moreKeysCount);
-            for (int i = additionalIndex; i < additionalCount; i++) {
-                out.add(additionalMoreKeys[i]);
-            }
-        }
-        if (out == null && moreKeysCount > 0) {
-            return moreKeys;
-        } else if (out != null && out.size() > 0) {
-            return out.toArray(new String[out.size()]);
-        } else {
-            return null;
+        final int markersCount = countMarkers(moreKeys);
+        final int additionalIndex = Math.min(markersCount, additionalMoreKeys.length);
+        final ArrayList<String> out = substituteMarkers(moreKeys, additionalMoreKeys);
+        final ArrayList<String> finalOut = combineUnmatchedKeys(moreKeys, additionalMoreKeys,
+                additionalIndex, out);
+        return toMoreKeysResult(moreKeys, finalOut);
+    }
+
+    private static boolean isKeySpecMatching(final String moreKeySpec, final String prefix) {
+        return moreKeySpec != null && moreKeySpec.startsWith(prefix);
+    }
+
+    private static int parseValueFromSpec(final String moreKeySpec, final int keyLen,
+            final String key) {
+        try {
+            return Integer.parseInt(moreKeySpec.substring(keyLen));
+        } catch (NumberFormatException e) {
+            throw new RuntimeException("integer should follow after " + key + ": " + moreKeySpec);
         }
     }
 
@@ -311,18 +403,12 @@ public final class MoreKeySpec {
         int value = defaultValue;
         for (int i = 0; i < moreKeys.length; i++) {
             final String moreKeySpec = moreKeys[i];
-            if (moreKeySpec == null || !moreKeySpec.startsWith(key)) {
-                continue;
-            }
-            moreKeys[i] = null;
-            try {
+            if (isKeySpecMatching(moreKeySpec, key)) {
+                moreKeys[i] = null;
                 if (!foundValue) {
-                    value = Integer.parseInt(moreKeySpec.substring(keyLen));
+                    value = parseValueFromSpec(moreKeySpec, keyLen, key);
                     foundValue = true;
                 }
-            } catch (NumberFormatException e) {
-                throw new RuntimeException(
-                        "integer should follow after " + key + ": " + moreKeySpec);
             }
         }
         return value;
@@ -334,12 +420,10 @@ public final class MoreKeySpec {
         }
         boolean value = false;
         for (int i = 0; i < moreKeys.length; i++) {
-            final String moreKeySpec = moreKeys[i];
-            if (moreKeySpec == null || !moreKeySpec.equals(key)) {
-                continue;
+            if (key.equals(moreKeys[i])) {
+                moreKeys[i] = null;
+                value = true;
             }
-            moreKeys[i] = null;
-            value = true;
         }
         return value;
     }

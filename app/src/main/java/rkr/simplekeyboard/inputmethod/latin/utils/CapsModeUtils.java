@@ -27,6 +27,14 @@ import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.settings.SpacingAndPunctuations;
 
 public final class CapsModeUtils {
+    private static final int STATE_CAPS = -1;
+    private static final int STATE_NO_CAPS = -2;
+    private static final int STATE_START = 0;
+    private static final int STATE_WORD = 1;
+    private static final int STATE_PERIOD = 2;
+    private static final int STATE_LETTER = 3;
+    private static final int STATE_NUMBER = 4;
+
     private CapsModeUtils() {
         // This utility class is not publicly instantiable.
     }
@@ -40,11 +48,212 @@ public final class CapsModeUtils {
      * @param codePoint the code point
      * @return true if it's starting punctuation, false otherwise.
      */
-    private static boolean isStartPunctuation(final int codePoint) {
-        return (codePoint == Constants.CODE_DOUBLE_QUOTE || codePoint == Constants.CODE_SINGLE_QUOTE
+    private static boolean isExplicitStartPunctuation(final int codePoint) {
+        return codePoint == Constants.CODE_DOUBLE_QUOTE
+                || codePoint == Constants.CODE_SINGLE_QUOTE
                 || codePoint == Constants.CODE_INVERTED_QUESTION_MARK
-                || codePoint == Constants.CODE_INVERTED_EXCLAMATION_MARK
-                || Character.getType(codePoint) == Character.START_PUNCTUATION);
+                || codePoint == Constants.CODE_INVERTED_EXCLAMATION_MARK;
+    }
+
+    private static boolean isStartPunctuation(final int codePoint) {
+        return isExplicitStartPunctuation(codePoint)
+                || Character.getType(codePoint) == Character.START_PUNCTUATION;
+    }
+
+    private static int getCharCaps(final int reqModes) {
+        return TextUtils.CAP_MODE_CHARACTERS & reqModes;
+    }
+
+    private static int getWordCaps(final int reqModes) {
+        return (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS) & reqModes;
+    }
+
+    private static int getAllCaps(final int reqModes) {
+        return (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS
+                | TextUtils.CAP_MODE_SENTENCES) & reqModes;
+    }
+
+    private static int skipStartPunctuation(final CharSequence cs) {
+        int i = cs.length();
+        while (i > 0 && isStartPunctuation(cs.charAt(i - 1))) {
+            i--;
+        }
+        return i;
+    }
+
+    private static int skipSpacesAndTabs(final CharSequence cs, int i) {
+        while (i > 0) {
+            final char c = cs.charAt(i - 1);
+            if (!Character.isSpaceChar(c) && c != Constants.CODE_TAB) {
+                break;
+            }
+            i--;
+        }
+        return i;
+    }
+
+    private static boolean isParagraphStart(final int nonSpaceIndex, final CharSequence cs) {
+        return nonSpaceIndex <= 0 || Character.isWhitespace(cs.charAt(nonSpaceIndex - 1));
+    }
+
+    private static boolean checkGermanCommaNewlineLoop(final CharSequence cs, int i, char prevChar) {
+        boolean hasNewLine = false;
+        while (--i >= 0 && Character.isWhitespace(prevChar)) {
+            if (Constants.CODE_ENTER == prevChar) {
+                hasNewLine = true;
+            }
+            prevChar = cs.charAt(i);
+        }
+        return Constants.CODE_COMMA == prevChar && hasNewLine;
+    }
+
+    private static boolean isGermanCommaBeforeNewline(final CharSequence cs, final int i) {
+        if (i <= 0) {
+            return false;
+        }
+        return checkGermanCommaNewlineLoop(cs, i, cs.charAt(i - 1));
+    }
+
+    private static int getParagraphStartCaps(final CharSequence cs, final int i,
+            final SpacingAndPunctuations sp, final int reqModes) {
+        if (sp.mUsesGermanRules && isGermanCommaBeforeNewline(cs, i)) {
+            return getWordCaps(reqModes);
+        }
+        return getAllCaps(reqModes);
+    }
+
+    private static int getWordSeparatorCaps(final CharSequence cs,
+            final SpacingAndPunctuations sp, final int reqModes) {
+        if (sp.isWordSeparator(cs.charAt(cs.length() - 1))) {
+            return getWordCaps(reqModes);
+        }
+        return getCharCaps(reqModes);
+    }
+
+    private static int skipAmericanClosingPunctuation(final CharSequence cs, int i) {
+        while (i > 0) {
+            final char c = cs.charAt(i - 1);
+            if (c != Constants.CODE_DOUBLE_QUOTE && c != Constants.CODE_SINGLE_QUOTE
+                    && Character.getType(c) != Character.END_PUNCTUATION) {
+                break;
+            }
+            i--;
+        }
+        return i;
+    }
+
+    private static boolean isTerminatorNotAbbreviation(final char c, final SpacingAndPunctuations sp) {
+        return sp.isSentenceTerminator(c) && !sp.isAbbreviationMarker(c);
+    }
+
+    private static int stepStartState(final char c, final boolean usesGermanRules) {
+        if (Character.isLetter(c)) {
+            return STATE_WORD;
+        }
+        if (Character.isWhitespace(c)) {
+            return STATE_NO_CAPS;
+        }
+        if (usesGermanRules && Character.isDigit(c)) {
+            return STATE_NUMBER;
+        }
+        return STATE_CAPS;
+    }
+
+    private static int stepWordState(final char c, final boolean isSeparator) {
+        if (Character.isLetter(c)) {
+            return STATE_WORD;
+        }
+        if (isSeparator) {
+            return STATE_PERIOD;
+        }
+        return STATE_CAPS;
+    }
+
+    private static int stepPeriodState(final char c) {
+        return Character.isLetter(c) ? STATE_LETTER : STATE_CAPS;
+    }
+
+    private static int stepLetterState(final char c, final boolean isSeparator) {
+        if (Character.isLetter(c)) {
+            return STATE_LETTER;
+        }
+        if (isSeparator) {
+            return STATE_PERIOD;
+        }
+        return STATE_NO_CAPS;
+    }
+
+    private static int stepNumberState(final char c) {
+        if (Character.isLetter(c)) {
+            return STATE_WORD;
+        }
+        if (Character.isDigit(c)) {
+            return STATE_NUMBER;
+        }
+        return STATE_NO_CAPS;
+    }
+
+    private static int stepOtherStates(final int state, final char c, final SpacingAndPunctuations sp) {
+        if (state == STATE_PERIOD) {
+            return stepPeriodState(c);
+        }
+        if (state == STATE_LETTER) {
+            return stepLetterState(c, sp.isSentenceSeparator(c));
+        }
+        return stepNumberState(c);
+    }
+
+    private static int stepState(final int state, final char c, final SpacingAndPunctuations sp) {
+        if (state == STATE_START) {
+            return stepStartState(c, sp.mUsesGermanRules);
+        }
+        if (state == STATE_WORD) {
+            return stepWordState(c, sp.isSentenceSeparator(c));
+        }
+        return stepOtherStates(state, c, sp);
+    }
+
+    private static boolean isTerminalCapsState(final int state) {
+        return state != STATE_START && state != STATE_LETTER;
+    }
+
+    private static boolean checkSentenceEndingPeriod(final CharSequence cs, int i,
+            final SpacingAndPunctuations sp) {
+        int state = STATE_START;
+        while (i > 0) {
+            final char c = cs.charAt(--i);
+            state = stepState(state, c, sp);
+            if (state == STATE_CAPS) {
+                return true;
+            }
+            if (state == STATE_NO_CAPS) {
+                return false;
+            }
+        }
+        return isTerminalCapsState(state);
+    }
+
+    private static int evaluateSentenceEnd(final CharSequence cs, final int i,
+            final char c, final SpacingAndPunctuations sp, final int reqModes) {
+        if (isTerminatorNotAbbreviation(c, sp)) {
+            return getAllCaps(reqModes);
+        }
+        if (sp.isSentenceSeparator(c) && i > 0 && checkSentenceEndingPeriod(cs, i, sp)) {
+            return getAllCaps(reqModes);
+        }
+        return getWordCaps(reqModes);
+    }
+
+    private static int getSentenceCapsMode(final CharSequence cs, int i,
+            final SpacingAndPunctuations sp, final int reqModes) {
+        if (sp.mUsesAmericanTypography) {
+            i = skipAmericanClosingPunctuation(cs, i);
+        }
+        if (i <= 0) {
+            return getCharCaps(reqModes);
+        }
+        final char c = cs.charAt(--i);
+        return evaluateSentenceEnd(cs, i, c, sp, reqModes);
     }
 
     /**
@@ -69,234 +278,33 @@ public final class CapsModeUtils {
      */
     public static int getCapsMode(final CharSequence cs, final int reqModes,
             final SpacingAndPunctuations spacingAndPunctuations) {
-        // Quick description of what we want to do:
-        // CAP_MODE_CHARACTERS is always on.
-        // CAP_MODE_WORDS is on if there is some whitespace before the cursor.
-        // CAP_MODE_SENTENCES is on if there is some whitespace before the cursor, and the end
-        //   of a sentence just before that.
-        // We ignore opening parentheses and the like just before the cursor for purposes of
-        // finding whitespace for WORDS and SENTENCES modes.
-        // The end of a sentence ends with a period, question mark or exclamation mark. If it's
-        // a period, it also needs not to be an abbreviation, which means it also needs to either
-        // be immediately preceded by punctuation, or by a string of only letters with single
-        // periods interleaved.
-
-        // Step 1 : check for cap MODE_CHARACTERS. If it's looked for, it's always on.
         if ((reqModes & (TextUtils.CAP_MODE_WORDS | TextUtils.CAP_MODE_SENTENCES)) == 0) {
-            // Here we are not looking for MODE_WORDS or MODE_SENTENCES, so since we already
-            // evaluated MODE_CHARACTERS, we can return.
-            return TextUtils.CAP_MODE_CHARACTERS & reqModes;
+            return getCharCaps(reqModes);
         }
-
-        // Step 2 : Skip (ignore at the end of input) any opening punctuation. This includes
-        // opening parentheses, brackets, opening quotes, everything that *opens* a span of
-        // text in the linguistic sense. In RTL languages, this is still an opening sign, although
-        // it may look like a right parenthesis for example. We also include double quote and
-        // single quote since they aren't start punctuation in the unicode sense, but should still
-        // be skipped for English. TODO: does this depend on the language?
-        int i;
-        for (i = cs.length(); i > 0; i--) {
-            final char c = cs.charAt(i - 1);
-            if (!isStartPunctuation(c)) {
-                break;
-            }
+        final int newCapIndex = skipStartPunctuation(cs);
+        final int nonSpaceIndex = skipSpacesAndTabs(cs, newCapIndex);
+        if (isParagraphStart(nonSpaceIndex, cs)) {
+            return getParagraphStartCaps(cs, nonSpaceIndex, spacingAndPunctuations, reqModes);
         }
-        final int newCapIndex = i;
-
-        // We are now on the character that precedes any starting punctuation, so in the most
-        // frequent case this will be whitespace or a letter, although it may occasionally be a
-        // start of line, or some symbol.
-
-        // Step 3 : Search for the start of a paragraph. From the starting point computed in step 2,
-        // we go back over any space or tab char sitting there. We find the start of a paragraph
-        // if the first char that's not a space or tab is a start of line (as in \n, start of text,
-        // or some other similar characters).
-        char prevChar = Constants.CODE_SPACE;
-        while (i > 0) {
-            prevChar = cs.charAt(i - 1);
-            if (!Character.isSpaceChar(prevChar) && prevChar != Constants.CODE_TAB) {
-                break;
-            }
-            i--;
-        }
-        if (i <= 0 || Character.isWhitespace(prevChar)) {
-            if (spacingAndPunctuations.mUsesGermanRules) {
-                // In German typography rules, there is a specific case that the first character
-                // of a new line should not be capitalized if the previous line ends in a comma.
-                boolean hasNewLine = false;
-                while (--i >= 0 && Character.isWhitespace(prevChar)) {
-                    if (Constants.CODE_ENTER == prevChar) {
-                        hasNewLine = true;
-                    }
-                    prevChar = cs.charAt(i);
-                }
-                if (Constants.CODE_COMMA == prevChar && hasNewLine) {
-                    return (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS) & reqModes;
-                }
-            }
-            // There are only spacing chars between the start of the paragraph and the cursor,
-            // defined as a isWhitespace() char that is neither a isSpaceChar() nor a tab. Both
-            // MODE_WORDS and MODE_SENTENCES should be active.
-            return (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS
-                    | TextUtils.CAP_MODE_SENTENCES) & reqModes;
-        }
-        if (newCapIndex == i) {
-            // The last character is all that really needs to be checked to determine if a new word
-            // is being started.
-            if (spacingAndPunctuations.isWordSeparator(cs.charAt(cs.length() - 1))) {
-                return (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS) & reqModes;
-            }
-            // If we don't have whitespace before newCapIndex, it means neither MODE_WORDS
-            // nor mode sentences should be on so we can return right away.
-            return TextUtils.CAP_MODE_CHARACTERS & reqModes;
+        if (newCapIndex == nonSpaceIndex) {
+            return getWordSeparatorCaps(cs, spacingAndPunctuations, reqModes);
         }
         if ((reqModes & TextUtils.CAP_MODE_SENTENCES) == 0) {
-            // Here we know we have whitespace before the cursor (if not, we returned in the above
-            // if newCapIndex == i clause), so we need MODE_WORDS to be on. And we don't need to
-            // evaluate MODE_SENTENCES so we can return right away.
-            return (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS) & reqModes;
+            return getWordCaps(reqModes);
         }
-        // Please note that because of the reqModes & CAP_MODE_SENTENCES test a few lines above,
-        // we know that MODE_SENTENCES is being requested.
+        return getSentenceCapsMode(cs, nonSpaceIndex, spacingAndPunctuations, reqModes);
+    }
 
-        // Step 4 : Search for MODE_SENTENCES.
-        // English is a special case in that "American typography" rules, which are the most common
-        // in English, state that a sentence terminator immediately following a quotation mark
-        // should be swapped with it and de-duplicated (included in the quotation mark),
-        // e.g. <<Did he say, "let's go home?">>
-        // No other language has such a rule as far as I know, instead putting inside the quotation
-        // mark as the exact thing quoted and handling the surrounding punctuation independently,
-        // e.g. <<Did he say, "let's go home"?>>
-        if (spacingAndPunctuations.mUsesAmericanTypography) {
-            for (; i > 0; i--) {
-                // Here we look to go over any closing punctuation. This is because in dominant
-                // variants of English, the final period is placed within double quotes and maybe
-                // other closing punctuation signs. This is generally not true in other languages.
-                final char c = cs.charAt(i - 1);
-                if (c != Constants.CODE_DOUBLE_QUOTE && c != Constants.CODE_SINGLE_QUOTE
-                        && Character.getType(c) != Character.END_PUNCTUATION) {
-                    break;
-                }
-            }
+    private static void appendFlagNames(final int capsFlags, final ArrayList<String> builder) {
+        if ((capsFlags & TextUtils.CAP_MODE_CHARACTERS) != 0) {
+            builder.add("characters");
         }
-
-        if (i <= 0) {
-            return TextUtils.CAP_MODE_CHARACTERS & reqModes;
+        if ((capsFlags & TextUtils.CAP_MODE_WORDS) != 0) {
+            builder.add("words");
         }
-        char c = cs.charAt(--i);
-
-        // We found the next interesting chunk of text ; next we need to determine if it's the
-        // end of a sentence. If we have a sentence terminator (typically a question mark or an
-        // exclamation mark), then it's the end of a sentence; however, we treat the abbreviation
-        // marker specially because usually is the same char as the sentence separator (the
-        // period in most languages) and in this case we need to apply a heuristic to determine
-        // in which of these senses it's used.
-        if (spacingAndPunctuations.isSentenceTerminator(c)
-                && !spacingAndPunctuations.isAbbreviationMarker(c)) {
-            return (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS
-                    | TextUtils.CAP_MODE_SENTENCES) & reqModes;
+        if ((capsFlags & TextUtils.CAP_MODE_SENTENCES) != 0) {
+            builder.add("sentences");
         }
-        // If we reach here, we know we have whitespace before the cursor and before that there
-        // is something that either does not terminate the sentence, or a symbol preceded by the
-        // start of the text, or it's the sentence separator AND it happens to be the same code
-        // point as the abbreviation marker.
-        // If it's a symbol or something that does not terminate the sentence, then we need to
-        // return caps for MODE_CHARACTERS and MODE_WORDS, but not for MODE_SENTENCES.
-        if (!spacingAndPunctuations.isSentenceSeparator(c) || i <= 0) {
-            return (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS) & reqModes;
-        }
-
-        // We found out that we have a period. We need to determine if this is a full stop or
-        // otherwise sentence-ending period, or an abbreviation like "e.g.". An abbreviation
-        // looks like (\w\.){2,}. Moreover, in German, you put periods after digits for dates
-        // and some other things, and in German specifically we need to not go into autocaps after
-        // a whitespace-digits-period sequence.
-        // To find out, we will have a simple state machine with the following states :
-        // START, WORD, PERIOD, ABBREVIATION, NUMBER
-        // On START : (just before the first period)
-        //           letter => WORD
-        //           digit => NUMBER if German; end with caps otherwise
-        //           whitespace => end with no caps (it was a stand-alone period)
-        //           otherwise => end with caps (several periods/symbols in a row)
-        // On WORD : (within the word just before the first period)
-        //           letter => WORD
-        //           period => PERIOD
-        //           otherwise => end with caps (it was a word with a full stop at the end)
-        // On PERIOD : (period within a potential abbreviation)
-        //           letter => LETTER
-        //           otherwise => end with caps (it was not an abbreviation)
-        // On LETTER : (letter within a potential abbreviation)
-        //           letter => LETTER
-        //           period => PERIOD
-        //           otherwise => end with no caps (it was an abbreviation)
-        // On NUMBER : (period immediately preceded by one or more digits)
-        //           digit => NUMBER
-        //           letter => LETTER (promote to word)
-        //           otherwise => end with no caps (it was a whitespace-digits-period sequence,
-        //            or a punctuation-digits-period sequence like "11.11.")
-        // "Not an abbreviation" in the above chart essentially covers cases like "...yes.". This
-        // should capitalize.
-
-        final int START = 0;
-        final int WORD = 1;
-        final int PERIOD = 2;
-        final int LETTER = 3;
-        final int NUMBER = 4;
-        final int caps = (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS
-                | TextUtils.CAP_MODE_SENTENCES) & reqModes;
-        final int noCaps = (TextUtils.CAP_MODE_CHARACTERS | TextUtils.CAP_MODE_WORDS) & reqModes;
-        int state = START;
-        while (i > 0) {
-            c = cs.charAt(--i);
-            switch (state) {
-            case START:
-                if (Character.isLetter(c)) {
-                    state = WORD;
-                } else if (Character.isWhitespace(c)) {
-                    return noCaps;
-                } else if (Character.isDigit(c) && spacingAndPunctuations.mUsesGermanRules) {
-                    state = NUMBER;
-                } else {
-                    return caps;
-                }
-                break;
-            case WORD:
-                if (Character.isLetter(c)) {
-                    state = WORD;
-                } else if (spacingAndPunctuations.isSentenceSeparator(c)) {
-                    state = PERIOD;
-                } else {
-                    return caps;
-                }
-                break;
-            case PERIOD:
-                if (Character.isLetter(c)) {
-                    state = LETTER;
-                } else {
-                    return caps;
-                }
-                break;
-            case LETTER:
-                if (Character.isLetter(c)) {
-                    state = LETTER;
-                } else if (spacingAndPunctuations.isSentenceSeparator(c)) {
-                    state = PERIOD;
-                } else {
-                    return noCaps;
-                }
-                break;
-            case NUMBER:
-                if (Character.isLetter(c)) {
-                    state = WORD;
-                } else if (Character.isDigit(c)) {
-                    state = NUMBER;
-                } else {
-                    return noCaps;
-                }
-            }
-        }
-        // Here we arrived at the start of the line. This should behave exactly like whitespace.
-        return (START == state || LETTER == state) ? noCaps : caps;
     }
 
     /**
@@ -314,15 +322,7 @@ public final class CapsModeUtils {
             return "unknown<0x" + Integer.toHexString(capsFlags) + ">";
         }
         final ArrayList<String> builder = new ArrayList<>();
-        if ((capsFlags & android.text.TextUtils.CAP_MODE_CHARACTERS) != 0) {
-            builder.add("characters");
-        }
-        if ((capsFlags & android.text.TextUtils.CAP_MODE_WORDS) != 0) {
-            builder.add("words");
-        }
-        if ((capsFlags & android.text.TextUtils.CAP_MODE_SENTENCES) != 0) {
-            builder.add("sentences");
-        }
+        appendFlagNames(capsFlags, builder);
         return builder.isEmpty() ? "none" : String.join("|", builder);
     }
 }

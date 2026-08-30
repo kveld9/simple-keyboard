@@ -2,11 +2,31 @@ apply plugin: 'com.android.application'
 
 def getGitVersionName() {
     try {
-        def text = providers.exec {
-            commandLine 'git', 'describe', '--tags', '--match', 'v[0-9]*', '--always'
+        def tagText = providers.exec {
+            commandLine 'git', 'tag', '--merged', 'HEAD', '--sort=-v:refname', 'v[0-9]*'
         }.standardOutput.asText.get()
-        def res = text.trim().replaceFirst('^v', '')
-        return res.isEmpty() ? "1.0.0" : res
+
+        def tags = tagText.readLines().collect { it.trim() }.findAll { !it.isEmpty() }
+        if (!tags.isEmpty()) {
+            def latestTag = tags[0]
+            def countText = providers.exec {
+                commandLine 'git', 'rev-list', '--count', "${latestTag}..HEAD"
+            }.standardOutput.asText.get().trim()
+            int count = countText.isInteger() ? countText.toInteger() : 0
+            def cleanTag = latestTag.replaceFirst('^v', '')
+            if (count > 0) {
+                def shortHash = providers.exec {
+                    commandLine 'git', 'rev-parse', '--short', 'HEAD'
+                }.standardOutput.asText.get().trim()
+                return "${cleanTag}-${count}-g${shortHash}"
+            }
+            return cleanTag
+        }
+
+        def fallback = providers.exec {
+            commandLine 'git', 'describe', '--tags', '--always'
+        }.standardOutput.asText.get().trim().replaceFirst('^v', '')
+        return fallback.isEmpty() ? "1.0.0" : fallback
     } catch (Exception ignored) {
         return "1.0.0"
     }

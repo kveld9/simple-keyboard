@@ -36,6 +36,8 @@ public class BeamSearchDecoder {
     private final BinaryTrieDictionary dictionary;
     private final SpatialTouchModel spatialModel;
     private final Stack<List<BeamHypothesis>> states;
+    private final char[] mChildrenChars = new char[256];
+    private final int[] mChildrenOffsets = new int[256];
 
     public BeamSearchDecoder(BinaryTrieDictionary dictionary, SpatialTouchModel spatialModel) {
         this.dictionary = dictionary;
@@ -88,12 +90,10 @@ public class BeamSearchDecoder {
     }
 
     private void expandSingleHypothesis(BeamHypothesis hyp, List<SpatialCandidate> candidates, List<BeamHypothesis> next) {
-        char[] childrenChars = new char[256];
-        int[] childrenOffsets = new int[256];
-        int count = dictionary.getChildren(hyp.nodeOffset, childrenChars, childrenOffsets);
+        int count = dictionary.getChildren(hyp.nodeOffset, mChildrenChars, mChildrenOffsets);
 
         for (int i = 0; i < count; i++) {
-            matchChildWithCandidates(hyp, childrenChars[i], childrenOffsets[i], candidates, next);
+            matchChildWithCandidates(hyp, mChildrenChars[i], mChildrenOffsets[i], candidates, next);
         }
     }
 

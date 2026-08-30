@@ -80,19 +80,42 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
         updatePopupBackground();
     }
 
+    private GradientDrawable mActiveKeyDrawable;
+
+    private GradientDrawable getActiveKeyDrawable() {
+        if (mActiveKeyDrawable == null) {
+            final Context context = getContext();
+            final GradientDrawable gd = new GradientDrawable();
+            gd.setShape(GradientDrawable.RECTANGLE);
+            int pressedColor = rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.getThemeColor(
+                    context, R.attr.keyPressedBackgroundColor, android.graphics.Color.DKGRAY);
+            gd.setColor(pressedColor);
+            final float cornerRadius = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getCornerRadius(context, mKeyShape);
+            gd.setCornerRadius(cornerRadius);
+            mActiveKeyDrawable = gd;
+        }
+        return mActiveKeyDrawable;
+    }
+
     private void updatePopupBackground() {
         final Context context = getContext();
         final float cornerRadius = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getCornerRadius(context, mKeyShape);
         final Drawable bg = getBackground();
-        if (bg instanceof android.graphics.drawable.GradientDrawable) {
-            ((android.graphics.drawable.GradientDrawable) bg.mutate()).setCornerRadius(cornerRadius);
+        if (bg instanceof GradientDrawable) {
+            ((GradientDrawable) bg.mutate()).setCornerRadius(cornerRadius);
         }
         final View container = getContainerView();
         if (container != null) {
             final Drawable containerBg = container.getBackground();
-            if (containerBg instanceof android.graphics.drawable.GradientDrawable) {
-                ((android.graphics.drawable.GradientDrawable) containerBg.mutate()).setCornerRadius(cornerRadius);
+            if (containerBg instanceof GradientDrawable) {
+                ((GradientDrawable) containerBg.mutate()).setCornerRadius(cornerRadius);
             }
+        }
+        if (mActiveKeyDrawable != null) {
+            mActiveKeyDrawable.setCornerRadius(cornerRadius);
+            int pressedColor = rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.getThemeColor(
+                    context, R.attr.keyPressedBackgroundColor, android.graphics.Color.DKGRAY);
+            mActiveKeyDrawable.setColor(pressedColor);
         }
     }
 
@@ -102,7 +125,15 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
         if (!key.isPressed()) {
             return;
         }
-        super.onDrawKeyBackground(key, canvas, background);
+        final int keyWidth = key.getWidth();
+        final int keyHeight = key.getHeight();
+        final Context context = getContext();
+        final int insetX = rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.dpToPx(context, 3);
+        final int insetY = rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils.dpToPx(context, 3);
+
+        final GradientDrawable activeDrawable = getActiveKeyDrawable();
+        activeDrawable.setBounds(insetX, insetY, keyWidth - insetX, keyHeight - insetY);
+        activeDrawable.draw(canvas);
     }
 
     @Override

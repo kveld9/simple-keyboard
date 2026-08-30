@@ -858,6 +858,10 @@ public class Key implements Comparable<Key> {
         mPressed = true;
     }
 
+    public boolean isPressed() {
+        return mPressed;
+    }
+
     /**
      * Informs the key that it has been released, in case it needs to change its appearance or
      * state.

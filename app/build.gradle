@@ -64,6 +64,7 @@ android {
         targetSdkVersion 37
         versionCode appVersionCode
         versionName appVersionName
+        resourceConfigurations += ["en", "es"]
     }
     signingConfigs {
         release {

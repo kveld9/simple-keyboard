@@ -48,11 +48,13 @@ public final class SubtypeLocaleUtils {
     private static final String LOCALE_ENGLISH_UNITED_STATES = "en_US";
     private static final String LOCALE_SPANISH = "es";
     private static final String LOCALE_SPANISH_LATIN_AMERICA = "es_419";
+    private static final String LOCALE_RUSSIAN = "ru";
 
     private static final String[] sSupportedLocales = new String[] {
             LOCALE_ENGLISH_UNITED_STATES,
             LOCALE_SPANISH,
-            LOCALE_SPANISH_LATIN_AMERICA
+            LOCALE_SPANISH_LATIN_AMERICA,
+            LOCALE_RUSSIAN
     };
 
     /**
@@ -66,6 +68,7 @@ public final class SubtypeLocaleUtils {
 
     public static final String LAYOUT_QWERTY = "qwerty";
     public static final String LAYOUT_SPANISH = "spanish";
+    public static final String LAYOUT_EAST_SLAVIC = "east_slavic";
 
     /**
      * Get a list of all of the supported subtypes for a locale.
@@ -198,6 +201,9 @@ public final class SubtypeLocaleUtils {
                 case LOCALE_SPANISH:
                 case LOCALE_SPANISH_LATIN_AMERICA:
                     addLayout(LAYOUT_SPANISH);
+                    break;
+                case LOCALE_RUSSIAN:
+                    addLayout(LAYOUT_EAST_SLAVIC);
                     break;
             }
             return mSubtypes;

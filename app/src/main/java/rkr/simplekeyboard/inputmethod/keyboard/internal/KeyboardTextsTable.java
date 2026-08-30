@@ -628,11 +628,79 @@ public final class KeyboardTextsTable {
 
 
 
+    private static final String[] TEXTS_ru = {
+        /* morekeys_a ~ */
+        null, null, null, null,
+        /* ~ morekeys_u */
+        // Label for "switch to alphabetic" key.
+        // U+0410: "А" CYRILLIC CAPITAL LETTER A
+        // U+0411: "Б" CYRILLIC CAPITAL LETTER BE
+        // U+0412: "В" CYRILLIC CAPITAL LETTER VE
+        /* keylabel_to_alpha */ "\u0410\u0411\u0412",
+        /* morekeys_i ~ */
+        null, null, null,
+        /* ~ morekeys_c */
+        /* double_quotes */ "!text/double_9qm_lqm",
+        /* morekeys_s */ null,
+        /* single_quotes */ "!text/single_9qm_lqm",
+        // U+20BD ₽ RUBLE SIGN
+        /* keyspec_currency ~ */ "\u20BD",
+        null, null, null, null, null, null, null, null, null, null,
+        /* ~ morekeys_k */
+        // U+0435 + U+0301: "е" CYRILLIC SMALL LETTER IE + ◌́ COMBINING ACUTE ACCENT
+        // U+0451: "ё" CYRILLIC SMALL LETTER IO
+        // U+0463: "ѣ" CYRILLIC SMALL LETTER YAT
+        /* morekeys_cyrillic_ie */ "\u0451,\u0435\u0301,\u0463",
+        /* keyspec_nordic_row1_11 ~ */
+        null, null, null, null,
+        /* ~ morekeys_nordic_row2_10 */
+        // U+0449: "щ" CYRILLIC SMALL LETTER SHCHA
+        /* keyspec_east_slavic_row1_9 */ "\u0449",
+        // U+044B: "ы" CYRILLIC SMALL LETTER YERU
+        /* keyspec_east_slavic_row2_2 */ "\u044B",
+        // U+044D: "э" CYRILLIC SMALL LETTER E
+        /* keyspec_east_slavic_row2_11 */ "\u044D",
+        // U+0438: "и" CYRILLIC SMALL LETTER I
+        /* keyspec_east_slavic_row3_5 */ "\u0438",
+        // U+044A: "ъ" CYRILLIC SMALL LETTER HARD SIGN
+        /* morekeys_cyrillic_soft_sign */ "\u044A",
+        null, null, null, null, null, null, null, null, null, null,/* #32-41 */
+        null, null, null, null, null, null, null, null, null, null,/* #42-51 */
+        null, null, null, null, null, null, null, null, null, null,/* #52-61 */
+        null, null, null, null, null, null, null, null, null, null,/* #62-71 */
+        null, null, null, null, null, null, null, null, null, null,/* #72-86 */
+        null, null, null, null, null,
+        // U+044B + U+0301: "ы" CYRILLIC SMALL LETTER YERU + ◌́ COMBINING ACUTE ACCENT
+        // U+A651: "ꙑ" CYRILLIC SMALL LETTER YERU WITH BACK YER
+        /* #87: morekeys_east_slavic_row2_2 */ "\u044B\u0301,\uA651",
+        // U+0443 + U+0301: "у" CYRILLIC SMALL LETTER U + ◌́ COMBINING ACUTE ACCENT
+        // U+045E: "ў" CYRILLIC SMALL LETTER SHORT U
+        /* morekeys_cyrillic_u */ "\u0443\u0301,\u045E",
+        /* morekeys_cyrillic_en */ null,
+        // U+0491: "ґ" CYRILLIC SMALL LETTER GHE WITH UPTURN
+        /* morekeys_cyrillic_ghe */ "\u0491",
+        // U+043E + U+0301: "о" CYRILLIC SMALL LETTER O + ◌́ COMBINING ACUTE ACCENT
+        /* #91: morekeys_cyrillic_o */ "\u043e\u0301",
+        // U+0438 + U+0301: "и" CYRILLIC SMALL LETTER I + ◌́ COMBINING ACUTE ACCENT
+        // U+0456: "і" CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I
+        // U+0457: "ї" CYRILLIC SMALL LETTER YI
+        /* morekeys_cyrillic_i */ "\u0438\u0301,\u0456,\u0457",
+        null, null, null, null, null, null, null, null, null, /* #93-101 */
+        null, null, null, null, null, null, null, null, null, null, /* #102-111 */
+        null, null, null, null, null, null, null, /* #112-118 */
+        // U+044D + U+0301: "э" CYRILLIC SMALL LETTER E + ◌́ COMBINING ACUTE ACCENT
+        // U+0454: "є" CYRILLIC SMALL LETTER UKRAINIAN IE
+        /* #119: morekeys_east_slavic_row2_11 */ "\u044d\u0301,\u0454",
+        /* #120: morekeys_cyrillic_ka */ null,
+        /* #121: morekeys_cyrillic_a */ "\u0430\u0301",
+    };
+
     private static final Object[] LOCALES_AND_TEXTS = {
     // "locale", TEXT_ARRAY,  /* numberOfNonNullText/lengthOf_TEXT_ARRAY localeName */
         "DEFAULT", TEXTS_DEFAULT, /* 176/176 DEFAULT */
         "en"     , TEXTS_en,    /*   8/ 10 English */
         "es"     , TEXTS_es,    /*   8/ 56 Spanish */
+        "ru"     , TEXTS_ru,    /*  18/122 Russian */
     };
 
     static {

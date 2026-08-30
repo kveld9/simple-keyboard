@@ -127,16 +127,7 @@ public class ClipboardHistoryView extends LinearLayout {
 
         mClearButton = ViewUtils.createSquareIconButton(context, R.drawable.ic_delete, dpToPx(44), dpToPx(10), mFunctionalTextColor, true);
         mClearButton.setContentDescription(context.getString(R.string.clipboard_clear_all));
-        mClearButton.setOnClickListener(v -> {
-            if (mDatabase != null) {
-                mAsyncExecutor.execute(() -> {
-                    mDatabase.clearUnpinned();
-                    clearSystemClipboardIfMatches(null);
-                    final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips();
-                    post(() -> displayClips(updatedClips));
-                });
-            }
-        });
+        mClearButton.setOnClickListener(v -> clearUnpinned());
         mHeaderLayout.addView(mClearButton);
 
         addView(mHeaderLayout);
@@ -210,17 +201,30 @@ public class ClipboardHistoryView extends LinearLayout {
         }
     }
 
-    public void reloadClips() {
+    private void executeDbTaskAndReload(final Runnable dbTask) {
         if (mDatabase == null) return;
+        mAsyncExecutor.execute(() -> {
+            if (dbTask != null) {
+                dbTask.run();
+            }
+            final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips();
+            post(() -> displayClips(updatedClips));
+        });
+    }
+
+    private void clearUnpinned() {
+        executeDbTaskAndReload(() -> {
+            mDatabase.clearUnpinned();
+            clearSystemClipboardIfMatches(null);
+        });
+    }
+
+    public void reloadClips() {
         final Context context = getContext();
         android.content.SharedPreferences prefs = rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat.getDeviceSharedPreferences(context);
         final long retentionMinutes = rkr.simplekeyboard.inputmethod.latin.settings.Settings.readClipboardRetentionMinutes(prefs);
 
-        mAsyncExecutor.execute(() -> {
-            mDatabase.deleteExpiredClips(retentionMinutes);
-            final List<ClipboardHistoryEntry> clips = mDatabase.getClips();
-            post(() -> displayClips(clips));
-        });
+        executeDbTaskAndReload(() -> mDatabase.deleteExpiredClips(retentionMinutes));
     }
 
     private void displayClips(List<ClipboardHistoryEntry> clips) {
@@ -354,12 +358,7 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     private void togglePinClip(ClipboardHistoryEntry entry) {
-        if (mDatabase == null) return;
-        mAsyncExecutor.execute(() -> {
-            mDatabase.setPinned(entry.id, !entry.isPinned);
-            final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips();
-            post(() -> displayClips(updatedClips));
-        });
+        executeDbTaskAndReload(() -> mDatabase.setPinned(entry.id, !entry.isPinned));
     }
 
     private ImageView createDeleteButton(Context context, final ClipboardHistoryEntry entry) {
@@ -372,17 +371,9 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     private void deleteClip(ClipboardHistoryEntry entry) {
-        if (mDatabase == null) return;
-        mAsyncExecutor.execute(() -> {
+        executeDbTaskAndReload(() -> {
             mDatabase.deleteClip(entry.id);
-            if (entry.uri != null) {
-                try {
-                    new java.io.File(entry.uri).delete();
-                } catch (Exception ignored) {}
-            }
             clearSystemClipboardIfMatches(entry.text);
-            final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips();
-            post(() -> displayClips(updatedClips));
         });
     }
 

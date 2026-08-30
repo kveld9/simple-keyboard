@@ -51,4 +51,18 @@ public class KeySpecParserTest {
     public void testGetLabelForIcon() {
         assertNull(KeySpecParser.getLabel("!icon/delete"));
     }
+
+    @Test
+    public void testGetCode() {
+        assertEquals('a', KeySpecParser.getCode("a"));
+        assertEquals(rkr.simplekeyboard.inputmethod.latin.common.Constants.CODE_OUTPUT_TEXT, KeySpecParser.getCode("abc"));
+        assertEquals(rkr.simplekeyboard.inputmethod.latin.common.Constants.CODE_TAB, KeySpecParser.getCode("Tab|!code/key_tab"));
+        assertEquals(rkr.simplekeyboard.inputmethod.latin.common.Constants.CODE_TAB, KeySpecParser.parseCode("!code/key_tab", rkr.simplekeyboard.inputmethod.latin.common.Constants.CODE_UNSPECIFIED));
+    }
+
+    @Test
+    public void testKeyboardCodesSet() {
+        assertEquals(rkr.simplekeyboard.inputmethod.latin.common.Constants.CODE_TAB, KeyboardCodesSet.getCode("key_tab"));
+        assertEquals(rkr.simplekeyboard.inputmethod.latin.common.Constants.CODE_DELETE, KeyboardCodesSet.getCode("key_delete"));
+    }
 }

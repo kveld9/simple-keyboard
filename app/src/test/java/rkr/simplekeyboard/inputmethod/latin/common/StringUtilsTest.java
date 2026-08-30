@@ -42,6 +42,17 @@ public class StringUtilsTest {
     }
 
     @Test
+    public void testGetSingleCodePoint() {
+        assertEquals('a', StringUtils.getSingleCodePoint("a", -1));
+        assertEquals('Z', StringUtils.getSingleCodePoint("Z", -1));
+        assertEquals(0x1D11E, StringUtils.getSingleCodePoint(StringUtils.newSingleCodePointString(0x1D11E), -1));
+        assertEquals(-1, StringUtils.getSingleCodePoint("abc", -1));
+        assertEquals(-1, StringUtils.getSingleCodePoint("", -1));
+        assertEquals(-1, StringUtils.getSingleCodePoint(null, -1));
+        assertEquals(42, StringUtils.getSingleCodePoint("multi char", 42));
+    }
+
+    @Test
     public void testContainsInArray() {
         final String[] items = {"alpha", "beta", "gamma"};
         assertTrue(StringUtils.containsInArray("alpha", items));

@@ -19,42 +19,13 @@
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
 import android.content.Context;
-import android.os.Bundle;
-import android.view.View;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.preference.PreferenceFragmentCompat;
-import androidx.recyclerview.widget.RecyclerView;
 
 /**
  * This is a helper class for an IME's settings preference fragment. It's recommended for every
  * IME to have its own settings preference fragment which inherits this class.
  */
-public abstract class InputMethodSettingsFragment extends PreferenceFragmentCompat {
+public abstract class InputMethodSettingsFragment extends BasePreferenceFragment {
     private final InputMethodSettingsImpl mSettings = new InputMethodSettingsImpl();
-
-    @Override
-    public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
-        getPreferenceManager().setStorageDeviceProtected();
-    }
-
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        setDivider(null);
-        setDividerHeight(0);
-
-        RecyclerView recyclerView = getListView();
-        if (recyclerView != null) {
-            recyclerView.setItemAnimator(null);
-            recyclerView.setClipToPadding(false);
-            recyclerView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
-            float density = getResources().getDisplayMetrics().density;
-            int paddingBottom = (int) (16 * density);
-            recyclerView.setPadding(0, 0, 0, paddingBottom);
-        }
-    }
 
     public void initSettings(Context context) {
         mSettings.init(context, getPreferenceScreen());

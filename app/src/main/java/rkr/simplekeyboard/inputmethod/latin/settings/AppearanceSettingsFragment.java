@@ -49,6 +49,7 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
 
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
+        super.onSharedPreferenceChanged(prefs, key);
         if (KeyboardTheme.KEYBOARD_THEME_KEY.equals(key)) {
             ThemeSettingsFragment.updateKeyboardThemeSummary(findPreference(Settings.SCREEN_THEME));
         }

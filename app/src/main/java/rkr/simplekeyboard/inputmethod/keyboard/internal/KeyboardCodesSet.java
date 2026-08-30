@@ -18,52 +18,39 @@
 
 package rkr.simplekeyboard.inputmethod.keyboard.internal;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 
 public final class KeyboardCodesSet {
     public static final String PREFIX_CODE = "!code/";
 
+    private static final Map<String, Integer> NAME_TO_CODE = new HashMap<>();
+
+    static {
+        NAME_TO_CODE.put("key_tab", Constants.CODE_TAB);
+        NAME_TO_CODE.put("key_enter", Constants.CODE_ENTER);
+        NAME_TO_CODE.put("key_space", Constants.CODE_SPACE);
+        NAME_TO_CODE.put("key_shift", Constants.CODE_SHIFT);
+        NAME_TO_CODE.put("key_capslock", Constants.CODE_CAPSLOCK);
+        NAME_TO_CODE.put("key_switch_alpha_symbol", Constants.CODE_SWITCH_ALPHA_SYMBOL);
+        NAME_TO_CODE.put("key_output_text", Constants.CODE_OUTPUT_TEXT);
+        NAME_TO_CODE.put("key_delete", Constants.CODE_DELETE);
+        NAME_TO_CODE.put("key_settings", Constants.CODE_SETTINGS);
+        NAME_TO_CODE.put("key_paste", Constants.CODE_PASTE);
+        NAME_TO_CODE.put("key_action_next", Constants.CODE_ACTION_NEXT);
+        NAME_TO_CODE.put("key_action_previous", Constants.CODE_ACTION_PREVIOUS);
+        NAME_TO_CODE.put("key_shift_enter", Constants.CODE_SHIFT_ENTER);
+        NAME_TO_CODE.put("key_language_switch", Constants.CODE_LANGUAGE_SWITCH);
+        NAME_TO_CODE.put("key_unspecified", Constants.CODE_UNSPECIFIED);
+    }
+
     public static int getCode(final String name) {
-        for (int i = 0; i < ID_TO_NAME.length; i++) {
-            if (ID_TO_NAME[i].equals(name)) return DEFAULT[i];
+        final Integer code = NAME_TO_CODE.get(name);
+        if (code != null) {
+            return code;
         }
         throw new RuntimeException("Unknown key code: " + name);
     }
-
-    private static final String[] ID_TO_NAME = {
-        "key_tab",
-        "key_enter",
-        "key_space",
-        "key_shift",
-        "key_capslock",
-        "key_switch_alpha_symbol",
-        "key_output_text",
-        "key_delete",
-        "key_settings",
-        "key_paste",
-        "key_action_next",
-        "key_action_previous",
-        "key_shift_enter",
-        "key_language_switch",
-        "key_unspecified",
-    };
-
-    private static final int[] DEFAULT = {
-        Constants.CODE_TAB,
-        Constants.CODE_ENTER,
-        Constants.CODE_SPACE,
-        Constants.CODE_SHIFT,
-        Constants.CODE_CAPSLOCK,
-        Constants.CODE_SWITCH_ALPHA_SYMBOL,
-        Constants.CODE_OUTPUT_TEXT,
-        Constants.CODE_DELETE,
-        Constants.CODE_SETTINGS,
-        Constants.CODE_PASTE,
-        Constants.CODE_ACTION_NEXT,
-        Constants.CODE_ACTION_PREVIOUS,
-        Constants.CODE_SHIFT_ENTER,
-        Constants.CODE_LANGUAGE_SWITCH,
-        Constants.CODE_UNSPECIFIED,
-    };
-
 }

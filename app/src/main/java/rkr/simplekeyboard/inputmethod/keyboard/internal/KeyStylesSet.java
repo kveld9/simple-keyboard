@@ -149,8 +149,9 @@ public final class KeyStylesSet {
         }
 
         private void readString(final TypedArray a, final int index) {
-            if (a.hasValue(index)) {
-                mStyleAttributes.put(index, parseString(a, index));
+            final String value = parseString(a, index);
+            if (value != null) {
+                mStyleAttributes.put(index, value);
             }
         }
 
@@ -169,8 +170,9 @@ public final class KeyStylesSet {
         }
 
         private void readStringArray(final TypedArray a, final int index) {
-            if (a.hasValue(index)) {
-                mStyleAttributes.put(index, parseStringArray(a, index));
+            final String[] value = parseStringArray(a, index);
+            if (value != null) {
+                mStyleAttributes.put(index, value);
             }
         }
     }

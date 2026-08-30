@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import rkr.simplekeyboard.inputmethod.compat.BuildCompatUtils;
 import rkr.simplekeyboard.inputmethod.compat.PermissionCompatUtils;
@@ -38,8 +39,8 @@ import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 
 public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipChangedListener {
     private static final String TAG = "ClipboardHistoryManager";
-    public static final long CLIPBOARD_SUGGESTION_TIMEOUT_MS = 15 * 60 * 1000L; // 15 minutes
-    public static final long SCREENSHOT_SUGGESTION_TIMEOUT_MS = 15 * 60 * 1000L; // 15 minutes
+    public static final long CLIPBOARD_SUGGESTION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(15);
+    public static final long SCREENSHOT_SUGGESTION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(15);
 
     public static class ScreenshotInfo {
         public final Uri uri;
@@ -248,7 +249,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         long maxTimeout = CLIPBOARD_SUGGESTION_TIMEOUT_MS;
         final long retentionMinutes = getRetentionMinutes();
         if (retentionMinutes > 0) {
-            maxTimeout = Math.min(maxTimeout, retentionMinutes * 60 * 1000L);
+            maxTimeout = Math.min(maxTimeout, TimeUnit.MINUTES.toMillis(retentionMinutes));
         }
         if (mLastTextTime <= 0 || (now - mLastTextTime > maxTimeout)) {
             return null;
@@ -285,7 +286,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
     private boolean isScreenshotSuggestionEnabled() {
         android.content.SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(mContext);
-        return Settings.readSuggestScreenshotsEnabled(prefs);
+        return prefs.getBoolean(Settings.PREF_SUGGEST_SCREENSHOTS, false);
     }
 
     private boolean hasStoragePermission() {
@@ -353,30 +354,27 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
                 if (cursor != null) {
                     int count = 0;
+                    final int idIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID);
+                    final int nameIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME);
+                    final int dateIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED);
+                    final int pathIndex = BuildCompatUtils.isAtLeastQ()
+                            ? cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
+                            : cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+
                     while (cursor.moveToNext() && count < 10) {
                         count++;
-                        int dateIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED);
                         long dateAdded = cursor.getLong(dateIndex) * 1000L;
                         long diff = System.currentTimeMillis() - dateAdded;
 
                         if (diff < SCREENSHOT_SUGGESTION_TIMEOUT_MS) {
-                            int nameIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME);
                             String fileName = cursor.getString(nameIndex);
                             if (fileName == null) fileName = "";
 
-                            String fullPath = "";
-                            if (BuildCompatUtils.isAtLeastQ()) {
-                                int relIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH);
-                                fullPath = cursor.getString(relIndex);
-                            } else {
-                                int dataIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-                                fullPath = cursor.getString(dataIndex);
-                            }
+                            String fullPath = cursor.getString(pathIndex);
                             if (fullPath == null) fullPath = "";
 
                             boolean isScreenshot = isScreenshotPath(fileName, fullPath);
                             if (isScreenshot) {
-                                int idIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID);
                                 long id = cursor.getLong(idIndex);
                                 Uri contentUri = ContentUris.withAppendedId(
                                         MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
@@ -481,7 +479,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
     public boolean isClipboardEnabled() {
         android.content.SharedPreferences prefs = PreferenceManagerCompat.getDeviceSharedPreferences(mContext);
-        return Settings.readClipboardEnabled(prefs);
+        return prefs.getBoolean(Settings.PREF_CLIPBOARD_ENABLED, true);
     }
 
     @Override

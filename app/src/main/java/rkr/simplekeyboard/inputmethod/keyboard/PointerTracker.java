@@ -323,33 +323,51 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         return mKeyDetector.detectHitKey(x, y);
     }
 
+    private void updateAssociatedKeysState(final Key key, final boolean pressed) {
+        if (key.isShift()) {
+            for (final Key shiftKey : mKeyboard.mShiftKeys) {
+                if (shiftKey != key) {
+                    if (pressed) {
+                        sDrawingProxy.onKeyPressed(shiftKey, false /* withPreview */);
+                    } else {
+                        sDrawingProxy.onKeyReleased(shiftKey, false /* withAnimation */);
+                    }
+                }
+            }
+        }
+
+        final boolean altersCode = pressed
+                ? (key.altCodeWhileTyping() && sTimerProxy.isTypingState())
+                : key.altCodeWhileTyping();
+        if (altersCode) {
+            final int altCode = key.getAltCode();
+            final Key altKey = mKeyboard.getKey(altCode);
+            if (altKey != null) {
+                if (pressed) {
+                    sDrawingProxy.onKeyPressed(altKey, false /* withPreview */);
+                } else {
+                    sDrawingProxy.onKeyReleased(altKey, false /* withAnimation */);
+                }
+            }
+            for (final Key k : mKeyboard.mAltCodeKeysWhileTyping) {
+                if (k != key && k.getAltCode() == altCode) {
+                    if (pressed) {
+                        sDrawingProxy.onKeyPressed(k, false /* withPreview */);
+                    } else {
+                        sDrawingProxy.onKeyReleased(k, false /* withAnimation */);
+                    }
+                }
+            }
+        }
+    }
+
     private void setReleasedKeyGraphics(final Key key, final boolean withAnimation) {
         if (key == null) {
             return;
         }
 
         sDrawingProxy.onKeyReleased(key, withAnimation);
-
-        if (key.isShift()) {
-            for (final Key shiftKey : mKeyboard.mShiftKeys) {
-                if (shiftKey != key) {
-                    sDrawingProxy.onKeyReleased(shiftKey, false /* withAnimation */);
-                }
-            }
-        }
-
-        if (key.altCodeWhileTyping()) {
-            final int altCode = key.getAltCode();
-            final Key altKey = mKeyboard.getKey(altCode);
-            if (altKey != null) {
-                sDrawingProxy.onKeyReleased(altKey, false /* withAnimation */);
-            }
-            for (final Key k : mKeyboard.mAltCodeKeysWhileTyping) {
-                if (k != key && k.getAltCode() == altCode) {
-                    sDrawingProxy.onKeyReleased(k, false /* withAnimation */);
-                }
-            }
-        }
+        updateAssociatedKeysState(key, false);
     }
 
     private void setPressedKeyGraphics(final Key key) {
@@ -357,31 +375,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
             return;
         }
 
-        // Even if the key is disabled, it should respond if it is in the altCodeWhileTyping state.
-        final boolean altersCode = key.altCodeWhileTyping() && sTimerProxy.isTypingState();
-
         sDrawingProxy.onKeyPressed(key, true);
-
-        if (key.isShift()) {
-            for (final Key shiftKey : mKeyboard.mShiftKeys) {
-                if (shiftKey != key) {
-                    sDrawingProxy.onKeyPressed(shiftKey, false /* withPreview */);
-                }
-            }
-        }
-
-        if (altersCode) {
-            final int altCode = key.getAltCode();
-            final Key altKey = mKeyboard.getKey(altCode);
-            if (altKey != null) {
-                sDrawingProxy.onKeyPressed(altKey, false /* withPreview */);
-            }
-            for (final Key k : mKeyboard.mAltCodeKeysWhileTyping) {
-                if (k != key && k.getAltCode() == altCode) {
-                    sDrawingProxy.onKeyPressed(k, false /* withPreview */);
-                }
-            }
-        }
+        updateAssociatedKeysState(key, true);
     }
 
     public void getLastCoordinates(final int[] outCoords) {
@@ -641,35 +636,45 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         transitionToNewKey(newKey, oldKey, x, y, eventTime);
     }
 
-    private boolean handleSpaceSwipe(final int x, final Key oldKey) {
-        if (oldKey == null || oldKey.getCode() != Constants.CODE_SPACE
-                || !Settings.getInstance().getCurrent().mSpaceSwipeEnabled) {
-            return false;
-        }
-        final int steps = (x - mStartX) / sPointerStep;
-        final int swipeIgnoreTime = Settings.getInstance().getCurrent().mKeyLongpressTimeout
-                / MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;
-        if (steps != 0 && mStartTime + swipeIgnoreTime < System.currentTimeMillis()) {
-            mCursorMoved = true;
-            mStartX += steps * sPointerStep;
-            sListener.onMoveCursorPointer(steps);
-        }
-        return true;
+    @FunctionalInterface
+    private interface SwipeListener {
+        void onSwipe(final int steps);
     }
 
-    private boolean handleDeleteSwipe(final int x, final Key oldKey) {
-        if (oldKey == null || oldKey.getCode() != Constants.CODE_DELETE
-                || !Settings.getInstance().getCurrent().mDeleteSwipeEnabled) {
+    private boolean handleSwipe(final int x, final Key oldKey, final int targetCode,
+            final boolean enabled, final boolean checkTimeout, final SwipeListener listener) {
+        if (oldKey == null || oldKey.getCode() != targetCode || !enabled) {
             return false;
         }
         final int steps = (x - mStartX) / sPointerStep;
         if (steps != 0) {
-            sTimerProxy.cancelKeyTimersOf(this);
+            if (checkTimeout) {
+                final int swipeIgnoreTime = Settings.getInstance().getCurrent().mKeyLongpressTimeout
+                        / MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;
+                if (mStartTime + swipeIgnoreTime >= System.currentTimeMillis()) {
+                    return true;
+                }
+            }
             mCursorMoved = true;
             mStartX += steps * sPointerStep;
-            sListener.onMoveDeletePointer(steps);
+            listener.onSwipe(steps);
         }
         return true;
+    }
+
+    private boolean handleSpaceSwipe(final int x, final Key oldKey) {
+        return handleSwipe(x, oldKey, Constants.CODE_SPACE,
+                Settings.getInstance().getCurrent().mSpaceSwipeEnabled,
+                true /* checkTimeout */, sListener::onMoveCursorPointer);
+    }
+
+    private boolean handleDeleteSwipe(final int x, final Key oldKey) {
+        return handleSwipe(x, oldKey, Constants.CODE_DELETE,
+                Settings.getInstance().getCurrent().mDeleteSwipeEnabled,
+                false /* checkTimeout */, steps -> {
+                    sTimerProxy.cancelKeyTimersOf(this);
+                    sListener.onMoveDeletePointer(steps);
+                });
     }
 
     private void transitionToNewKey(final Key newKey, final Key oldKey, final int x, final int y,

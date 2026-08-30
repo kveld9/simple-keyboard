@@ -69,7 +69,7 @@ public class BeamSearchDecoder {
     private List<SpatialCandidate> getTouchCandidates(float x, float y, char rawChar) {
         List<SpatialCandidate> candidates = spatialModel != null ? spatialModel.getCandidatesForTouch(x, y, rawChar) : new ArrayList<SpatialCandidate>();
         if (candidates.isEmpty()) {
-            candidates.add(new SpatialCandidate(rawChar, 1.0f, 0.0f));
+            candidates.add(SpatialCandidate.exact(rawChar));
         }
         return candidates;
     }
@@ -198,6 +198,9 @@ public class BeamSearchDecoder {
         if (current == null || current.isEmpty() || current.get(0).word.isEmpty()) return null;
         
         BeamHypothesis best = current.get(0);
+        if (best.totalScore < threshold) {
+            return null;
+        }
         if (best.nodeOffset > 0 && dictionary.isTerminal(best.nodeOffset)) {
             String word = dictionary.getNodeWord(best.nodeOffset);
             if (word != null && !word.equalsIgnoreCase(typedWord)) {

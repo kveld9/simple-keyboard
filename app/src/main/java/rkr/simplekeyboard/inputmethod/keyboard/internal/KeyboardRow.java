@@ -93,11 +93,7 @@ public final class KeyboardRow {
          */
         public RowAttributes(final TypedArray keyAttr, final float defaultKeyPaddedWidth,
                 final float keyboardWidth) {
-            mDefaultKeyPaddedWidth = ResourceUtils.getFraction(keyAttr,
-                    R.styleable.Keyboard_Key_keyWidth, keyboardWidth, defaultKeyPaddedWidth);
-            mDefaultKeyLabelFlags = keyAttr.getInt(R.styleable.Keyboard_Key_keyLabelFlags, 0);
-            mDefaultBackgroundType = keyAttr.getInt(R.styleable.Keyboard_Key_backgroundType,
-                    Key.BACKGROUND_TYPE_NORMAL);
+            this(keyAttr, defaultKeyPaddedWidth, 0, Key.BACKGROUND_TYPE_NORMAL, keyboardWidth);
         }
 
         /**
@@ -110,13 +106,19 @@ public final class KeyboardRow {
          */
         public RowAttributes(final TypedArray keyAttr, final RowAttributes defaultRowAttr,
                 final float keyboardWidth) {
+            this(keyAttr, defaultRowAttr.mDefaultKeyPaddedWidth, defaultRowAttr.mDefaultKeyLabelFlags,
+                    defaultRowAttr.mDefaultBackgroundType, keyboardWidth);
+        }
+
+        private RowAttributes(final TypedArray keyAttr, final float defaultKeyPaddedWidth,
+                final int defaultKeyLabelFlags, final int defaultBackgroundType,
+                final float keyboardWidth) {
             mDefaultKeyPaddedWidth = ResourceUtils.getFraction(keyAttr,
-                    R.styleable.Keyboard_Key_keyWidth, keyboardWidth,
-                    defaultRowAttr.mDefaultKeyPaddedWidth);
+                    R.styleable.Keyboard_Key_keyWidth, keyboardWidth, defaultKeyPaddedWidth);
             mDefaultKeyLabelFlags = keyAttr.getInt(R.styleable.Keyboard_Key_keyLabelFlags, 0)
-                    | defaultRowAttr.mDefaultKeyLabelFlags;
+                    | defaultKeyLabelFlags;
             mDefaultBackgroundType = keyAttr.getInt(R.styleable.Keyboard_Key_backgroundType,
-                    defaultRowAttr.mDefaultBackgroundType);
+                    defaultBackgroundType);
         }
     }
 

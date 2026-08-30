@@ -220,60 +220,11 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
 
 
     // Accessed from the settings interface, hence public
-    public static boolean readKeypressSoundEnabled(final SharedPreferences prefs,
-            final Resources res) {
-        return prefs.getBoolean(PREF_SOUND_ON,
-                res.getBoolean(R.bool.config_default_sound_enabled));
-    }
-
     public static boolean readVibrationEnabled(final SharedPreferences prefs,
             final Resources res) {
         final boolean hasVibrator = AudioAndHapticFeedbackManager.getInstance().hasVibrator();
         return hasVibrator && prefs.getBoolean(PREF_VIBRATE_ON,
                 res.getBoolean(R.bool.config_default_vibration_enabled));
-    }
-
-    public static boolean readKeyPreviewPopupEnabled(final SharedPreferences prefs,
-            final Resources res) {
-        final boolean defaultKeyPreviewPopup = res.getBoolean(
-                R.bool.config_default_key_preview_popup);
-        return prefs.getBoolean(PREF_POPUP_ON, defaultKeyPreviewPopup);
-    }
-
-    public static boolean readShowLanguageSwitchKey(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_SHOW_LANGUAGE_SWITCH_KEY, true);
-    }
-
-    public static boolean readShowLanguageOnSpacebar(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_SHOW_LANGUAGE_ON_SPACEBAR, true);
-    }
-
-    public static boolean readUseOnScreenKeyboard(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_USE_ON_SCREEN, false);
-    }
-
-    public static boolean readEnableImeSwitch(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_ENABLE_IME_SWITCH, false);
-    }
-
-    public static boolean readShowSpecialChars(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_SHOW_SPECIAL_CHARS, true);
-    }
-
-    public static boolean readShowNumberRow(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_SHOW_NUMBER_ROW, false);
-    }
-
-    public static boolean readSpaceSwipeEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_SPACE_SWIPE, false);
-    }
-
-    public static boolean readDeleteSwipeEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_DELETE_SWIPE, false);
-    }
-
-    public static boolean readClipboardEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_CLIPBOARD_ENABLED, true);
     }
 
     public static int readClipboardRetentionMinutes(final SharedPreferences prefs) {
@@ -294,20 +245,8 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         return Math.min(CLIPBOARD_RETENTION_TIME_MAX_MINUTES, Math.max(CLIPBOARD_RETENTION_TIME_MIN_MINUTES, minutes));
     }
 
-    public static boolean readClipboardSuggestionsEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_CLIPBOARD_SUGGESTIONS, false);
-    }
-
-    public static boolean readSuggestScreenshotsEnabled(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_SUGGEST_SCREENSHOTS, false);
-    }
-
     public static String readKeyShape(final SharedPreferences prefs) {
         return prefs.getString(PREF_KEY_SHAPE, KEY_SHAPE_ROUNDED);
-    }
-
-    public static boolean readShowSuggestions(final SharedPreferences prefs) {
-        return prefs.getBoolean(PREF_SHOW_SUGGESTIONS, true);
     }
 
     public static float readAutoCorrectionThreshold(final SharedPreferences prefs) {
@@ -317,10 +256,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         } catch (NumberFormatException | NullPointerException e) {
             return AUTO_CORRECTION_THRESHOLD_MODEST;
         }
-    }
-
-    public static boolean readAutoCorrectionEnabled(final SharedPreferences prefs) {
-        return readAutoCorrectionThreshold(prefs) > 0.0f;
     }
 
     public static String readPrefSubtypes(final SharedPreferences prefs) {
@@ -370,7 +305,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static int readKeyboardDefaultColor(final Context context) {
         final int[] keyboardThemeColors = context.getResources().getIntArray(R.array.keyboard_theme_colors);
         final int[] keyboardThemeIds = context.getResources().getIntArray(R.array.keyboard_theme_ids);
-        final int themeId = getKeyboardTheme(context).mThemeId;
+        final int themeId = KeyboardTheme.getKeyboardTheme(context).mThemeId;
         for (int index = 0; index < keyboardThemeIds.length; index++) {
             if (themeId == keyboardThemeIds[index]) {
                 return keyboardThemeColors[index];
@@ -378,10 +313,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         }
 
         return Color.TRANSPARENT;
-    }
-
-    public static KeyboardTheme getKeyboardTheme(final Context context) {
-        return KeyboardTheme.getKeyboardTheme(context);
     }
 
     public static boolean readUseFullscreenMode(final Resources res) {

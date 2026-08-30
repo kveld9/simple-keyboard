@@ -165,8 +165,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             final KeyboardSwitcher switcher = latinIme.mKeyboardSwitcher;
             switch (msg.what) {
             case MSG_UPDATE_SHIFT_STATE:
-                switcher.requestUpdatingShiftState(latinIme.getCurrentAutoCapsState(),
-                        latinIme.getCurrentRecapitalizeState());
+                switcher.requestUpdatingShiftState();
                 latinIme.updateSuggestions();
                 break;
             case MSG_DEALLOCATE_MEMORY:
@@ -471,24 +470,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
                     @Override
                     public void onClipboardSuggestionClicked(String fullClipText) {
-                        if (fullClipText != null && !fullClipText.isEmpty()) {
-                            mInputLogic.mConnection.commitText(fullClipText, 1);
-                            if (mClipboardHistoryManager != null) {
-                                mClipboardHistoryManager.markLatestClipUsed();
-                            }
-                            updateSuggestions();
-                        }
+                        commitClipboardText(fullClipText, false);
                     }
 
                     @Override
                     public void onScreenshotSuggestionClicked(String imageUri) {
-                        if (imageUri != null && !imageUri.isEmpty()) {
-                            onImageSelected(imageUri);
-                            if (mClipboardHistoryManager != null) {
-                                mClipboardHistoryManager.markLatestScreenshotUsed();
-                            }
-                            updateSuggestions();
-                        }
+                        commitClipboardImage(imageUri, false);
                     }
                 });
             }
@@ -497,24 +484,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 mClipboardHistoryView.setListener(new ClipboardHistoryView.ClipboardHistoryListener() {
                     @Override
                     public void onPasteText(CharSequence text) {
-                        mInputLogic.mConnection.commitText(text, 1);
-                        if (mClipboardHistoryManager != null) {
-                            mClipboardHistoryManager.markLatestClipUsed();
-                        }
-                        hideClipboardHistory();
-                        updateSuggestions();
+                        commitClipboardText(text, true);
                     }
 
                     @Override
                     public void onPasteImage(String imageUri) {
-                        if (imageUri != null && !imageUri.isEmpty()) {
-                            onImageSelected(imageUri);
-                            if (mClipboardHistoryManager != null) {
-                                mClipboardHistoryManager.markLatestScreenshotUsed();
-                            }
-                            hideClipboardHistory();
-                            updateSuggestions();
-                        }
+                        commitClipboardImage(imageUri, true);
                     }
 
                     @Override
@@ -534,7 +509,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
                     @Override
                     public void onDeleteEmoji() {
-                        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL);
+                        mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DEL);
                     }
 
                     @Override
@@ -546,21 +521,49 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
-    public void showClipboardHistory() {
-        if (mClipboardHistoryView == null || mInputView == null) {
+    private void commitClipboardText(final CharSequence text, final boolean closeHistory) {
+        if (text != null && text.length() > 0) {
+            mInputLogic.mConnection.commitText(text, 1);
+            if (mClipboardHistoryManager != null) {
+                mClipboardHistoryManager.markLatestClipUsed();
+            }
+            if (closeHistory) {
+                hideClipboardHistory();
+            }
+            updateSuggestions();
+        }
+    }
+
+    private void commitClipboardImage(final String uri, final boolean closeHistory) {
+        if (uri != null && !uri.isEmpty()) {
+            onImageSelected(uri);
+            if (mClipboardHistoryManager != null) {
+                mClipboardHistoryManager.markLatestScreenshotUsed();
+            }
+            if (closeHistory) {
+                hideClipboardHistory();
+            }
+            updateSuggestions();
+        }
+    }
+
+    private void showSecondaryView(final View secondaryView, final Runnable prepareAction) {
+        if (secondaryView == null || mInputView == null) {
             return;
         }
-        hideEmojiView();
-        if (mClipboardHistoryManager != null) {
-            mClipboardHistoryManager.updateCurrentClip();
-            mClipboardHistoryView.setDatabase(mClipboardHistoryManager.getDatabase());
+        if (prepareAction != null) {
+            prepareAction.run();
         }
         final int topBarHeight = (mTopBarView != null && mTopBarView.getVisibility() == View.VISIBLE) ? mTopBarView.getHeight() : 0;
         final View visibleKeyboardView = mKeyboardSwitcher.getVisibleKeyboardView();
         final int keyboardHeight = (visibleKeyboardView != null && visibleKeyboardView.getVisibility() == View.VISIBLE) ? visibleKeyboardView.getHeight() : 0;
         final int totalHeight = topBarHeight + keyboardHeight;
         if (totalHeight > 0) {
-            mClipboardHistoryView.setTargetHeight(totalHeight);
+            if (secondaryView instanceof ClipboardHistoryView) {
+                ((ClipboardHistoryView) secondaryView).setTargetHeight(totalHeight);
+            } else if (secondaryView instanceof EmojiPalettesView) {
+                ((EmojiPalettesView) secondaryView).setTargetHeight(totalHeight);
+            }
         }
 
         if (mTopBarView != null) {
@@ -570,14 +573,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             visibleKeyboardView.setVisibility(View.GONE);
         }
 
-        mClipboardHistoryView.reloadClips();
-        mClipboardHistoryView.setVisibility(View.VISIBLE);
+        secondaryView.setVisibility(View.VISIBLE);
         mInputView.requestLayout();
     }
 
-    public void hideClipboardHistory() {
-        if (mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE) {
-            mClipboardHistoryView.setVisibility(View.GONE);
+    private void hideSecondaryView(final View secondaryView) {
+        if (secondaryView != null && secondaryView.getVisibility() == View.VISIBLE) {
+            secondaryView.setVisibility(View.GONE);
             if (mTopBarView != null) {
                 mTopBarView.setVisibility(View.VISIBLE);
                 mTopBarView.setMode(TopBarView.MODE_NORMAL);
@@ -592,29 +594,26 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
+    public void showClipboardHistory() {
+        showSecondaryView(mClipboardHistoryView, () -> {
+            hideEmojiView();
+            if (mClipboardHistoryManager != null) {
+                mClipboardHistoryManager.updateCurrentClip();
+                mClipboardHistoryView.setDatabase(mClipboardHistoryManager.getDatabase());
+            }
+            mClipboardHistoryView.reloadClips();
+        });
+    }
+
+    public void hideClipboardHistory() {
+        hideSecondaryView(mClipboardHistoryView);
+    }
+
     public void showEmojiView() {
-        if (mEmojiPalettesView == null || mInputView == null) {
-            return;
-        }
-        hideClipboardHistory();
-        mEmojiPalettesView.reloadRecentEmojis();
-        final int topBarHeight = (mTopBarView != null && mTopBarView.getVisibility() == View.VISIBLE) ? mTopBarView.getHeight() : 0;
-        final View visibleKeyboardView = mKeyboardSwitcher.getVisibleKeyboardView();
-        final int keyboardHeight = (visibleKeyboardView != null && visibleKeyboardView.getVisibility() == View.VISIBLE) ? visibleKeyboardView.getHeight() : 0;
-        final int totalHeight = topBarHeight + keyboardHeight;
-        if (totalHeight > 0) {
-            mEmojiPalettesView.setTargetHeight(totalHeight);
-        }
-
-        if (mTopBarView != null) {
-            mTopBarView.setVisibility(View.GONE);
-        }
-        if (visibleKeyboardView != null) {
-            visibleKeyboardView.setVisibility(View.GONE);
-        }
-
-        mEmojiPalettesView.setVisibility(View.VISIBLE);
-        mInputView.requestLayout();
+        showSecondaryView(mEmojiPalettesView, () -> {
+            hideClipboardHistory();
+            mEmojiPalettesView.reloadRecentEmojis();
+        });
     }
 
     public boolean isEmojiViewShowing() {
@@ -626,20 +625,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     public void hideEmojiView() {
-        if (mEmojiPalettesView != null && mEmojiPalettesView.getVisibility() == View.VISIBLE) {
-            mEmojiPalettesView.setVisibility(View.GONE);
-            if (mTopBarView != null) {
-                mTopBarView.setVisibility(View.VISIBLE);
-                mTopBarView.setMode(TopBarView.MODE_NORMAL);
-            }
-            final View keyboardView = mKeyboardSwitcher.getMainKeyboardView();
-            if (keyboardView != null) {
-                keyboardView.setVisibility(View.VISIBLE);
-            }
-            if (mInputView != null) {
-                mInputView.requestLayout();
-            }
-        }
+        hideSecondaryView(mEmojiPalettesView);
     }
 
     @Override
@@ -769,7 +755,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             switcher.loadKeyboard(editorInfo, currentSettingsValues, getCurrentAutoCapsState(),
                     getCurrentRecapitalizeState());
         } else if (restarting) {
-            switcher.requestUpdatingShiftState(getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+            switcher.requestUpdatingShiftState();
         }
 
         if (mClipboardHistoryManager != null) {
@@ -902,8 +888,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (isInputViewShown()) {
             mInputLogic.reloadTextCache();
 
-            mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),
-                    getCurrentRecapitalizeState());
+            mKeyboardSwitcher.requestUpdatingShiftState();
             updateSuggestions();
         }
     }
@@ -1207,22 +1192,24 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         if (mBeamSearchDecoder != null) {
             final java.util.List<CharSequence> matches = mBeamSearchDecoder.getSuggestions(word, 3, w2);
-            if (matches != null && !matches.isEmpty()) {
+            if (matches != null) {
                 for (CharSequence m : matches) {
                     if (merged.size() >= 3) break;
                     if (added.add(m.toString().toLowerCase())) {
                         merged.add(m);
                     }
                 }
-                if (!merged.isEmpty()) return merged;
+                if (merged.size() >= 3) return merged;
             }
         }
-        final java.util.List<CharSequence> dictMatches = mPrefixDictionary.getSuggestions(word, 3, w1, w2);
-        if (dictMatches != null) {
-            for (CharSequence d : dictMatches) {
-                if (merged.size() >= 3) break;
-                if (added.add(d.toString().toLowerCase())) {
-                    merged.add(d);
+        if (mPrefixDictionary != null) {
+            final java.util.List<CharSequence> dictMatches = mPrefixDictionary.getSuggestions(word, 3, w1, w2);
+            if (dictMatches != null) {
+                for (CharSequence d : dictMatches) {
+                    if (merged.size() >= 3) break;
+                    if (added.add(d.toString().toLowerCase())) {
+                        merged.add(d);
+                    }
                 }
             }
         }
@@ -1284,9 +1271,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             if (fuzzy != null) {
                 for (CharSequence f : fuzzy) {
                     if (suggestions.size() >= 3) break;
+                    final String fStr = f.toString();
+                    if (fStr.equalsIgnoreCase(word)) {
+                        continue;
+                    }
                     boolean exists = false;
                     for (CharSequence s : suggestions) {
-                        if (s.toString().equalsIgnoreCase(f.toString()) || s.toString().equalsIgnoreCase("\"" + f + "\"")) {
+                        if (s.toString().equalsIgnoreCase(fStr)) {
                             exists = true;
                             break;
                         }
@@ -1436,12 +1427,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
-    int getCurrentAutoCapsState() {
+    public int getCurrentAutoCapsState() {
         return mInputLogic.getCurrentAutoCapsState(mSettings.getCurrent(),
                 mRichImm.getCurrentSubtype().getKeyboardLayoutSet());
     }
 
-    int getCurrentRecapitalizeState() {
+    public int getCurrentRecapitalizeState() {
         return mInputLogic.getCurrentRecapitalizeState();
     }
 
@@ -1482,10 +1473,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mInputLogic.mConnection.setSelection(start, end);
             hapticTickFeedback();
         } else {
-            for (; steps < 0; steps++)
-                mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT);
-            for (; steps > 0; steps--)
-                mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT);
+            if (steps < 0) {
+                mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT, -steps);
+            } else if (steps > 0) {
+                mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT, steps);
+            }
             hapticTickFeedback();
         }
     }
@@ -1502,8 +1494,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mInputLogic.mConnection.setSelection(start, end);
             hapticTickFeedback();
         } else {
-            for (; steps < 0; steps++)
-                mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DEL);
+            if (steps < 0) {
+                mInputLogic.sendDownUpKeyEvent(KeyEvent.KEYCODE_DEL, -steps);
+            }
             hapticTickFeedback();
         }
     }
@@ -1583,7 +1576,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final InputTransaction completeInputTransaction =
                 mInputLogic.onCodeInput(mSettings.getCurrent(), event);
         updateStateAfterInputTransaction(completeInputTransaction);
-        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+        mKeyboardSwitcher.onEvent(event);
         updateSuggestions();
     }
 
@@ -1648,7 +1641,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mCanRevertAutocorrect = false;
         mOriginalTypedWordBeforeAutocorrect = null;
         mAutocorrectedWord = null;
-        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+        mKeyboardSwitcher.onEvent(event);
         updateSuggestions();
     }
 
@@ -1755,15 +1748,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final InputTransaction completeInputTransaction =
                 mInputLogic.onTextInput(mSettings.getCurrent(), event);
         updateStateAfterInputTransaction(completeInputTransaction);
-        mKeyboardSwitcher.onEvent(event, getCurrentAutoCapsState(), getCurrentRecapitalizeState());
+        mKeyboardSwitcher.onEvent(event);
     }
 
     // Called from PointerTracker through the KeyboardActionListener interface
     @Override
     public void onFinishSlidingInput() {
         // User finished sliding input.
-        mKeyboardSwitcher.onFinishSlidingInput(getCurrentAutoCapsState(),
-                getCurrentRecapitalizeState());
+        mKeyboardSwitcher.onFinishSlidingInput();
     }
 
     private void loadKeyboard() {
@@ -1792,8 +1784,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mHandler.postUpdateShiftState();
             break;
         case InputTransaction.SHIFT_UPDATE_NOW:
-            mKeyboardSwitcher.requestUpdatingShiftState(getCurrentAutoCapsState(),
-                    getCurrentRecapitalizeState());
+            mKeyboardSwitcher.requestUpdatingShiftState();
             break;
         default: // SHIFT_NO_UPDATE
         }
@@ -1834,8 +1825,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onPressKey(final int primaryCode, final int repeatCount,
             final boolean isSinglePointer) {
-        mKeyboardSwitcher.onPressKey(primaryCode, isSinglePointer, getCurrentAutoCapsState(),
-                getCurrentRecapitalizeState());
+        mKeyboardSwitcher.onPressKey(primaryCode, isSinglePointer);
         hapticAndAudioFeedback(primaryCode, repeatCount);
     }
 
@@ -1843,8 +1833,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // press matching call is {@link #onPressKey(int,int,boolean)} above.
     @Override
     public void onReleaseKey(final int primaryCode, final boolean withSliding) {
-        mKeyboardSwitcher.onReleaseKey(primaryCode, withSliding, getCurrentAutoCapsState(),
-                getCurrentRecapitalizeState());
+        mKeyboardSwitcher.onReleaseKey(primaryCode, withSliding);
     }
 
     // receive ringer mode change and user unlock.

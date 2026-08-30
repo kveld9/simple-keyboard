@@ -70,7 +70,7 @@ public class SpatialTouchModel {
 
         // If no candidate met the threshold, try to find the fallback
         if (candidates.isEmpty() && fallbackCode > 0 && Character.isLetter(fallbackCode)) {
-            candidates.add(new SpatialCandidate((char) fallbackCode, 1.0f, 0.0f));
+            candidates.add(SpatialCandidate.exact(fallbackCode));
         }
 
         Collections.sort(candidates);

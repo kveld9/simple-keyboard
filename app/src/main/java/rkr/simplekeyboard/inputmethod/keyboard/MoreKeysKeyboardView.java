@@ -18,7 +18,6 @@
 package rkr.simplekeyboard.inputmethod.keyboard;
 
 import android.content.Context;
-import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.util.AttributeSet;
@@ -53,9 +52,6 @@ public class MoreKeysKeyboardView extends KeyboardView implements MoreKeysPanel 
     public MoreKeysKeyboardView(final Context context, final AttributeSet attrs,
             final int defStyle) {
         super(context, attrs, defStyle);
-        final TypedArray moreKeysKeyboardViewAttr = context.obtainStyledAttributes(attrs,
-                R.styleable.MoreKeysKeyboardView, defStyle, R.style.MoreKeysKeyboardView);
-        moreKeysKeyboardViewAttr.recycle();
         mKeyDetector = new MoreKeysDetector(getResources().getDimension(
                 R.dimen.config_more_keys_keyboard_slide_allowance));
     }

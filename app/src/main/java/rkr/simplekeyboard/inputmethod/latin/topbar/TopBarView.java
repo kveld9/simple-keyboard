@@ -29,6 +29,7 @@ public class TopBarView extends FrameLayout {
     private ImageView mExpandButton;
     private LinearLayout mSuggestionsContainer;
     private boolean mIsExternalActive;
+    private boolean mIsSinglePillMode;
     private TextView mLeftSlot;
     private View mDivider1;
     private TextView mCenterSlot;
@@ -197,9 +198,25 @@ public class TopBarView extends FrameLayout {
         resetSlot(mCenterSlot);
         mDivider2.setVisibility(View.INVISIBLE);
         resetSlot(mRightSlot);
-        mLeftSlot.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
-        mCenterSlot.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
-        mRightSlot.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
+
+        if (mIsSinglePillMode) {
+            mIsSinglePillMode = false;
+            restoreSlotLayoutParams(mLeftSlot);
+            restoreSlotLayoutParams(mCenterSlot);
+            restoreSlotLayoutParams(mRightSlot);
+        }
+    }
+
+    private void restoreSlotLayoutParams(TextView slot) {
+        ViewGroup.LayoutParams lp = slot.getLayoutParams();
+        if (lp instanceof LinearLayout.LayoutParams) {
+            LinearLayout.LayoutParams llp = (LinearLayout.LayoutParams) lp;
+            llp.width = 0;
+            llp.weight = 1.0f;
+            slot.setLayoutParams(llp);
+        } else {
+            slot.setLayoutParams(new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f));
+        }
     }
 
     private void dispatchSuggestions(List<CharSequence> suggestions, int boldIndex) {
@@ -238,12 +255,21 @@ public class TopBarView extends FrameLayout {
     }
 
     private void setupSingleCenterPillMode() {
+        mIsSinglePillMode = true;
         mLeftSlot.setVisibility(View.GONE);
         mDivider1.setVisibility(View.GONE);
         mDivider2.setVisibility(View.GONE);
         mRightSlot.setVisibility(View.GONE);
 
-        mCenterSlot.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
+        ViewGroup.LayoutParams lp = mCenterSlot.getLayoutParams();
+        if (lp instanceof LinearLayout.LayoutParams) {
+            LinearLayout.LayoutParams llp = (LinearLayout.LayoutParams) lp;
+            llp.width = LayoutParams.WRAP_CONTENT;
+            llp.weight = 0f;
+            mCenterSlot.setLayoutParams(llp);
+        } else {
+            mCenterSlot.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
+        }
         int paddingH = ViewUtils.dpToPx(getContext(), 12);
         mCenterSlot.setPadding(paddingH, 0, paddingH, 0);
         mCenterSlot.setVisibility(View.VISIBLE);
@@ -315,6 +341,8 @@ public class TopBarView extends FrameLayout {
         slot.setCompoundDrawablePadding(0);
         int paddingH = ViewUtils.dpToPx(getContext(), 4);
         slot.setPadding(paddingH, 0, paddingH, 0);
+        slot.setTypeface(Typeface.DEFAULT);
+        slot.setAlpha(0.85f);
         slot.setVisibility(View.INVISIBLE);
         slot.setOnClickListener(null);
     }
@@ -345,8 +373,6 @@ public class TopBarView extends FrameLayout {
         }
 
         slot.setText(text);
-        slot.setCompoundDrawablesRelative(null, null, null, null);
-        slot.setCompoundDrawablePadding(0);
         slot.setVisibility(View.VISIBLE);
         applySlotStyle(slot, isHighlighted);
         slot.setOnClickListener(v -> handleSuggestionClick(text));

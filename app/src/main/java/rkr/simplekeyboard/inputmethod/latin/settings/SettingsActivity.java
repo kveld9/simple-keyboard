@@ -171,8 +171,4 @@ public class SettingsActivity extends AppCompatActivity implements
                                           @NonNull final PreferenceScreen pref) {
         return false;
     }
-
-    public boolean isValidFragment(final String fragmentName) {
-        return FragmentUtils.isValidFragment(fragmentName);
-    }
 }

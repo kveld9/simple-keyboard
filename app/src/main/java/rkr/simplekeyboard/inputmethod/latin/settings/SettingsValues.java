@@ -80,12 +80,12 @@ public class SettingsValues {
         // Get the settings preferences
         mAutoCap = prefs.getBoolean(Settings.PREF_AUTO_CAP, true);
         mVibrateOn = Settings.readVibrationEnabled(prefs, res);
-        mSoundOn = Settings.readKeypressSoundEnabled(prefs, res);
-        mKeyPreviewPopupOn = Settings.readKeyPreviewPopupEnabled(prefs, res);
-        mUseOnScreen = Settings.readUseOnScreenKeyboard(prefs);
-        mShowsLanguageSwitchKey = Settings.readShowLanguageSwitchKey(prefs);
-        mShowLanguageOnSpacebar = Settings.readShowLanguageOnSpacebar(prefs);
-        mImeSwitchEnabled = Settings.readEnableImeSwitch(prefs);
+        mSoundOn = prefs.getBoolean(Settings.PREF_SOUND_ON, res.getBoolean(R.bool.config_default_sound_enabled));
+        mKeyPreviewPopupOn = prefs.getBoolean(Settings.PREF_POPUP_ON, res.getBoolean(R.bool.config_default_key_preview_popup));
+        mUseOnScreen = prefs.getBoolean(Settings.PREF_USE_ON_SCREEN, false);
+        mShowsLanguageSwitchKey = prefs.getBoolean(Settings.PREF_SHOW_LANGUAGE_SWITCH_KEY, true);
+        mShowLanguageOnSpacebar = prefs.getBoolean(Settings.PREF_SHOW_LANGUAGE_ON_SPACEBAR, true);
+        mImeSwitchEnabled = prefs.getBoolean(Settings.PREF_ENABLE_IME_SWITCH, false);
         mHasHardwareKeyboard = Settings.readHasHardwareKeyboard(res.getConfiguration());
 
         // Compute other readable settings
@@ -95,16 +95,16 @@ public class SettingsValues {
         mKeyboardHeightScale = Settings.readKeyboardHeight(prefs, DEFAULT_SIZE_SCALE);
         mBottomOffsetPortrait = Settings.readBottomOffsetPortrait(prefs);
         mDisplayOrientation = res.getConfiguration().orientation;
-        mShowSpecialChars = Settings.readShowSpecialChars(prefs);
-        mShowNumberRow = Settings.readShowNumberRow(prefs);
-        mSpaceSwipeEnabled = Settings.readSpaceSwipeEnabled(prefs);
-        mDeleteSwipeEnabled = Settings.readDeleteSwipeEnabled(prefs);
-        mShowSuggestions = Settings.readShowSuggestions(prefs);
-        mClipboardEnabled = Settings.readClipboardEnabled(prefs);
-        mClipboardSuggestionsEnabled = Settings.readClipboardSuggestionsEnabled(prefs);
-        mSuggestScreenshots = Settings.readSuggestScreenshotsEnabled(prefs);
+        mShowSpecialChars = prefs.getBoolean(Settings.PREF_SHOW_SPECIAL_CHARS, true);
+        mShowNumberRow = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, false);
+        mSpaceSwipeEnabled = prefs.getBoolean(Settings.PREF_SPACE_SWIPE, false);
+        mDeleteSwipeEnabled = prefs.getBoolean(Settings.PREF_DELETE_SWIPE, false);
+        mShowSuggestions = prefs.getBoolean(Settings.PREF_SHOW_SUGGESTIONS, true);
+        mClipboardEnabled = prefs.getBoolean(Settings.PREF_CLIPBOARD_ENABLED, true);
+        mClipboardSuggestionsEnabled = prefs.getBoolean(Settings.PREF_CLIPBOARD_SUGGESTIONS, false);
+        mSuggestScreenshots = prefs.getBoolean(Settings.PREF_SUGGEST_SCREENSHOTS, false);
         mAutoCorrectionThreshold = Settings.readAutoCorrectionThreshold(prefs);
-        mAutoCorrectionEnabled = Settings.readAutoCorrectionEnabled(prefs);
+        mAutoCorrectionEnabled = mAutoCorrectionThreshold > 0.0f;
     }
 
     public boolean isWordSeparator(final int code) {

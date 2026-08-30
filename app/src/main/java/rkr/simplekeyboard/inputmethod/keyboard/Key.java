@@ -94,19 +94,19 @@ public class Key implements Comparable<Key> {
     private final int mIconId;
 
     /** Width of the key, excluding the padding */
-    private final int mWidth;
+    private int mWidth;
     /** Height of the key, excluding the padding */
-    private final int mHeight;
+    private int mHeight;
     /** Exact theoretical width of the key, excluding the padding */
-    private final float mDefinedWidth;
+    private float mDefinedWidth;
     /** Exact theoretical height of the key, excluding the padding */
-    private final float mDefinedHeight;
+    private float mDefinedHeight;
     /** X coordinate of the top-left corner of the key in the keyboard layout, excluding the
      *  padding. */
-    private final int mX;
+    private int mX;
     /** Y coordinate of the top-left corner of the key in the keyboard layout, excluding the
      *  padding. */
-    private final int mY;
+    private int mY;
     /** Hit bounding box of the key */
     private final Rect mHitbox = new Rect();
 
@@ -173,14 +173,9 @@ public class Key implements Comparable<Key> {
     /** The current pressed state of this key */
     private boolean mPressed;
 
-    /**
-     * Constructor for a key on <code>MoreKeyKeyboard</code>.
-     */
-    public Key(final String label, final int iconId, final int code, final String outputText,
-               final String hintLabel, final int labelFlags, final int backgroundType,
-               final float x, final float y, final float width, final float height,
-               final float leftPadding, final float rightPadding, final float topPadding,
-               final float bottomPadding) {
+    private void initGeometry(final float x, final float y, final float width, final float height,
+            final float leftPadding, final float rightPadding, final float topPadding,
+            final float bottomPadding) {
         mHitbox.set(Math.round(x - leftPadding), Math.round(y - topPadding),
                 Math.round(x + width + rightPadding), Math.round(y + height + bottomPadding));
         mX = Math.round(x);
@@ -189,6 +184,17 @@ public class Key implements Comparable<Key> {
         mHeight = Math.round(y + height) - mY;
         mDefinedWidth = width;
         mDefinedHeight = height;
+    }
+
+    /**
+     * Constructor for a key on <code>MoreKeyKeyboard</code>.
+     */
+    public Key(final String label, final int iconId, final int code, final String outputText,
+               final String hintLabel, final int labelFlags, final int backgroundType,
+               final float x, final float y, final float width, final float height,
+               final float leftPadding, final float rightPadding, final float topPadding,
+               final float bottomPadding) {
+        initGeometry(x, y, width, height, leftPadding, rightPadding, topPadding, bottomPadding);
         mHintLabel = hintLabel;
         mLabelFlags = labelFlags;
         mBackgroundType = backgroundType;
@@ -222,25 +228,9 @@ public class Key implements Comparable<Key> {
         // Update the row to work with the new key
         row.setCurrentKey(keyAttr, isSpacer());
 
-        mDefinedWidth = row.getKeyWidth();
-        mDefinedHeight = row.getKeyHeight();
-
-        final float keyLeft = row.getKeyX();
-        final float keyTop = row.getKeyY();
-        final float keyRight = keyLeft + mDefinedWidth;
-        final float keyBottom = keyTop + mDefinedHeight;
-
-        final float leftPadding = row.getKeyLeftPadding();
-        final float topPadding = row.getKeyTopPadding();
-        final float rightPadding = row.getKeyRightPadding();
-        final float bottomPadding = row.getKeyBottomPadding();
-
-        mHitbox.set(Math.round(keyLeft - leftPadding), Math.round(keyTop - topPadding),
-                Math.round(keyRight + rightPadding), Math.round(keyBottom + bottomPadding));
-        mX = Math.round(keyLeft);
-        mY = Math.round(keyTop);
-        mWidth = Math.round(keyRight) - mX;
-        mHeight = Math.round(keyBottom) - mY;
+        initGeometry(row.getKeyX(), row.getKeyY(), row.getKeyWidth(), row.getKeyHeight(),
+                row.getKeyLeftPadding(), row.getKeyRightPadding(),
+                row.getKeyTopPadding(), row.getKeyBottomPadding());
 
         mBackgroundType = style.getInt(keyAttr,
                 R.styleable.Keyboard_Key_backgroundType, row.getDefaultBackgroundType());
@@ -374,21 +364,23 @@ public class Key implements Comparable<Key> {
     }
 
     private static CodeAndOutput resolveCodeFromOutputText(final String outputText) {
-        if (StringUtils.codePointCount(outputText) == 1) {
-            return new CodeAndOutput(outputText.codePointAt(0), null);
+        final int code = StringUtils.getSingleCodePoint(outputText, CODE_OUTPUT_TEXT);
+        if (code != CODE_OUTPUT_TEXT) {
+            return new CodeAndOutput(code, null);
         }
         return new CodeAndOutput(CODE_OUTPUT_TEXT, outputText);
     }
 
     private static CodeAndOutput resolveCodeFromLabel(final String label, final String hintLabel,
             final int labelFlags) {
-        if (StringUtils.codePointCount(label) != 1) {
+        final int labelCode = StringUtils.getSingleCodePoint(label, CODE_OUTPUT_TEXT);
+        if (labelCode == CODE_OUTPUT_TEXT) {
             return new CodeAndOutput(CODE_OUTPUT_TEXT, label);
         }
         final boolean useShiftedHint = (labelFlags & LABEL_FLAGS_HAS_SHIFTED_LETTER_HINT) != 0
                 && !TextUtils.isEmpty(hintLabel)
                 && (labelFlags & LABEL_FLAGS_SHIFTED_LETTER_ACTIVATED) != 0;
-        final int code = useShiftedHint ? hintLabel.codePointAt(0) : label.codePointAt(0);
+        final int code = useShiftedHint ? hintLabel.codePointAt(0) : labelCode;
         return new CodeAndOutput(code, null);
     }
 

@@ -283,19 +283,45 @@ public final class RichInputConnection {
         return mTextSelection;
     }
 
-    public String getWordBeforeCursor() {
-        String text = mTextBeforeCursor;
-        if ((text == null || text.isEmpty()) && isConnected()) {
+    private String getCachedOrFetchTextBefore(final int maxChars) {
+        if (mTextBeforeCursor != null && !mTextBeforeCursor.isEmpty()) {
+            final int len = Math.min(maxChars, mTextBeforeCursor.length());
+            return mTextBeforeCursor.substring(mTextBeforeCursor.length() - len);
+        }
+        if (isConnected()) {
             try {
-                final CharSequence icText = mIC.getTextBeforeCursor(40, 0);
-                if (icText != null && icText.length() > 0) {
-                    text = icText.toString();
+                final CharSequence cs = mIC.getTextBeforeCursor(maxChars, 0);
+                if (cs != null) {
+                    return cs.toString();
                 }
             } catch (Exception e) {
                 // Ignore fallback
             }
         }
-        if (text == null || text.isEmpty()) {
+        return "";
+    }
+
+    private String getCachedOrFetchTextAfter(final int maxChars) {
+        if (mTextAfterCursor != null && !mTextAfterCursor.isEmpty()) {
+            final int len = Math.min(maxChars, mTextAfterCursor.length());
+            return mTextAfterCursor.substring(0, len);
+        }
+        if (isConnected()) {
+            try {
+                final CharSequence cs = mIC.getTextAfterCursor(maxChars, 0);
+                if (cs != null) {
+                    return cs.toString();
+                }
+            } catch (Exception e) {
+                // Ignore fallback
+            }
+        }
+        return "";
+    }
+
+    public String getWordBeforeCursor() {
+        final String text = getCachedOrFetchTextBefore(40);
+        if (text.isEmpty()) {
             return "";
         }
         final int i = skipWordCharactersBackwards(text, text.length() - 1);
@@ -303,18 +329,8 @@ public final class RichInputConnection {
     }
 
     public String[] getTwoPreviousWordsBeforeCursor() {
-        String text = mTextBeforeCursor;
-        if ((text == null || text.isEmpty()) && isConnected()) {
-            try {
-                final CharSequence icText = mIC.getTextBeforeCursor(100, 0);
-                if (icText != null && icText.length() > 0) {
-                    text = icText.toString();
-                }
-            } catch (Exception e) {
-                // Ignore fallback
-            }
-        }
-        if (text == null || text.isEmpty()) {
+        final String text = getCachedOrFetchTextBefore(100);
+        if (text.isEmpty()) {
             return new String[]{"", ""};
         }
         int i = text.length() - 1;
@@ -341,36 +357,12 @@ public final class RichInputConnection {
     }
 
     public String getTextBeforeCursor(final int n, final int flags) {
-        if (mTextBeforeCursor != null && mTextBeforeCursor.length() > 0) {
-            final int len = Math.min(n, mTextBeforeCursor.length());
-            return mTextBeforeCursor.substring(mTextBeforeCursor.length() - len);
-        }
-        if (isConnected()) {
-            try {
-                final CharSequence cs = mIC.getTextBeforeCursor(n, flags);
-                if (cs != null) {
-                    return cs.toString();
-                }
-            } catch (Exception e) {
-                // Ignore fallback
-            }
-        }
-        return "";
+        return getCachedOrFetchTextBefore(n);
     }
 
     public String getWordAfterCursor() {
-        String text = mTextAfterCursor;
-        if ((text == null || text.isEmpty()) && isConnected()) {
-            try {
-                final CharSequence icText = mIC.getTextAfterCursor(40, 0);
-                if (icText != null && icText.length() > 0) {
-                    text = icText.toString();
-                }
-            } catch (Exception e) {
-                // Ignore fallback
-            }
-        }
-        if (text == null || text.isEmpty()) {
+        final String text = getCachedOrFetchTextAfter(40);
+        if (text.isEmpty()) {
             return "";
         }
         int i = 0;

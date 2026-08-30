@@ -130,36 +130,12 @@ public final class InputLogic {
     public InputTransaction onCodeInput(final SettingsValues settingsValues, final Event event) {
         final InputTransaction inputTransaction = new InputTransaction(settingsValues);
 
-        Event currentEvent = event;
-        while (null != currentEvent) {
-            if (currentEvent.isConsumed()) {
-                handleConsumedEvent(currentEvent);
-            } else if (currentEvent.isFunctionalKeyEvent()) {
-                handleFunctionalEvent(currentEvent, inputTransaction);
-            } else {
-                handleNonFunctionalEvent(currentEvent, inputTransaction);
-            }
-            currentEvent = currentEvent.mNextEvent;
+        if (event.isFunctionalKeyEvent()) {
+            handleFunctionalEvent(event, inputTransaction);
+        } else {
+            handleNonFunctionalEvent(event, inputTransaction);
         }
         return inputTransaction;
-    }
-
-    /**
-     * Handle a consumed event.
-     *
-     * Consumed events represent events that have already been consumed, typically by the
-     * combining chain.
-     *
-     * @param event The event to handle.
-     */
-    private void handleConsumedEvent(final Event event) {
-        // A consumed event may have text to commit and an update to the composing state, so
-        // we evaluate both. With some combiners, it's possible than an event contains both
-        // and we enter both of the following if clauses.
-        final CharSequence textToCommit = event.getTextToCommit();
-        if (!TextUtils.isEmpty(textToCommit)) {
-            mConnection.commitText(textToCommit, 1);
-        }
     }
 
     /**
@@ -212,7 +188,7 @@ public final class InputLogic {
                 handleLanguageSwitchKey();
                 break;
             case Constants.CODE_SHIFT_ENTER:
-                sendDownUpKeyEvent(KeyEvent.KEYCODE_ENTER, KeyEvent.META_SHIFT_ON);
+                sendDownUpKeyEventWithMeta(KeyEvent.KEYCODE_ENTER, KeyEvent.META_SHIFT_ON);
                 // Shift + Enter is not supported in all devices
                 break;
             default:
@@ -446,10 +422,16 @@ public final class InputLogic {
      * @param keyCode the key code to send inside the key event.
      */
     public void sendDownUpKeyEvent(final int keyCode) {
-        sendDownUpKeyEvent(keyCode, 0);
+        sendDownUpKeyEvent(keyCode, 1);
     }
 
-    public void sendDownUpKeyEvent(final int keyCode, final int metaState) {
+    public void sendDownUpKeyEvent(final int keyCode, final int repeatCount) {
+        for (int i = 0; i < repeatCount; i++) {
+            sendDownUpKeyEventWithMeta(keyCode, 0);
+        }
+    }
+
+    public void sendDownUpKeyEventWithMeta(final int keyCode, final int metaState) {
         final long eventTime = SystemClock.uptimeMillis();
         mConnection.sendKeyEvent(new KeyEvent(eventTime, eventTime,
                 KeyEvent.ACTION_DOWN, keyCode, 0, metaState, KeyCharacterMap.VIRTUAL_KEYBOARD, 0,

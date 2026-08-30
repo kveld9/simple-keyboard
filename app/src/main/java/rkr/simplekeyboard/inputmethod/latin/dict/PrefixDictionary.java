@@ -398,15 +398,21 @@ public final class PrefixDictionary {
         return score + getPrefixContextBonus(w1, w2, sw.word);
     }
 
-    private float getPrefixContextBonus(final String w1, final String w2, final String word) {
+    private float calcContextBonus(final String w1, final String w2, final String word,
+            final float triBase, final float triWeight, final float biBase, final float biWeight) {
         final int triFreq = getTrigramFrequency(w1, w2, word);
-        final int biFreq = getBigramFrequency(w2, word);
         if (triFreq > 0) {
-            return 800.0f + (triFreq * 3.0f) + (biFreq * 1.0f);
-        } else if (biFreq > 0) {
-            return 400.0f + (biFreq * 2.0f);
+            return triBase + (triFreq * triWeight);
+        }
+        final int biFreq = getBigramFrequency(w2, word);
+        if (biFreq > 0) {
+            return biBase + (biFreq * biWeight);
         }
         return 0.0f;
+    }
+
+    private float getPrefixContextBonus(final String w1, final String w2, final String word) {
+        return calcContextBonus(w1, w2, word, 800.0f, 3.0f, 400.0f, 2.0f);
     }
 
     private List<CharSequence> formatSuggestions(final List<ScoredWord> scoredWords, final String originalPrefix, final int maxCount) {
@@ -600,14 +606,7 @@ public final class PrefixDictionary {
     }
 
     private float getFuzzyContextBonus(final String w1, final String w2, final String word) {
-        final int triFreq = getTrigramFrequency(w1, w2, word);
-        final int biFreq = getBigramFrequency(w2, word);
-        if (triFreq > 0) {
-            return 600.0f + (triFreq * 2.5f);
-        } else if (biFreq > 0) {
-            return 300.0f + (biFreq * 1.5f);
-        }
-        return 0.0f;
+        return calcContextBonus(w1, w2, word, 600.0f, 2.5f, 300.0f, 1.5f);
     }
 
     private boolean isValidCorrection(final ScoredWord best, final String word, final String norm, final String w1, final String w2, final boolean isWordValid) {

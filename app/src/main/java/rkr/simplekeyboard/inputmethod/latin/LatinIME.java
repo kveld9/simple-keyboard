@@ -82,6 +82,7 @@ import rkr.simplekeyboard.inputmethod.latin.clipboard.ClipboardHistoryView;
 import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPalettesView;
 import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary;
+import rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -125,10 +126,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private final java.util.concurrent.ExecutorService mDictExecutor =
             java.util.concurrent.Executors.newSingleThreadExecutor();
     private Locale mLoadedLocale;
+    private int mDictLoadGeneration = 0;
 
     public final rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel mSpatialTouchModel = new rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel();
-    public rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary mBinaryTrieDictionary;
-    public rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder mBeamSearchDecoder;
+    public BinaryTrieDictionary mBinaryTrieDictionary;
+    public BeamSearchDecoder mBeamSearchDecoder;
 
     private String mOriginalTypedWordBeforeAutocorrect = null;
     private String mAutocorrectedWord = null;
@@ -903,8 +905,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         mLoadedLocale = currentLocale;
         final String currentLang = (currentLocale != null) ? currentLocale.getLanguage() : "es";
-
-        loadBinaryDictionary(currentLang);
+        final int loadGeneration = ++mDictLoadGeneration;
 
         final java.util.Set<String> enabledLangs = new java.util.LinkedHashSet<>();
         if (mRichImm != null) {
@@ -924,39 +925,52 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
 
         mDictExecutor.execute(() -> {
+            // 1. Construct binary trie dictionary and beam search decoder in background
+            BinaryTrieDictionary newBinaryDict = null;
+            BeamSearchDecoder newDecoder = null;
+            final String primaryAssetName = "es".equals(currentLang) ? "dict_es.bin" : "dict_en.bin";
+            try (InputStream is = getAssets().open(primaryAssetName)) {
+                byte[] bytes = new byte[is.available()];
+                is.read(bytes);
+                ByteBuffer buffer = ByteBuffer.wrap(bytes);
+                newBinaryDict = new BinaryTrieDictionary(buffer);
+                newDecoder = new BeamSearchDecoder(newBinaryDict, mSpatialTouchModel);
+            } catch (Exception e) {
+                Log.w(TAG, "Could not load binary trie dictionary asset: " + primaryAssetName, e);
+            }
+
+            // 2. Populate PrefixDictionary in background
             final PrefixDictionary newDict = new PrefixDictionary();
             final SettingsValues settingsValues = mSettings.getCurrent();
             if (settingsValues != null) {
                 newDict.setAutoCorrectionThreshold(settingsValues.mAutoCorrectionThreshold);
             }
-            // 1. Load secondary enabled languages first (with 85% relative frequency)
+            // Load secondary enabled languages first (with 85% relative frequency)
             for (String lang : enabledLangs) {
                 if (!lang.equals(currentLang)) {
                     loadSingleLanguageBinaryDictionaryInto(newDict, lang, 0.85f);
                 }
             }
 
-            // 2. Load primary active language with 100% frequency
+            // Load primary active language with 100% frequency
             loadSingleLanguageBinaryDictionaryInto(newDict, currentLang, 1.0f);
 
+            final BinaryTrieDictionary finalBinaryDict = newBinaryDict;
+            final BeamSearchDecoder finalDecoder = newDecoder;
+
             mHandler.post(() -> {
+                if (loadGeneration != mDictLoadGeneration) {
+                    // Stale load generation, ignore obsolete dictionary
+                    return;
+                }
+                if (finalBinaryDict != null && finalDecoder != null) {
+                    mBinaryTrieDictionary = finalBinaryDict;
+                    mBeamSearchDecoder = finalDecoder;
+                }
                 mPrefixDictionary.copyFrom(newDict);
                 updateSuggestions();
             });
         });
-    }
-
-    private void loadBinaryDictionary(final String lang) {
-        final String assetName = "es".equals(lang) ? "dict_es.bin" : "dict_en.bin";
-        try (InputStream is = getAssets().open(assetName)) {
-            byte[] bytes = new byte[is.available()];
-            is.read(bytes);
-            ByteBuffer buffer = ByteBuffer.wrap(bytes);
-            mBinaryTrieDictionary = new rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary(buffer);
-            mBeamSearchDecoder = new rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder(mBinaryTrieDictionary, mSpatialTouchModel);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     private void loadSingleLanguageBinaryDictionaryInto(final PrefixDictionary targetDict, final String lang, final float weightFactor) {

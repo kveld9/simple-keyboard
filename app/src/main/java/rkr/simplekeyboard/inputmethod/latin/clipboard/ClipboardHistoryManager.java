@@ -132,8 +132,14 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
     public void close() {
         stop();
+        try {
+            mExecutor.execute(() -> {
+                try {
+                    mDatabase.close();
+                } catch (Throwable ignored) {}
+            });
+        } catch (Throwable ignored) {}
         mExecutor.shutdown();
-        mDatabase.close();
     }
 
     public ClipboardDatabase getDatabase() {
@@ -222,14 +228,23 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
             mLastTextUsed = false;
 
             final long retentionMinutes = getRetentionMinutes();
-            mDatabase.deleteExpiredClips(retentionMinutes);
-            mDatabase.insertClip(currentText, false, clipTimestamp, null);
-
-            mMainHandler.post(() -> {
-                if (mOnPrimaryClipChangeListener != null) {
-                    mOnPrimaryClipChangeListener.run();
-                }
-            });
+            try {
+                mExecutor.execute(() -> {
+                    try {
+                        mDatabase.deleteExpiredClips(retentionMinutes);
+                        mDatabase.insertClip(currentText, false, clipTimestamp, null);
+                    } catch (Throwable t) {
+                        Log.e(TAG, "Error storing clip in database asynchronously", t);
+                    }
+                    mMainHandler.post(() -> {
+                        if (mOnPrimaryClipChangeListener != null) {
+                            mOnPrimaryClipChangeListener.run();
+                        }
+                    });
+                });
+            } catch (java.util.concurrent.RejectedExecutionException ignored) {
+                // Executor shutting down
+            }
         } else if (mLastTextTime <= 0) {
             mLastTextTime = clipTimestamp;
         }

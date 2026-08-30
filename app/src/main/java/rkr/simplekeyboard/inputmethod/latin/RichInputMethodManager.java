@@ -167,14 +167,14 @@ public class RichInputMethodManager {
          * Add a listener to be called when the virtual subtype changes.
          * @param listener the listener to call when the subtype changes.
          */
-        public void setSubtypeChangeHandler(final SubtypeChangedListener listener) {
+        public synchronized void setSubtypeChangeHandler(final SubtypeChangedListener listener) {
             mSubtypeChangedListener = listener;
         }
 
         /**
          * Call the subtype changed handler to indicate that the virtual subtype has changed.
          */
-        public void notifySubtypeChanged() {
+        public synchronized void notifySubtypeChanged() {
             if (mSubtypeChangedListener != null) {
                 mSubtypeChangedListener.onCurrentSubtypeChanged();
             }

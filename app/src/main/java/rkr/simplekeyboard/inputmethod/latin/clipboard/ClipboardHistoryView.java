@@ -256,8 +256,28 @@ public class ClipboardHistoryView extends LinearLayout {
         addView(mContentContainer);
     }
 
-    private java.util.concurrent.ExecutorService mAsyncExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private java.util.concurrent.ExecutorService mAsyncExecutor = null;
     private Drawable.ConstantState mCardBgConstantState;
+
+    private synchronized java.util.concurrent.ExecutorService getAsyncExecutor() {
+        if (mAsyncExecutor == null || mAsyncExecutor.isShutdown()) {
+            mAsyncExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        }
+        return mAsyncExecutor;
+    }
+
+    public synchronized void shutdownExecutor() {
+        if (mAsyncExecutor != null && !mAsyncExecutor.isShutdown()) {
+            mAsyncExecutor.shutdownNow();
+            mAsyncExecutor = null;
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        shutdownExecutor();
+        super.onDetachedFromWindow();
+    }
 
     public void deallocateMemory() {
         if (mCardsContainer != null) {
@@ -334,17 +354,21 @@ public class ClipboardHistoryView extends LinearLayout {
         if (mDatabase == null) return;
         final long token = ++mCurrentQueryToken;
         final String query = mIsSearchActive ? mSearchQuery : null;
-        mAsyncExecutor.execute(() -> {
-            if (dbTask != null) {
-                dbTask.run();
-            }
-            final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips(query);
-            post(() -> {
-                if (token == mCurrentQueryToken) {
-                    displayClips(updatedClips);
+        try {
+            getAsyncExecutor().execute(() -> {
+                if (dbTask != null) {
+                    dbTask.run();
                 }
+                final List<ClipboardHistoryEntry> updatedClips = mDatabase.getClips(query);
+                post(() -> {
+                    if (token == mCurrentQueryToken) {
+                        displayClips(updatedClips);
+                    }
+                });
             });
-        });
+        } catch (java.util.concurrent.RejectedExecutionException ignored) {
+            // View being detached or executor shut down
+        }
     }
 
     private void clearUnpinned() {
@@ -442,17 +466,21 @@ public class ClipboardHistoryView extends LinearLayout {
 
             final java.lang.ref.WeakReference<ImageView> imageViewRef = new java.lang.ref.WeakReference<>(imageView);
             final String imagePath = entry.uri;
-            mAsyncExecutor.execute(() -> {
-                final android.graphics.Bitmap bm = decodeSampledBitmapFromFile(imagePath, imgSize, imgSize);
-                if (bm != null) {
-                    post(() -> {
-                        final ImageView iv = imageViewRef.get();
-                        if (iv != null && targetTag.equals(iv.getTag())) {
-                            iv.setImageBitmap(bm);
-                        }
-                    });
-                }
-            });
+            try {
+                getAsyncExecutor().execute(() -> {
+                    final android.graphics.Bitmap bm = decodeSampledBitmapFromFile(imagePath, imgSize, imgSize);
+                    if (bm != null) {
+                        post(() -> {
+                            final ImageView iv = imageViewRef.get();
+                            if (iv != null && targetTag.equals(iv.getTag())) {
+                                iv.setImageBitmap(bm);
+                            }
+                        });
+                    }
+                });
+            } catch (java.util.concurrent.RejectedExecutionException ignored) {
+                // View detached / shutting down
+            }
             textContainer.addView(imageView);
         }
 
@@ -656,13 +684,7 @@ public class ClipboardHistoryView extends LinearLayout {
         return Math.max(1, inSampleSize);
     }
 
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        if (mAsyncExecutor != null && !mAsyncExecutor.isShutdown()) {
-            mAsyncExecutor.shutdownNow();
-        }
-    }
+
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {

@@ -82,11 +82,31 @@ public class BinaryTrieDictionary {
 
     public List<CharSequence> getPrefixSuggestions(String prefix, int limit) {
         List<CharSequence> result = new ArrayList<>();
-        int node = getNodeForWord(prefix);
-        if (node > 0) {
-            collectSuggestions(node, result, limit);
-        }
+        if (prefix == null || prefix.isEmpty() || limit <= 0) return result;
+        collectPrefixMatches(rootOffset, prefix, 0, result, limit);
         return result;
+    }
+
+    private void collectPrefixMatches(int nodeOffset, String prefix, int prefixIdx, List<CharSequence> result, int limit) {
+        if (nodeOffset <= 0 || result.size() >= limit) return;
+        if (prefixIdx == prefix.length()) {
+            collectSuggestions(nodeOffset, result, limit);
+            return;
+        }
+
+        char targetChar = StringUtils.foldChar(prefix.charAt(prefixIdx));
+        int childCount = buffer.get(nodeOffset + 4) & 0xFF;
+        if (childCount == 0) return;
+        int childrenOffset = buffer.getInt(nodeOffset + 8);
+
+        for (int i = 0; i < childCount; i++) {
+            if (result.size() >= limit) break;
+            int childNode = childrenOffset + i * 16;
+            char c = (char) (buffer.getShort(childNode) & 0xFFFF);
+            if (StringUtils.foldChar(c) == targetChar) {
+                collectPrefixMatches(childNode, prefix, prefixIdx + 1, result, limit);
+            }
+        }
     }
     
     private void collectSuggestions(int node, List<CharSequence> result, int limit) {

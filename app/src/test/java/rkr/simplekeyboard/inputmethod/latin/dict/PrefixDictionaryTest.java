@@ -273,6 +273,11 @@ public class PrefixDictionaryTest {
         mDict.insert("mierda", 210);
         mDict.insert("mierd", 40);
         assertEquals("mierda", mDict.getBestCorrection("mierdsa"));
+
+        mDict.insert("mano", 164);
+        mDict.insert("no", 252);
+        assertEquals(null, mDict.getBestCorrection("Mano"));
+        assertEquals(null, mDict.getBestCorrection("mano"));
     }
 
     @Test

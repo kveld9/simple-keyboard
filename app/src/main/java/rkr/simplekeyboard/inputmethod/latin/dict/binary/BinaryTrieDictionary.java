@@ -103,9 +103,11 @@ public class BinaryTrieDictionary {
     }
 
     private int getNodeForWord(String word) {
+        if (word == null || word.isEmpty()) return -1;
         int node = rootOffset;
         for (int i = 0; i < word.length(); i++) {
-            node = getChildNode(node, word.charAt(i));
+            char c = Character.toLowerCase(word.charAt(i));
+            node = getChildNode(node, c);
             if (node <= 0) return -1;
         }
         return node;

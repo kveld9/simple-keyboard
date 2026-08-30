@@ -261,7 +261,7 @@ public final class PrefixDictionary {
         final float relativeDist = dist / Math.max(1, maxLen);
         final float lengthBonus = getLongWordCorrectionBonus(normTyped, normCandidate);
 
-        return (candidateFreq * (1.0f - (relativeDist * 0.3f))) - (dist * 20.0f) + lengthBonus;
+        return (candidateFreq * (1.0f - (relativeDist * 0.4f))) - (dist * 35.0f) + lengthBonus;
     }
 
     public synchronized void insert(final String word, final int frequency) {

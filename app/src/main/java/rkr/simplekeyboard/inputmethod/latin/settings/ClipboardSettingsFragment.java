@@ -24,29 +24,47 @@ import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
-import android.preference.Preference;
-import android.preference.PreferenceScreen;
-import android.preference.SwitchPreference;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceCategory;
+import androidx.preference.SwitchPreferenceCompat;
 
 import rkr.simplekeyboard.inputmethod.R;
 
 public final class ClipboardSettingsFragment extends SubScreenFragment {
     private static final int PERMISSION_REQUEST_SCREENSHOTS = 101;
 
-    private SwitchPreference mMasterPref;
-    private Preference mSuggestionsPref;
+    private PreferenceCategory mSuggestionsCategory;
+    private PreferenceCategory mHistoryCategory;
+    private SwitchPreferenceCompat mHistoryEnabledPref;
     private Preference mScreenshotsPref;
     private SeekBarDialogPreference mRetentionPref;
 
     @Override
-    public void onCreate(final Bundle icicle) {
-        super.onCreate(icicle);
-        addPreferencesFromResource(R.xml.prefs_screen_clipboard);
+    public void onCreatePreferences(@Nullable final Bundle savedInstanceState, @Nullable final String rootKey) {
+        super.onCreatePreferences(savedInstanceState, rootKey);
+        setPreferencesFromResource(R.xml.prefs_screen_clipboard, rootKey);
 
-        mMasterPref = (SwitchPreference) findPreference(Settings.PREF_CLIPBOARD_HISTORY_ENABLED);
-        mSuggestionsPref = findPreference(Settings.PREF_CLIPBOARD_SUGGESTIONS);
+        mSuggestionsCategory = findPreference("category_suggestions");
+        mHistoryCategory = findPreference("category_history");
+
+        final SwitchPreferenceCompat masterPref = findPreference(Settings.PREF_CLIPBOARD_ENABLED);
+        if (masterPref != null) {
+            updateCategoriesVisibility(masterPref.isChecked());
+            masterPref.setOnPreferenceChangeListener((preference, newValue) -> {
+                if (newValue instanceof Boolean) {
+                    updateCategoriesVisibility((Boolean) newValue);
+                }
+                return true;
+            });
+        }
+
+        mHistoryEnabledPref = findPreference(Settings.PREF_CLIPBOARD_HISTORY_ENABLED);
         mScreenshotsPref = findPreference(Settings.PREF_SUGGEST_SCREENSHOTS);
-        mRetentionPref = (SeekBarDialogPreference) findPreference(Settings.PREF_CLIPBOARD_RETENTION_TIME);
+        mRetentionPref = findPreference(Settings.PREF_CLIPBOARD_RETENTION_TIME);
 
         setupClipboardRetentionTimeSettings(mRetentionPref);
 
@@ -57,7 +75,7 @@ public final class ClipboardSettingsFragment extends SubScreenFragment {
                         final String permission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                                 ? Manifest.permission.READ_MEDIA_IMAGES
                                 : Manifest.permission.READ_EXTERNAL_STORAGE;
-                        if (getActivity() != null && getActivity().checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+                        if (getActivity() != null && ContextCompat.checkSelfPermission(requireContext(), permission) != PackageManager.PERMISSION_GRANTED) {
                             requestPermissions(new String[]{permission}, PERMISSION_REQUEST_SCREENSHOTS);
                             return false;
                         }
@@ -65,45 +83,6 @@ public final class ClipboardSettingsFragment extends SubScreenFragment {
                 }
                 return true;
             });
-        }
-
-        if (mMasterPref != null) {
-            final boolean isEnabled = Settings.readClipboardHistoryEnabled(getSharedPreferences());
-            mMasterPref.setChecked(isEnabled);
-            updateSubPreferencesVisibility(isEnabled);
-            mMasterPref.setOnPreferenceChangeListener((preference, newValue) -> {
-                final boolean enabled = Boolean.TRUE.equals(newValue);
-                updateSubPreferencesVisibility(enabled);
-                return true;
-            });
-        }
-    }
-
-    private void updateSubPreferencesVisibility(final boolean isEnabled) {
-        final PreferenceScreen screen = getPreferenceScreen();
-        if (screen == null) {
-            return;
-        }
-        if (isEnabled) {
-            if (findPreference(Settings.PREF_CLIPBOARD_SUGGESTIONS) == null && mSuggestionsPref != null) {
-                screen.addPreference(mSuggestionsPref);
-            }
-            if (findPreference(Settings.PREF_SUGGEST_SCREENSHOTS) == null && mScreenshotsPref != null) {
-                screen.addPreference(mScreenshotsPref);
-            }
-            if (findPreference(Settings.PREF_CLIPBOARD_RETENTION_TIME) == null && mRetentionPref != null) {
-                screen.addPreference(mRetentionPref);
-            }
-        } else {
-            if (mSuggestionsPref != null) {
-                screen.removePreference(mSuggestionsPref);
-            }
-            if (mScreenshotsPref != null) {
-                screen.removePreference(mScreenshotsPref);
-            }
-            if (mRetentionPref != null) {
-                screen.removePreference(mRetentionPref);
-            }
         }
     }
 
@@ -158,11 +137,20 @@ public final class ClipboardSettingsFragment extends SubScreenFragment {
         }
     }
 
+    private void updateCategoriesVisibility(boolean enabled) {
+        if (mSuggestionsCategory != null) {
+            mSuggestionsCategory.setVisible(enabled);
+        }
+        if (mHistoryCategory != null) {
+            mHistoryCategory.setVisible(enabled);
+        }
+    }
+
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_SCREENSHOTS && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            final SwitchPreference pref = (SwitchPreference) findPreference(Settings.PREF_SUGGEST_SCREENSHOTS);
+            final SwitchPreferenceCompat pref = findPreference(Settings.PREF_SUGGEST_SCREENSHOTS);
             if (pref != null) {
                 pref.setChecked(true);
             }

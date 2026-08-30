@@ -194,15 +194,14 @@ public final class SubtypeLocaleUtils {
             switch (mLocale) {
                 case LOCALE_ENGLISH_UNITED_STATES:
                     addLayout(LAYOUT_QWERTY);
-                    addGenericLayouts();
                     break;
                 case LOCALE_SPANISH:
                 case LOCALE_SPANISH_LATIN_AMERICA:
                     addLayout(LAYOUT_SPANISH);
-                    addGenericLayouts();
                     break;
             }
             return mSubtypes;
+
         }
 
         /**

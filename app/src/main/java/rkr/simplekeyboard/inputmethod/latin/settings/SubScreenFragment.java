@@ -22,26 +22,32 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.os.Bundle;
-import android.preference.Preference;
-import android.preference.PreferenceFragment;
-import android.preference.PreferenceGroup;
-import android.preference.PreferenceScreen;
 import android.util.Log;
+import android.view.View;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceGroup;
+import androidx.preference.PreferenceScreen;
+import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.Set;
 
 import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
 
 /**
- * A base abstract class for a {@link PreferenceFragment} that implements a nested
+ * A base abstract class for a {@link PreferenceFragmentCompat} that implements a nested
  * {@link PreferenceScreen} of the main preference screen.
  */
-public abstract class SubScreenFragment extends PreferenceFragment
+public abstract class SubScreenFragment extends PreferenceFragmentCompat
         implements OnSharedPreferenceChangeListener {
     private OnSharedPreferenceChangeListener mSharedPreferenceChangeListener;
 
     static void setPreferenceEnabled(final String prefKey, final boolean enabled,
-            final PreferenceScreen screen) {
+                                     final PreferenceScreen screen) {
+        if (screen == null) return;
         final Preference preference = screen.findPreference(prefKey);
         if (preference != null) {
             preference.setEnabled(enabled);
@@ -49,6 +55,7 @@ public abstract class SubScreenFragment extends PreferenceFragment
     }
 
     static void removePreference(final String prefKey, final PreferenceScreen screen) {
+        if (screen == null) return;
         final Preference preference = screen.findPreference(prefKey);
         if (preference != null) {
             screen.removePreference(preference);
@@ -64,30 +71,92 @@ public abstract class SubScreenFragment extends PreferenceFragment
     }
 
     final SharedPreferences getSharedPreferences() {
-        return PreferenceManagerCompat.getDeviceSharedPreferences(getActivity());
+        return PreferenceManagerCompat.getDeviceSharedPreferences(requireActivity());
     }
 
     @Override
     public void addPreferencesFromResource(final int preferencesResId) {
         super.addPreferencesFromResource(preferencesResId);
 
+        final Context context = getContext();
+        if (context == null) return;
         final Set<String> restrictionKeys = getSharedPreferences().getStringSet(Settings.ACTIVE_RESTRICTIONS, null);
         if (restrictionKeys != null && !restrictionKeys.isEmpty()) {
             final PreferenceGroup group = getPreferenceScreen();
-            final int count = group.getPreferenceCount();
-            for (int index = 0; index < count; index++) {
-                final Preference preference = group.getPreference(index);
-                if (restrictionKeys.contains(preference.getKey())) {
-                    preference.setEnabled(false);
+            if (group != null) {
+                final int count = group.getPreferenceCount();
+                for (int index = 0; index < count; index++) {
+                    final Preference preference = group.getPreference(index);
+                    if (restrictionKeys.contains(preference.getKey())) {
+                        preference.setEnabled(false);
+                    }
                 }
             }
         }
     }
 
     @Override
+    public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
+        getPreferenceManager().setStorageDeviceProtected();
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        setDivider(null);
+        setDividerHeight(0);
+
+        RecyclerView recyclerView = getListView();
+        if (recyclerView != null) {
+            recyclerView.setItemAnimator(null);
+            recyclerView.addItemDecoration(new SettingsCardItemDecoration(requireContext()));
+            recyclerView.setClipToPadding(false);
+            recyclerView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
+            float density = getResources().getDisplayMetrics().density;
+            int paddingHorizontal = (int) (16 * density);
+            int paddingBottom = (int) (24 * density);
+            int paddingTop = (int) (8 * density);
+            recyclerView.setPadding(paddingHorizontal, paddingTop, paddingHorizontal, paddingBottom);
+        }
+    }
+
+    @Override
+    public void onDisplayPreferenceDialog(@NonNull Preference preference) {
+        if (preference instanceof SeekBarDialogPreference) {
+            ((SeekBarDialogPreference) preference).showDialog(requireContext());
+            return;
+        }
+        if (preference instanceof androidx.preference.ListPreference) {
+            final androidx.preference.ListPreference listPref = (androidx.preference.ListPreference) preference;
+            final CharSequence[] entries = listPref.getEntries();
+            final CharSequence[] entryValues = listPref.getEntryValues();
+            if (entries == null || entryValues == null) {
+                super.onDisplayPreferenceDialog(preference);
+                return;
+            }
+            int selectedIndex = listPref.findIndexOfValue(listPref.getValue());
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(listPref.getDialogTitle() != null ? listPref.getDialogTitle() : listPref.getTitle())
+                    .setSingleChoiceItems(entries, selectedIndex, (dialog, which) -> {
+                        if (which >= 0 && which < entryValues.length) {
+                            String val = entryValues[which].toString();
+                            if (listPref.callChangeListener(val)) {
+                                listPref.setValue(val);
+                            }
+                        }
+                        dialog.dismiss();
+                    })
+                    .show();
+            return;
+
+        }
+        super.onDisplayPreferenceDialog(preference);
+    }
+
+
+    @Override
     public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        super.getPreferenceManager().setStorageDeviceProtected();
 
         mSharedPreferenceChangeListener = new OnSharedPreferenceChangeListener() {
             @Override
@@ -96,8 +165,6 @@ public abstract class SubScreenFragment extends PreferenceFragment
                 final Context context = fragment.getActivity();
                 if (context == null || fragment.getPreferenceScreen() == null) {
                     final String tag = fragment.getClass().getSimpleName();
-                    // TODO: Introduce a static function to register this class and ensure that
-                    // onCreate must be called before "onSharedPreferenceChanged" is called.
                     Log.w(tag, "onSharedPreferenceChanged called before activity starts.");
                     return;
                 }

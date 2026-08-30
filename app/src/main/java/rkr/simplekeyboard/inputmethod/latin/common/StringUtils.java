@@ -46,6 +46,19 @@ public final class StringUtils {
         return new String(Character.toChars(codePoint));
     }
 
+    public static boolean containsIgnoreCase(final Iterable<? extends CharSequence> collection, final CharSequence target) {
+        if (collection == null || target == null) {
+            return false;
+        }
+        final String targetStr = target.toString();
+        for (final CharSequence item : collection) {
+            if (item != null && targetStr.equalsIgnoreCase(item.toString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean containsInArray(final String text,
             final String[] array) {
         for (final String element : array) {
@@ -348,6 +361,20 @@ public final class StringUtils {
             sb.append(foldChar(s.charAt(i)));
         }
         return sb.toString();
+    }
+
+    public static boolean hasAccents(final CharSequence s) {
+        if (s == null) {
+            return false;
+        }
+        final int len = s.length();
+        for (int i = 0; i < len; i++) {
+            final char c = s.charAt(i);
+            if (c != 'ñ' && c != 'Ñ' && foldChar(c) != Character.toLowerCase(c)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean isAllUpperCase(final String s) {

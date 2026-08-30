@@ -29,17 +29,11 @@ import rkr.simplekeyboard.inputmethod.latin.utils.InputTypeUtils;
 public final class InputAttributes {
     private final String TAG = InputAttributes.class.getSimpleName();
 
-    final public String mTargetApplicationPackageName;
-    final public boolean mInputTypeNoAutoCorrect;
-    final public boolean mIsPasswordField;
-    final public boolean mShouldShowSuggestions;
-    final public boolean mApplicationSpecifiedCompletionOn;
-    final public boolean mShouldInsertSpacesAutomatically;
-    /**
-     * Whether the floating gesture preview should be disabled. If true, this should override the
-     * corresponding keyboard settings preference, always suppressing the floating preview text.
-     */
-    final private int mInputType;
+    public final String mTargetApplicationPackageName;
+    public final boolean mIsPasswordField;
+    public final boolean mShouldShowSuggestions;
+    public final boolean mNoPersonalizedLearning;
+    private final int mInputType;
 
     public InputAttributes(final EditorInfo editorInfo, final boolean isFullscreenMode) {
         mTargetApplicationPackageName = null != editorInfo ? editorInfo.packageName : null;
@@ -48,79 +42,36 @@ public final class InputAttributes {
         mInputType = inputType;
         mIsPasswordField = InputTypeUtils.isPasswordInputType(inputType)
                 || InputTypeUtils.isVisiblePasswordInputType(inputType);
+        mNoPersonalizedLearning = 0 != (null != editorInfo
+                ? (editorInfo.imeOptions & EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) : 0);
+
         if (inputClass != InputType.TYPE_CLASS_TEXT) {
-            // If we are not looking at a TYPE_CLASS_TEXT field, the following strange
-            // cases may arise, so we do a couple sanity checks for them. If it's a
-            // TYPE_CLASS_TEXT field, these special cases cannot happen, by construction
-            // of the flags.
-            if (null == editorInfo) {
-                Log.w(TAG, "No editor info for this field. Bug?");
-            } else if (InputType.TYPE_NULL == inputType) {
-                // TODO: We should honor TYPE_NULL specification.
-                Log.i(TAG, "InputType.TYPE_NULL is specified");
-            } else if (inputClass == 0) {
-                // TODO: is this check still necessary?
-                Log.w(TAG, String.format("Unexpected input class: inputType=0x%08x"
-                        + " imeOptions=0x%08x", inputType, editorInfo.imeOptions));
-            }
             mShouldShowSuggestions = false;
-            mInputTypeNoAutoCorrect = false;
-            mApplicationSpecifiedCompletionOn = false;
-            mShouldInsertSpacesAutomatically = false;
             return;
         }
-        // inputClass == InputType.TYPE_CLASS_TEXT
+
         final int variation = inputType & InputType.TYPE_MASK_VARIATION;
-        final boolean flagNoSuggestions =
-                0 != (inputType & InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        final boolean flagMultiLine =
-                0 != (inputType & InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        final boolean flagAutoCorrect =
-                0 != (inputType & InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
-        final boolean flagAutoComplete =
-                0 != (inputType & InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE);
 
-        // Make sure that passwords and incognito/private fields are not displayed in SuggestionStripView.
-        final boolean flagNoPersonalizedLearning = 0 != (null != editorInfo
-                ? (editorInfo.imeOptions & EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) : 0);
+        // Suppress suggestions only for password fields, email addresses, or direct URLs
         final boolean shouldSuppressSuggestions = mIsPasswordField
-                || flagNoPersonalizedLearning
                 || InputTypeUtils.isEmailVariation(variation)
-                || InputType.TYPE_TEXT_VARIATION_URI == variation
-                || InputType.TYPE_TEXT_VARIATION_FILTER == variation
-                || flagNoSuggestions
-                || flagAutoComplete;
+                || InputType.TYPE_TEXT_VARIATION_URI == variation;
         mShouldShowSuggestions = !shouldSuppressSuggestions;
-
-        mShouldInsertSpacesAutomatically = InputTypeUtils.isAutoSpaceFriendlyType(inputType);
-
-        // If it's a browser edit field and auto correct is not ON explicitly, then
-        // disable auto correction, but keep suggestions on.
-        // If NO_SUGGESTIONS is set, don't do prediction.
-        // If it's not multiline and the autoCorrect flag is not set, then don't correct
-        mInputTypeNoAutoCorrect =
-                (variation == InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT && !flagAutoCorrect)
-                || flagNoSuggestions
-                || (!flagAutoCorrect && !flagMultiLine);
-
-        mApplicationSpecifiedCompletionOn = flagAutoComplete && isFullscreenMode;
     }
 
     public boolean isSameInputType(final EditorInfo editorInfo) {
-        return editorInfo.inputType == mInputType;
+        return editorInfo != null && editorInfo.inputType == mInputType;
     }
 
     // Pretty print
     @Override
     public String toString() {
         return String.format(
-                "%s: inputType=0x%08x%s%s%s%s%s targetApp=%s\n", getClass().getSimpleName(),
+                "%s: inputType=0x%08x%s%s%s targetApp=%s\n", getClass().getSimpleName(),
                 mInputType,
-                (mInputTypeNoAutoCorrect ? " noAutoCorrect" : ""),
                 (mIsPasswordField ? " password" : ""),
                 (mShouldShowSuggestions ? " shouldShowSuggestions" : ""),
-                (mApplicationSpecifiedCompletionOn ? " appSpecified" : ""),
-                (mShouldInsertSpacesAutomatically ? " insertSpaces" : ""),
+                (mNoPersonalizedLearning ? " noPersonalizedLearning" : ""),
                 mTargetApplicationPackageName);
     }
 }

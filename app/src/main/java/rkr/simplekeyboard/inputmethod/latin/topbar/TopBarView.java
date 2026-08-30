@@ -192,12 +192,12 @@ public class TopBarView extends FrameLayout {
     }
 
     public void setSuggestions(List<CharSequence> suggestions, int boldIndex) {
-        if (suggestions == null || suggestions.isEmpty()) {
-            clearSuggestions();
-            return;
-        }
         if (isExternalViewActive()) {
             setExternalView(null);
+        }
+        clearSuggestions();
+        if (suggestions == null || suggestions.isEmpty()) {
+            return;
         }
         dispatchSuggestions(suggestions, boldIndex);
     }
@@ -249,8 +249,8 @@ public class TopBarView extends FrameLayout {
         if (isExternalViewActive()) {
             setExternalView(null);
         }
+        clearSuggestions();
         if (fullClipText == null || fullClipText.trim().isEmpty()) {
-            setSuggestions(null, -1);
             return;
         }
 
@@ -267,6 +267,7 @@ public class TopBarView extends FrameLayout {
 
         mCenterSlot.setText(displayText);
         mCenterSlot.setCompoundDrawablesRelative(null, null, null, null);
+        mCenterSlot.setCompoundDrawablePadding(0);
         mCenterSlot.setVisibility(View.VISIBLE);
         mCenterSlot.setTypeface(Typeface.DEFAULT_BOLD);
         mCenterSlot.setAlpha(1.0f);
@@ -281,8 +282,8 @@ public class TopBarView extends FrameLayout {
         if (isExternalViewActive()) {
             setExternalView(null);
         }
+        clearSuggestions();
         if (imageUri == null || imageUri.trim().isEmpty()) {
-            setSuggestions(null, -1);
             return;
         }
 
@@ -300,6 +301,7 @@ public class TopBarView extends FrameLayout {
             mCenterSlot.setCompoundDrawablePadding(ViewUtils.dpToPx(getContext(), 6));
         } else {
             mCenterSlot.setCompoundDrawablesRelative(null, null, null, null);
+            mCenterSlot.setCompoundDrawablePadding(0);
         }
         mCenterSlot.setVisibility(View.VISIBLE);
         mCenterSlot.setTypeface(Typeface.DEFAULT_BOLD);
@@ -314,6 +316,7 @@ public class TopBarView extends FrameLayout {
     private void resetSlot(TextView slot) {
         slot.setText("");
         slot.setCompoundDrawablesRelative(null, null, null, null);
+        slot.setCompoundDrawablePadding(0);
         slot.setVisibility(View.INVISIBLE);
         slot.setOnClickListener(null);
     }
@@ -344,6 +347,8 @@ public class TopBarView extends FrameLayout {
         }
 
         slot.setText(text);
+        slot.setCompoundDrawablesRelative(null, null, null, null);
+        slot.setCompoundDrawablePadding(0);
         slot.setVisibility(View.VISIBLE);
         applySlotStyle(slot, isHighlighted);
         slot.setOnClickListener(v -> handleSuggestionClick(text));

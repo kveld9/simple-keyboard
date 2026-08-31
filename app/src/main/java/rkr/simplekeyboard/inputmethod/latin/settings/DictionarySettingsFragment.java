@@ -18,6 +18,7 @@ package rkr.simplekeyboard.inputmethod.latin.settings;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -30,6 +31,8 @@ import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryEntry;
 import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryManager;
 
 public final class DictionarySettingsFragment extends SubScreenFragment {
+    private static final String TAG = DictionarySettingsFragment.class.getSimpleName();
+
     private Preference mLearnedWordsPref;
     private Preference mBlockedWordsPref;
     private Preference mClearLearnedPref;
@@ -114,7 +117,10 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
 
     private void showClearLearnedWordsDialog() {
         final Context context = getContext();
-        if (context == null) return;
+        if (context == null) {
+            Log.w(TAG, "showClearLearnedWordsDialog: context is null");
+            return;
+        }
         final UserDictionaryManager manager = UserDictionaryManager.getInstance(context);
         if (manager.getLearnedWordsCount() == 0) {
             Toast.makeText(context, R.string.no_learned_words, Toast.LENGTH_SHORT).show();
@@ -134,7 +140,10 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
 
     private void showClearBlockedWordsDialog() {
         final Context context = getContext();
-        if (context == null) return;
+        if (context == null) {
+            Log.w(TAG, "showClearBlockedWordsDialog: context is null");
+            return;
+        }
         final UserDictionaryManager manager = UserDictionaryManager.getInstance(context);
         if (manager.getBlockedWordsCount() == 0) {
             Toast.makeText(context, R.string.no_blocked_words, Toast.LENGTH_SHORT).show();
@@ -154,7 +163,10 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
 
     private void updateWordCounts() {
         final Context context = getContext();
-        if (context == null) return;
+        if (context == null) {
+            Log.w(TAG, "updateWordCounts: context is null");
+            return;
+        }
         final UserDictionaryManager manager = UserDictionaryManager.getInstance(context);
         final int learnedCount = manager.getLearnedWordsCount();
         final int blockedCount = manager.getBlockedWordsCount();

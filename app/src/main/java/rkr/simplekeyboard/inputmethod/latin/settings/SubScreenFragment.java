@@ -38,10 +38,11 @@ import rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat;
  */
 public abstract class SubScreenFragment extends BasePreferenceFragment
         implements OnSharedPreferenceChangeListener {
+    private static final String TAG = SubScreenFragment.class.getSimpleName();
 
     static void removePreference(final String prefKey, final PreferenceScreen screen) {
         if (screen == null) {
-            Log.w("SubScreenFragment", "SubScreenFragment: screen/pref is null");
+            Log.w(TAG, "removePreference: preference screen is null");
             return;
         }
         final Preference preference = screen.findPreference(prefKey);
@@ -64,7 +65,7 @@ public abstract class SubScreenFragment extends BasePreferenceFragment
 
         final Context context = getContext();
         if (context == null) {
-            Log.w("SubScreenFragment", "SubScreenFragment: screen/pref is null");
+            Log.w(TAG, "addPreferencesFromResource: context is null");
             return;
         }
         final Set<String> restrictionKeys = getSharedPreferences().getStringSet(Settings.ACTIVE_RESTRICTIONS, null);

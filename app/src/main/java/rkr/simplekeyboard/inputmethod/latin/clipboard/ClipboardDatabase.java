@@ -246,28 +246,54 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     }
 
     public synchronized boolean setPinned(long id, boolean isPinned) {
+        Cursor cursor = null;
         try {
-            SQLiteDatabase db = getWritableDatabase();
+            final SQLiteDatabase db = getWritableDatabase();
+            cursor = db.query(TABLE_NAME, new String[]{COL_PINNED}, COL_ID + "=?",
+                    new String[]{String.valueOf(id)}, null, null, null);
+            if (cursor == null || !cursor.moveToFirst()) {
+                return false;
+            }
+            final boolean currentPinned = cursor.getInt(0) == 1;
+            cursor.close();
+            cursor = null;
+
+            if (currentPinned == isPinned) {
+                return true;
+            }
+
             if (isPinned) {
-                Cursor countCursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE " + COL_PINNED + "=1", null);
+                Cursor countCursor = null;
                 int pinnedCount = 0;
-                if (countCursor != null) {
-                    if (countCursor.moveToFirst()) {
+                try {
+                    countCursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE " + COL_PINNED + "=1", null);
+                    if (countCursor != null && countCursor.moveToFirst()) {
                         pinnedCount = countCursor.getInt(0);
                     }
-                    countCursor.close();
+                } finally {
+                    if (countCursor != null) {
+                        try {
+                            countCursor.close();
+                        } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
+                    }
                 }
                 if (pinnedCount >= MAX_PINNED_CLIPS) {
                     return false;
                 }
             }
-            ContentValues values = new ContentValues();
+            final ContentValues values = new ContentValues();
             values.put(COL_PINNED, isPinned ? 1 : 0);
-            db.update(TABLE_NAME, values, COL_ID + "=?", new String[]{String.valueOf(id)});
-            return true;
+            final int rows = db.update(TABLE_NAME, values, COL_ID + "=?", new String[]{String.valueOf(id)});
+            return rows > 0;
         } catch (Throwable e) {
             Log.e(TAG, "Error setting clip pinned state", e);
             return false;
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
+            }
         }
     }
 

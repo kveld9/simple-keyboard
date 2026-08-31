@@ -42,6 +42,7 @@ import rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils;
  * "Languages" settings screen with direct switches for all supported languages.
  */
 public final class LanguagesSettingsFragment extends SubScreenFragment {
+    private static final String TAG = LanguagesSettingsFragment.class.getSimpleName();
 
     private RichInputMethodManager mRichImm;
     private final List<LanguageSwitchPreference> mLanguagePreferences = new ArrayList<>();
@@ -64,12 +65,12 @@ public final class LanguagesSettingsFragment extends SubScreenFragment {
     private void buildContent() {
         final Context context = getContext();
         if (context == null) {
-            Log.w("LanguagesSettingsFragment", "LanguagesSettingsFragment: context/imm is null");
+            Log.w(TAG, "buildContent: context is null");
             return;
         }
         final PreferenceGroup group = getPreferenceScreen();
         if (group == null) {
-            Log.w("LanguagesSettingsFragment", "LanguagesSettingsFragment: context/imm is null");
+            Log.w(TAG, "buildContent: preference group is null");
             return;
         }
         group.removeAll();

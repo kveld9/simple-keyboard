@@ -21,6 +21,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -57,6 +58,7 @@ import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryEntry;
 
 public abstract class BaseUserDictionaryWordsFragment extends Fragment implements MenuProvider {
+    private static final String TAG = BaseUserDictionaryWordsFragment.class.getSimpleName();
 
     private EditText mSearchEditText;
     private ImageButton mClearSearchButton;
@@ -165,7 +167,10 @@ public abstract class BaseUserDictionaryWordsFragment extends Fragment implement
 
     protected void loadWords() {
         final Context context = getContext();
-        if (context == null) return;
+        if (context == null) {
+            Log.w(TAG, "loadWords: context is null");
+            return;
+        }
         final List<UserDictionaryEntry> words = queryEntries(context, mCurrentQuery);
         if (mAdapter != null) {
             mAdapter.setWords(words);
@@ -184,7 +189,10 @@ public abstract class BaseUserDictionaryWordsFragment extends Fragment implement
 
     private void onWordSingleClicked(final UserDictionaryEntry entry) {
         final Context context = getContext();
-        if (context == null) return;
+        if (context == null) {
+            Log.w(TAG, "onWordSingleClicked: context is null");
+            return;
+        }
         new MaterialAlertDialogBuilder(context)
                 .setTitle(getDeleteSingleDialogTitleResId())
                 .setMessage(getString(getDeleteSingleDialogMessageResId(), entry.word))
@@ -205,7 +213,10 @@ public abstract class BaseUserDictionaryWordsFragment extends Fragment implement
     }
 
     private void onSelectionChanged() {
-        if (mAdapter == null) return;
+        if (mAdapter == null) {
+            Log.w(TAG, "onSelectionChanged: mAdapter is null");
+            return;
+        }
         final boolean inSelection = mAdapter.isSelectionMode();
         if (mBackCallback != null) {
             mBackCallback.setEnabled(inSelection);
@@ -273,9 +284,19 @@ public abstract class BaseUserDictionaryWordsFragment extends Fragment implement
 
     private void showDeleteSelectedDialog() {
         final Context context = getContext();
-        if (context == null || mAdapter == null) return;
+        if (context == null) {
+            Log.w(TAG, "showDeleteSelectedDialog: context is null");
+            return;
+        }
+        if (mAdapter == null) {
+            Log.w(TAG, "showDeleteSelectedDialog: mAdapter is null");
+            return;
+        }
         final int count = mAdapter.getSelectedCount();
-        if (count == 0) return;
+        if (count == 0) {
+            Log.w(TAG, "showDeleteSelectedDialog: selected count is 0");
+            return;
+        }
 
         new MaterialAlertDialogBuilder(context)
                 .setTitle(getDeleteBatchDialogTitleResId())

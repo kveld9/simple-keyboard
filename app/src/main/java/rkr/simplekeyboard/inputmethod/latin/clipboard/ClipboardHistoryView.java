@@ -27,7 +27,7 @@ import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils;
 
 public class ClipboardHistoryView extends LinearLayout {
-    private static final String TAG = "ClipboardHistoryView";
+    private static final String TAG = ClipboardHistoryView.class.getSimpleName();
 
     public interface ClipboardHistoryListener {
         void onPasteText(CharSequence text);
@@ -374,8 +374,8 @@ public class ClipboardHistoryView extends LinearLayout {
                     }
                 });
             });
-        } catch (java.util.concurrent.RejectedExecutionException ignored) {
-            // View being detached or executor shut down
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            Log.w(TAG, "executeDbTaskAndReload: task rejected by async executor", e);
         }
     }
 
@@ -486,8 +486,8 @@ public class ClipboardHistoryView extends LinearLayout {
                         });
                     }
                 });
-            } catch (java.util.concurrent.RejectedExecutionException ignored) {
-                // View detached / shutting down
+            } catch (java.util.concurrent.RejectedExecutionException e) {
+                Log.w(TAG, "displayClips: image decode task rejected by async executor", e);
             }
             textContainer.addView(imageView);
         }

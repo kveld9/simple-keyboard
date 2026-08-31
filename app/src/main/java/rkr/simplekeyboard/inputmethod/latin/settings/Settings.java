@@ -155,7 +155,6 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     @Override public void onReceive(Context context, Intent intent) {
         loadRestrictions(mRestrictionsMgr, mPrefs);
         onSharedPreferenceChanged(mPrefs, null);
-        RichInputMethodManager.getInstance().reloadSubtypes(context);
     }
 
     public static Set<String> loadRestrictions(final RestrictionsManager restrictionsMgr, final SharedPreferences prefs) {
@@ -304,10 +303,12 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         try {
             minutes = prefs.getInt(PREF_CLIPBOARD_RETENTION_TIME, CLIPBOARD_RETENTION_TIME_DEFAULT_MINUTES);
         } catch (ClassCastException e) {
+            Log.w(TAG, "readClipboardRetentionMinutes: ClassCastException reading int pref, falling back to String parsing", e);
             String val = prefs.getString(PREF_CLIPBOARD_RETENTION_TIME, String.valueOf(CLIPBOARD_RETENTION_TIME_DEFAULT_MINUTES));
             try {
                 minutes = Integer.parseInt(val);
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException nfe) {
+                Log.w(TAG, "readClipboardRetentionMinutes: NumberFormatException parsing string pref: " + val, nfe);
                 minutes = CLIPBOARD_RETENTION_TIME_DEFAULT_MINUTES;
             }
         }
@@ -323,6 +324,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         try {
             return Float.parseFloat(str);
         } catch (NumberFormatException | NullPointerException e) {
+            Log.w(TAG, "readAutoCorrectionThreshold: Failed to parse float value: " + str, e);
             return AUTO_CORRECTION_THRESHOLD_MODEST;
         }
     }
@@ -335,6 +337,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         try {
             return Float.parseFloat(str);
         } catch (NumberFormatException | NullPointerException e) {
+            Log.w(TAG, "readSwipeSensitivity: Failed to parse float value: " + str, e);
             return 1.0f;
         }
     }

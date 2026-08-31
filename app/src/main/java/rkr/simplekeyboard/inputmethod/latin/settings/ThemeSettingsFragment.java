@@ -35,6 +35,7 @@ import rkr.simplekeyboard.inputmethod.latin.settings.RadioButtonPreference.OnRad
  */
 public final class ThemeSettingsFragment extends SubScreenFragment
         implements OnRadioButtonClickedListener {
+    private static final String TAG = ThemeSettingsFragment.class.getSimpleName();
     private int mSelectedThemeId;
 
     static class KeyboardThemePreference extends RadioButtonPreference {
@@ -49,7 +50,7 @@ public final class ThemeSettingsFragment extends SubScreenFragment
 
     static void updateKeyboardThemeSummary(final Preference pref) {
         if (pref == null) {
-            Log.w("ThemeSettingsFragment", "ThemeSettingsFragment: pref is null for key");
+            Log.w(TAG, "updateKeyboardThemeSummary: pref is null");
             return;
         }
         final Context context = pref.getContext();
@@ -108,7 +109,7 @@ public final class ThemeSettingsFragment extends SubScreenFragment
     private void updateSelected() {
         final PreferenceScreen screen = getPreferenceScreen();
         if (screen == null) {
-            Log.w("ThemeSettingsFragment", "ThemeSettingsFragment: pref is null for key");
+            Log.w(TAG, "updateSelected: preference screen is null");
             return;
         }
         final int count = screen.getPreferenceCount();

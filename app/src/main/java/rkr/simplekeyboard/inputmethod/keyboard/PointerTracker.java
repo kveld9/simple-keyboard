@@ -127,6 +127,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     // true if dragging finger is allowed.
     private boolean mIsAllowedDraggingFinger;
 
+    private static Settings sSettings;
+
     // TODO: Add PointerTrackerFactory singleton and move some class static methods into it.
     public static void init(final TypedArray mainKeyboardViewAttr, final TimerProxy timerProxy,
             final DrawingProxy drawingProxy) {
@@ -137,6 +139,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
 
         sTimerProxy = timerProxy;
         sDrawingProxy = drawingProxy;
+        sSettings = Settings.getInstance();
     }
 
     public static PointerTracker getPointerTracker(final int id) {
@@ -556,7 +559,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     }
 
     private void onDownEventInternal(final int x, final int y) {
-        mGestureSettings = Settings.getInstance().getCurrent();
+        if (sSettings == null) {
+            sSettings = Settings.getInstance();
+        }
+        mGestureSettings = sSettings.getCurrent();
         final Key key = onDownKey(x, y);
         mIsAllowedDraggingFinger = isDraggingFingerAllowed(key);
         mKeyboardLayoutHasBeenChanged = false;
@@ -692,10 +698,26 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         void onSwipe(final int steps);
     }
 
+    private static final SwipeListener sCursorSwipeListener = steps -> {
+        if (sListener != null) {
+            sListener.onMoveCursorPointer(steps);
+        }
+    };
+
+    private final SwipeListener mDeleteSwipeListener = steps -> {
+        sTimerProxy.cancelKeyTimersOf(this);
+        if (sListener != null) {
+            sListener.onMoveDeletePointer(steps);
+        }
+    };
+
     private SettingsValues getGestureSettings() {
         SettingsValues sv = mGestureSettings;
         if (sv == null) {
-            sv = Settings.getInstance().getCurrent();
+            if (sSettings == null) {
+                sSettings = Settings.getInstance();
+            }
+            sv = sSettings.getCurrent();
             mGestureSettings = sv;
         }
         return sv;
@@ -745,17 +767,14 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         final SettingsValues sv = getGestureSettings();
         return handleSwipe(x, oldKey, Constants.CODE_SPACE,
                 sv != null && sv.mSpaceSwipeEnabled,
-                true /* checkTimeout */, sListener::onMoveCursorPointer);
+                true /* checkTimeout */, sCursorSwipeListener);
     }
 
     private boolean handleDeleteSwipe(final int x, final Key oldKey) {
         final SettingsValues sv = getGestureSettings();
         return handleSwipe(x, oldKey, Constants.CODE_DELETE,
                 sv != null && sv.mDeleteSwipeEnabled,
-                false /* checkTimeout */, steps -> {
-                    sTimerProxy.cancelKeyTimersOf(this);
-                    sListener.onMoveDeletePointer(steps);
-                });
+                false /* checkTimeout */, mDeleteSwipeListener);
     }
 
     private void transitionToNewKey(final Key newKey, final Key oldKey, final int x, final int y,

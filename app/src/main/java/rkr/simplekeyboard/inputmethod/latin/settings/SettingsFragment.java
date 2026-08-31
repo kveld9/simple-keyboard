@@ -35,7 +35,7 @@ import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.utils.ApplicationUtils;
 
 public final class SettingsFragment extends InputMethodSettingsFragment {
-    private static final String TAG = "SettingsFragment";
+    private static final String TAG = SettingsFragment.class.getSimpleName();
 
     private Preference mImeBannerPref;
 
@@ -126,18 +126,18 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
 
     public void updateImeBanner() {
         if (mImeBannerPref == null) {
-            Log.w(TAG, "SettingsFragment: context/imm is null");
+            Log.w(TAG, "updateImeBanner: mImeBannerPref is null");
             return;
         }
         final Context context = getContext();
         if (context == null) {
-            Log.w(TAG, "SettingsFragment: context/imm is null");
+            Log.w(TAG, "updateImeBanner: context is null");
             return;
         }
 
         final InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm == null) {
-            Log.w(TAG, "SettingsFragment: context/imm is null");
+            Log.w(TAG, "updateImeBanner: InputMethodManager is null");
             return;
         }
 

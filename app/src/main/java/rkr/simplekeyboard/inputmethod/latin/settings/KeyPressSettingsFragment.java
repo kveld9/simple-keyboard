@@ -23,6 +23,7 @@ import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.media.AudioManager;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
@@ -41,6 +42,8 @@ import rkr.simplekeyboard.inputmethod.latin.AudioAndHapticFeedbackManager;
  * - Key long press delay
  */
 public final class KeyPressSettingsFragment extends SubScreenFragment {
+    private static final String TAG = KeyPressSettingsFragment.class.getSimpleName();
+
     @Override
     public void onCreatePreferences(@Nullable final Bundle savedInstanceState, @Nullable final String rootKey) {
         super.onCreatePreferences(savedInstanceState, rootKey);
@@ -61,6 +64,7 @@ public final class KeyPressSettingsFragment extends SubScreenFragment {
     private void setupKeypressSoundVolumeSettings() {
         final SeekBarDialogPreference pref = findPreference(Settings.PREF_KEYPRESS_SOUND_VOLUME);
         if (pref == null) {
+            Log.w(TAG, "setupKeypressSoundVolumeSettings: " + Settings.PREF_KEYPRESS_SOUND_VOLUME + " preference not found");
             return;
         }
         final SharedPreferences prefs = getSharedPreferences();
@@ -97,6 +101,7 @@ public final class KeyPressSettingsFragment extends SubScreenFragment {
         final Resources res = getResources();
         final SeekBarDialogPreference pref = findPreference(Settings.PREF_KEY_LONGPRESS_TIMEOUT);
         if (pref == null) {
+            Log.w(TAG, "setupKeyLongpressTimeoutSettings: " + Settings.PREF_KEY_LONGPRESS_TIMEOUT + " preference not found");
             return;
         }
         pref.setInterface(new SeekBarDialogPreference.SimpleIntProxy(prefs) {

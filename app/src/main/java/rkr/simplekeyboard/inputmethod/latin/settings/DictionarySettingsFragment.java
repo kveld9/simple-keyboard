@@ -16,10 +16,14 @@
 
 package rkr.simplekeyboard.inputmethod.latin.settings;
 
+import android.content.Context;
 import android.os.Bundle;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.preference.Preference;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryEntry;
@@ -28,6 +32,7 @@ import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryManager;
 public final class DictionarySettingsFragment extends SubScreenFragment {
     private Preference mLearnedWordsPref;
     private Preference mBlockedWordsPref;
+    private Preference mClearLearnedPref;
 
     private final UserDictionaryManager.UserDictionaryListener mListener =
             new UserDictionaryManager.UserDictionaryListener() {
@@ -69,6 +74,14 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
 
         mLearnedWordsPref = findPreference("screen_learned_words");
         mBlockedWordsPref = findPreference("screen_blocked_words");
+        mClearLearnedPref = findPreference("pref_clear_all_learned_words");
+
+        if (mClearLearnedPref != null) {
+            mClearLearnedPref.setOnPreferenceClickListener(preference -> {
+                showClearLearnedWordsDialog();
+                return true;
+            });
+        }
     }
 
     @Override
@@ -90,8 +103,25 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
         updateWordCounts();
     }
 
+    private void showClearLearnedWordsDialog() {
+        final Context context = getContext();
+        if (context == null) return;
+        new MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.clear_learned_words_title)
+                .setMessage(R.string.clear_learned_words_message)
+                .setPositiveButton(R.string.clear_all, (dialog, which) -> {
+                    UserDictionaryManager.getInstance(context).clearLearnedWords();
+                    Toast.makeText(context, R.string.learned_words_cleared, Toast.LENGTH_SHORT).show();
+                    updateWordCounts();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
     private void updateWordCounts() {
-        final UserDictionaryManager manager = UserDictionaryManager.getInstance(requireContext());
+        final Context context = getContext();
+        if (context == null) return;
+        final UserDictionaryManager manager = UserDictionaryManager.getInstance(context);
         final int learnedCount = manager.getLearnedWordsCount();
         final int blockedCount = manager.getBlockedWordsCount();
 
@@ -109,6 +139,10 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
             } else {
                 mBlockedWordsPref.setSummary(getString(R.string.blocked_words_summary_count, blockedCount));
             }
+        }
+
+        if (mClearLearnedPref != null) {
+            mClearLearnedPref.setEnabled(learnedCount > 0);
         }
     }
 }

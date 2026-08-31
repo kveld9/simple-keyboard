@@ -167,6 +167,31 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
         }
     }
 
+    public synchronized boolean deleteWordsByIds(final List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return true;
+        SQLiteDatabase db = null;
+        try {
+            db = getWritableDatabase();
+            db.beginTransaction();
+            for (final Long id : ids) {
+                if (id != null) {
+                    db.delete(TABLE_WORDS, COL_WORDS_ID + "=?", new String[]{String.valueOf(id)});
+                }
+            }
+            db.setTransactionSuccessful();
+            return true;
+        } catch (Throwable e) {
+            Log.e(TAG, "Error batch deleting words by ids", e);
+            return false;
+        } finally {
+            if (db != null && db.inTransaction()) {
+                try {
+                    db.endTransaction();
+                } catch (Throwable ignored) {}
+            }
+        }
+    }
+
     public synchronized String getWordById(final long id) {
         Cursor cursor = null;
         try {
@@ -337,6 +362,31 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
         } catch (Throwable e) {
             Log.e(TAG, "Error deleting blocked word by id", e);
             return false;
+        }
+    }
+
+    public synchronized boolean deleteBlockedWordsByIds(final List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return true;
+        SQLiteDatabase db = null;
+        try {
+            db = getWritableDatabase();
+            db.beginTransaction();
+            for (final Long id : ids) {
+                if (id != null) {
+                    db.delete(TABLE_BLOCKED, COL_BLOCKED_ID + "=?", new String[]{String.valueOf(id)});
+                }
+            }
+            db.setTransactionSuccessful();
+            return true;
+        } catch (Throwable e) {
+            Log.e(TAG, "Error batch deleting blocked words by ids", e);
+            return false;
+        } finally {
+            if (db != null && db.inTransaction()) {
+                try {
+                    db.endTransaction();
+                } catch (Throwable ignored) {}
+            }
         }
     }
 

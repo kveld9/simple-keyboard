@@ -10,6 +10,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
 import androidx.preference.PreferenceScreen;
@@ -60,15 +61,25 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
         });
         actionsCategory.addPreference(importPref);
 
-        final Preference downloadPref = new Preference(context);
-        downloadPref.setTitle(R.string.download_dictionaries_title);
-        downloadPref.setSummary(R.string.download_dictionaries_summary);
-        downloadPref.setWidgetLayoutResource(R.layout.preference_external_link);
-        downloadPref.setOnPreferenceClickListener(p -> {
-            openDownloadUrl();
+        final Preference downloadRepoPref = new Preference(context);
+        downloadRepoPref.setTitle(R.string.download_repo_dictionaries_title);
+        downloadRepoPref.setSummary(R.string.download_repo_dictionaries_summary);
+        downloadRepoPref.setWidgetLayoutResource(R.layout.preference_external_link);
+        downloadRepoPref.setOnPreferenceClickListener(p -> {
+            openDownloadUrl(R.string.dictionaries_download_url);
             return true;
         });
-        actionsCategory.addPreference(downloadPref);
+        actionsCategory.addPreference(downloadRepoPref);
+
+        final Preference downloadHeliumPref = new Preference(context);
+        downloadHeliumPref.setTitle(R.string.download_helium314_dictionaries_title);
+        downloadHeliumPref.setSummary(R.string.download_helium314_dictionaries_summary);
+        downloadHeliumPref.setWidgetLayoutResource(R.layout.preference_external_link);
+        downloadHeliumPref.setOnPreferenceClickListener(p -> {
+            openDownloadUrl(R.string.dictionaries_helium314_download_url);
+            return true;
+        });
+        actionsCategory.addPreference(downloadHeliumPref);
 
         setPreferenceScreen(screen);
     }
@@ -121,13 +132,13 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
         }).start();
     }
 
-    private void openDownloadUrl() {
+    private void openDownloadUrl(@StringRes final int urlResId) {
         try {
-            final String url = getString(R.string.dictionaries_download_url);
+            final String url = getString(urlResId);
             final Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
             startActivity(intent);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to open download url", e);
+            Log.e(TAG, "Failed to open download url: " + urlResId, e);
         }
     }
 

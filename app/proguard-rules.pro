@@ -27,3 +27,13 @@
 -keep class rkr.simplekeyboard.inputmethod.latin.settings.PreferencesSettingsFragment { public <init>(); }
 -keep class rkr.simplekeyboard.inputmethod.latin.settings.SettingsFragment { public <init>(); }
 -keep class rkr.simplekeyboard.inputmethod.latin.settings.ThemeSettingsFragment { public <init>(); }
+
+# Strip all Log calls in release builds (debug APK retains them)
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+    public static int w(...);
+    public static int e(...);
+    public static int wtf(...);
+}

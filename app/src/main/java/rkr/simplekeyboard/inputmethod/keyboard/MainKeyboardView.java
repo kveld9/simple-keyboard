@@ -74,6 +74,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
     private final float mLanguageOnSpacebarTextRatio;
     private float mLanguageOnSpacebarTextSize;
     private final int mLanguageOnSpacebarTextColor;
+    private boolean mShouldDrawLanguageOnSpacebar;
     // The minimum x-scale to fit the language name on spacebar.
     private static final float MINIMUM_XSCALE_OF_LANGUAGE_NAME = 0.8f;
 
@@ -250,6 +251,9 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         mSpaceKey = keyboard.getKey(Constants.CODE_SPACE);
         final int keyHeight = keyboard.mMostCommonKeyHeight;
         mLanguageOnSpacebarTextSize = keyHeight * mLanguageOnSpacebarTextRatio;
+        final SettingsValues settingsValues = Settings.getInstance().getCurrent();
+        final boolean showLanguageOnSpacebar = settingsValues == null || settingsValues.mShowLanguageOnSpacebar;
+        mShouldDrawLanguageOnSpacebar = showLanguageOnSpacebar && RichInputMethodManager.getInstance().hasMultipleEnabledSubtypes();
     }
 
     /**
@@ -547,9 +551,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         if (key.getCode() != Constants.CODE_SPACE) {
             return false;
         }
-        final SettingsValues settingsValues = Settings.getInstance().getCurrent();
-        final boolean showLanguageOnSpacebar = settingsValues == null || settingsValues.mShowLanguageOnSpacebar;
-        return showLanguageOnSpacebar && RichInputMethodManager.getInstance().hasMultipleEnabledSubtypes();
+        return mShouldDrawLanguageOnSpacebar;
     }
 
     private boolean fitsTextIntoWidth(final int width, final String text, final Paint paint) {

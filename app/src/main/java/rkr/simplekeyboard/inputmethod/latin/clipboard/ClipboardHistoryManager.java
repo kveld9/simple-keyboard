@@ -514,7 +514,10 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
 
             try (InputStream in = mContext.getContentResolver().openInputStream(uri);
                  OutputStream out = new FileOutputStream(file)) {
-                if (in == null) return null;
+                if (in == null) {
+                    Log.e(TAG, "cacheImage: failed to open input stream");
+                    return null;
+                }
                 byte[] buffer = new byte[8192];
                 int read;
                 while ((read = in.read(buffer)) != -1) {
@@ -530,7 +533,10 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     }
 
     public Bitmap getScreenshotThumbnail(ScreenshotInfo info) {
-        if (info == null) return null;
+        if (info == null) {
+            Log.w(TAG, "getScreenshotThumbnail: screenshot info is null");
+            return null;
+        }
         if (info.cachedThumbnail != null && !info.cachedThumbnail.isRecycled()) {
             return info.cachedThumbnail;
         }

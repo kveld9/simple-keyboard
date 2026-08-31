@@ -154,6 +154,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
+    private AudioAndHapticFeedbackManager mFeedbackManager;
 
     private AlertDialog mOptionsDialog;
 
@@ -337,6 +338,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mRichImm.setSubtypeChangeHandler(this);
         KeyboardSwitcher.init(this);
         AudioAndHapticFeedbackManager.init(this);
+        mFeedbackManager = AudioAndHapticFeedbackManager.getInstance();
         super.onCreate();
 
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
@@ -2055,7 +2057,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 return;
             }
         }
-        final AudioAndHapticFeedbackManager feedbackManager = AudioAndHapticFeedbackManager.getInstance();
+        final AudioAndHapticFeedbackManager feedbackManager = mFeedbackManager;
         if (repeatCount == 0) {
             // TODO: Reconsider how to perform haptic feedback when repeating key.
             feedbackManager.performHapticFeedback(keyboardView);
@@ -2064,7 +2066,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void hapticTickFeedback() {
-        final AudioAndHapticFeedbackManager feedbackManager = AudioAndHapticFeedbackManager.getInstance();
+        final AudioAndHapticFeedbackManager feedbackManager = mFeedbackManager;
         feedbackManager.performTickFeedback();
     }
 

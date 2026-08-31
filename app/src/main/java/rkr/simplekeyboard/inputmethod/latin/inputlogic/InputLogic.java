@@ -23,6 +23,7 @@ package rkr.simplekeyboard.inputmethod.latin.inputlogic;
 
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.SparseArray;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
@@ -42,6 +43,8 @@ import rkr.simplekeyboard.inputmethod.latin.utils.RecapitalizeStatus;
  * This class manages the input logic.
  */
 public final class InputLogic {
+    private static final String TAG = InputLogic.class.getSimpleName();
+
     // TODO : Remove this member when we can.
     final LatinIME mLatinIME;
 
@@ -399,7 +402,10 @@ public final class InputLogic {
         }
 
         final EditorInfo ei = getCurrentInputEditorInfo();
-        if (ei == null) return Constants.TextUtils.CAP_MODE_OFF;
+        if (ei == null) {
+            Log.w(TAG, "getCurrentAutoCapsState: EditorInfo is null");
+            return Constants.TextUtils.CAP_MODE_OFF;
+        }
         final int inputType = ei.inputType;
         // Warning: this depends on mSpaceState, which may not be the most current value. If
         // mSpaceState gets updated later, whoever called this may need to be told about it.

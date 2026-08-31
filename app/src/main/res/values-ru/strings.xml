@@ -171,4 +171,6 @@
     <string name="words_unblocked">Разблокировано слов: %d</string>
     <string name="clear_learned_words_summary">Удалить все выученные при вводе слова</string>
     <string name="learned_words_cleared">Выученные слова очищены</string>
+    <string name="clear_blocked_words_summary">Разблокировать все заблокированные слова</string>
+    <string name="blocked_words_cleared">Заблокированные слова очищены</string>
 </resources>

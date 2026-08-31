@@ -171,6 +171,8 @@
     <string name="words_unblocked">%d palabras desbloqueadas</string>
     <string name="clear_learned_words_summary">Eliminar todas las palabras aprendidas al escribir</string>
     <string name="learned_words_cleared">Palabras aprendidas eliminadas</string>
+    <string name="clear_blocked_words_summary">Desbloquear todas las palabras bloqueadas</string>
+    <string name="blocked_words_cleared">Palabras bloqueadas restablecidas</string>
 </resources>
 
 

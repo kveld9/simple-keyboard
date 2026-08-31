@@ -33,6 +33,7 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
     private Preference mLearnedWordsPref;
     private Preference mBlockedWordsPref;
     private Preference mClearLearnedPref;
+    private Preference mClearBlockedPref;
 
     private final UserDictionaryManager.UserDictionaryListener mListener =
             new UserDictionaryManager.UserDictionaryListener() {
@@ -75,10 +76,18 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
         mLearnedWordsPref = findPreference("screen_learned_words");
         mBlockedWordsPref = findPreference("screen_blocked_words");
         mClearLearnedPref = findPreference("pref_clear_all_learned_words");
+        mClearBlockedPref = findPreference("pref_clear_all_blocked_words");
 
         if (mClearLearnedPref != null) {
             mClearLearnedPref.setOnPreferenceClickListener(preference -> {
                 showClearLearnedWordsDialog();
+                return true;
+            });
+        }
+
+        if (mClearBlockedPref != null) {
+            mClearBlockedPref.setOnPreferenceClickListener(preference -> {
+                showClearBlockedWordsDialog();
                 return true;
             });
         }
@@ -118,6 +127,21 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
                 .show();
     }
 
+    private void showClearBlockedWordsDialog() {
+        final Context context = getContext();
+        if (context == null) return;
+        new MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.clear_blocked_words_title)
+                .setMessage(R.string.clear_blocked_words_message)
+                .setPositiveButton(R.string.clear_all, (dialog, which) -> {
+                    UserDictionaryManager.getInstance(context).clearBlockedWords();
+                    Toast.makeText(context, R.string.blocked_words_cleared, Toast.LENGTH_SHORT).show();
+                    updateWordCounts();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
     private void updateWordCounts() {
         final Context context = getContext();
         if (context == null) return;
@@ -143,6 +167,10 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
 
         if (mClearLearnedPref != null) {
             mClearLearnedPref.setEnabled(learnedCount > 0);
+        }
+
+        if (mClearBlockedPref != null) {
+            mClearBlockedPref.setEnabled(blockedCount > 0);
         }
     }
 }

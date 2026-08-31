@@ -37,6 +37,11 @@
             android:title="@string/clear_learned_words_title"
             android:summary="@string/clear_learned_words_summary" />
 
+        <Preference
+            android:key="pref_clear_all_blocked_words"
+            android:title="@string/clear_blocked_words_title"
+            android:summary="@string/clear_blocked_words_summary" />
+
     </PreferenceCategory>
 
 </PreferenceScreen>

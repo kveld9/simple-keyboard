@@ -227,6 +227,8 @@
     <string name="words_unblocked">%d words unblocked</string>
     <string name="clear_learned_words_summary">Remove all words learned by typing</string>
     <string name="learned_words_cleared">Learned words cleared</string>
+    <string name="clear_blocked_words_summary">Unblock all blocked words</string>
+    <string name="blocked_words_cleared">Blocked words cleared</string>
 </resources>
 
 

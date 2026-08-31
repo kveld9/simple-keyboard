@@ -268,19 +268,6 @@ public final class LearnedWordsSettingsFragment extends Fragment implements Menu
                 .show();
     }
 
-    private void showClearAllDialog() {
-        final Context context = requireContext();
-        new MaterialAlertDialogBuilder(context)
-                .setTitle(R.string.clear_learned_words_title)
-                .setMessage(R.string.clear_learned_words_message)
-                .setPositiveButton(R.string.clear_all, (dialog, which) -> {
-                    UserDictionaryManager.getInstance(context).clearLearnedWords();
-                    loadWords();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
-
     @Override
     public void onCreateMenu(@NonNull final Menu menu, @NonNull final MenuInflater menuInflater) {
         if (mAdapter != null && mAdapter.isSelectionMode()) {
@@ -292,20 +279,13 @@ public final class LearnedWordsSettingsFragment extends Fragment implements Menu
             final MenuItem deleteSelectedItem = menu.add(Menu.NONE, R.id.action_delete_selected, Menu.NONE, R.string.delete_selected);
             deleteSelectedItem.setIcon(R.drawable.ic_delete);
             deleteSelectedItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
-        } else {
-            final MenuItem clearItem = menu.add(Menu.NONE, R.id.action_clear_all, Menu.NONE, R.string.clear_all);
-            clearItem.setIcon(R.drawable.ic_delete);
-            clearItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
         }
     }
 
     @Override
     public boolean onMenuItemSelected(@NonNull final MenuItem menuItem) {
         final int id = menuItem.getItemId();
-        if (id == R.id.action_clear_all) {
-            showClearAllDialog();
-            return true;
-        } else if (id == R.id.action_select_all) {
+        if (id == R.id.action_select_all) {
             mAdapter.toggleSelectAll();
             return true;
         } else if (id == R.id.action_delete_selected) {

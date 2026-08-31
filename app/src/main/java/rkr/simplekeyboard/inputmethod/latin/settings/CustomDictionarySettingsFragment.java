@@ -71,16 +71,6 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
         });
         actionsCategory.addPreference(downloadRepoPref);
 
-        final Preference downloadHeliumPref = new Preference(context);
-        downloadHeliumPref.setTitle(R.string.download_helium314_dictionaries_title);
-        downloadHeliumPref.setSummary(R.string.download_helium314_dictionaries_summary);
-        downloadHeliumPref.setWidgetLayoutResource(R.layout.preference_external_link);
-        downloadHeliumPref.setOnPreferenceClickListener(p -> {
-            openDownloadUrl(R.string.dictionaries_helium314_download_url);
-            return true;
-        });
-        actionsCategory.addPreference(downloadHeliumPref);
-
         setPreferenceScreen(screen);
     }
 

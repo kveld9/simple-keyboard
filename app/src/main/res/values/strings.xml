@@ -254,8 +254,6 @@
     <string name="import_dictionary_summary">Load a .dict or .bin file</string>
     <string name="download_repo_dictionaries_title">Download repository dictionaries</string>
     <string name="download_repo_dictionaries_summary">Browse pre-compiled dictionaries on GitHub</string>
-    <string name="download_helium314_dictionaries_title">Download AOSP dictionaries (Helium314)</string>
-    <string name="download_helium314_dictionaries_summary">Browse compatible language dictionaries on Codeberg</string>
     <string name="no_custom_dictionaries_title">No dictionaries installed</string>
     <string name="no_custom_dictionaries_summary">Import a .dict or .bin file to enable word suggestions</string>
     <string name="custom_dict_item_summary">%1$d words · %2$s</string>

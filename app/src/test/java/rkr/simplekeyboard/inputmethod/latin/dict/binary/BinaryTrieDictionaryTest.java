@@ -103,6 +103,100 @@ public class BinaryTrieDictionaryTest {
     }
 
     @Test
+    public void testPrefixSuggestionsFindsWordsAcrossMultipleBranches() {
+        List<CharSequence> suggestions = esDict.getPrefixSuggestions("h", 30);
+        assertNotNull(suggestions);
+        assertTrue("Should collect suggestions across multiple branches", suggestions.size() > 0);
+        boolean foundHoBranch = false;
+        boolean foundHeBranch = false;
+        for (CharSequence s : suggestions) {
+            String w = s.toString().toLowerCase();
+            if (w.startsWith("ho")) {
+                foundHoBranch = true;
+            }
+            if (w.startsWith("he")) {
+                foundHeBranch = true;
+            }
+        }
+        assertTrue("Prefix 'h' must discover words in 'ho...' branch (e.g. hoy, hola, hora)", foundHoBranch);
+        assertTrue("Prefix 'h' must discover words in 'he...' branch (e.g. hecho, hemos)", foundHeBranch);
+    }
+
+    @Test
+    public void testFuzzySearchFindsMatchWithCostZeroPriority() {
+        assertTrue("Dictionary must contain 'manzana'", esDict.containsWord("manzana"));
+        List<rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord> candidates = new java.util.ArrayList<>();
+        esDict.searchFuzzy(esDict.getRootNode(), new StringBuilder(), "mwnzana", 0, 1, candidates);
+        boolean foundManzana = false;
+        for (rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord sw : candidates) {
+            if ("manzana".equalsIgnoreCase(sw.word)) {
+                foundManzana = true;
+                break;
+            }
+        }
+        assertTrue("Fuzzy search for 'mwnzana' must find 'manzana' without getting trapped in earlier branches", foundManzana);
+
+        candidates.clear();
+        esDict.searchFuzzy(esDict.getRootNode(), new StringBuilder(), "hxla", 0, 1, candidates);
+        boolean foundHola = false;
+        for (rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord sw : candidates) {
+            if ("hola".equalsIgnoreCase(sw.word)) {
+                foundHola = true;
+                break;
+            }
+        }
+        assertTrue("Fuzzy search for 'hxla' must find 'hola'", foundHola);
+    }
+
+    @Test
+    public void testPrefixSuggestionsBoundariesAndLimits() {
+        // Limit 1, 5, 40 boundary tests
+        List<CharSequence> res1 = esDict.getPrefixSuggestions("a", 1);
+        assertNotNull(res1);
+        assertEquals(1, res1.size());
+
+        List<CharSequence> res5 = esDict.getPrefixSuggestions("a", 5);
+        assertNotNull(res5);
+        assertEquals(5, res5.size());
+
+        List<CharSequence> res40 = esDict.getPrefixSuggestions("a", 40);
+        assertNotNull(res40);
+        assertEquals(40, res40.size());
+
+        // Empty / non-matching prefix
+        List<CharSequence> resNone = esDict.getPrefixSuggestions("zzxxqq123", 10);
+        assertNotNull(resNone);
+        assertEquals(0, resNone.size());
+    }
+
+    @Test
+    public void testFuzzySearchAdversarialCases() {
+        List<rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord> candidates = new java.util.ArrayList<>();
+
+        // 1. Exact match (Cost 0)
+        esDict.searchFuzzy(esDict.getRootNode(), new StringBuilder(), "casa", 0, 0, candidates);
+        assertTrue("Exact match search for 'casa' with distance 0 must find 'casa'",
+                candidates.stream().anyMatch(sw -> "casa".equalsIgnoreCase(sw.word)));
+
+        // 2. Extra character typed by user (deletion from target)
+        candidates.clear();
+        esDict.searchFuzzy(esDict.getRootNode(), new StringBuilder(), "casasx", 0, 1, candidates);
+        assertTrue("Fuzzy search for 'casasx' must find 'casas'",
+                candidates.stream().anyMatch(sw -> "casas".equalsIgnoreCase(sw.word)));
+
+        // 3. Missing character typed by user (insertion into target)
+        candidates.clear();
+        esDict.searchFuzzy(esDict.getRootNode(), new StringBuilder(), "csa", 0, 1, candidates);
+        assertTrue("Fuzzy search for 'csa' must find 'casa'",
+                candidates.stream().anyMatch(sw -> "casa".equalsIgnoreCase(sw.word)));
+
+        // 4. Non-matching input (negative case)
+        candidates.clear();
+        esDict.searchFuzzy(esDict.getRootNode(), new StringBuilder(), "zzqqxx123", 0, 1, candidates);
+        assertEquals("Fuzzy search for impossible word must return 0 candidates", 0, candidates.size());
+    }
+
+    @Test
     public void testForEachWord() {
         int[] count = new int[1];
         boolean[] foundQue = new boolean[1];

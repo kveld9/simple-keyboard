@@ -128,11 +128,66 @@ public final class CustomDictionaryManager {
         return false;
     }
 
+    public static boolean isValidLanguageCode(final String lang) {
+        if (lang == null || (lang.length() != 2 && lang.length() != 3)) {
+            return false;
+        }
+        for (String iso : java.util.Locale.getISOLanguages()) {
+            if (iso.equalsIgnoreCase(lang)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static String parseLanguageFromFilename(final String fileName) {
+        if (fileName == null || fileName.trim().isEmpty()) {
+            return null;
+        }
+        String name = fileName.trim().toLowerCase(java.util.Locale.US);
+        int lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+        if (lastSlash >= 0 && lastSlash < name.length() - 1) {
+            name = name.substring(lastSlash + 1);
+        }
+        final java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^(?:dict_)?([a-z]{2,3})(?:_[a-z]{2,4})?(?:\\.[a-z0-9]+)?$");
+        final java.util.regex.Matcher matcher = pattern.matcher(name);
+        if (matcher.matches()) {
+            final String candidate = matcher.group(1);
+            if (isValidLanguageCode(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    public static String extractLanguageFromUri(final Context context, final Uri uri) {
+        if (context == null || uri == null) {
+            return null;
+        }
+        String fileName = null;
+        if ("content".equalsIgnoreCase(uri.getScheme())) {
+            try (android.database.Cursor cursor = context.getContentResolver().query(uri, new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                    if (nameIdx >= 0) {
+                        fileName = cursor.getString(nameIdx);
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (fileName == null || fileName.isEmpty()) {
+            fileName = uri.getLastPathSegment();
+        }
+        return parseLanguageFromFilename(fileName);
+    }
+
     public synchronized ImportResult importDictionary(final Context context, final Uri uri, final String fallbackLang) {
         if (context == null || uri == null) {
             return new ImportResult(false, null, 0, "Invalid arguments");
         }
 
+        final String detectedLang = extractLanguageFromUri(context, uri);
         File tempFile = null;
         File stagingFile = null;
         try {
@@ -166,8 +221,16 @@ public final class CustomDictionaryManager {
 
             // Case 1: Already SKDB format (0x42444B53 in little endian = 0x534B4442 in big endian)
             if (magic == 0x534B4442 || magic == 0x42444B53) {
-                final String targetLang = (fallbackLang != null && !fallbackLang.isEmpty()) ? fallbackLang : "es";
-                final File targetFile = new File(dictDir, "dict_" + targetLang.toLowerCase() + ".bin");
+                final String targetLang = (detectedLang != null)
+                        ? detectedLang
+                        : (isValidLanguageCode(fallbackLang) ? fallbackLang.toLowerCase(java.util.Locale.US) : null);
+
+                if (targetLang == null) {
+                    return new ImportResult(false, null, 0,
+                            "Could not determine language for dictionary file (expected name like dict_<lang>.bin)");
+                }
+
+                final File targetFile = new File(dictDir, "dict_" + targetLang + ".bin");
                 stagingFile = File.createTempFile("dict_stage_", ".bin", dictDir);
                 copyFile(tempFile, stagingFile);
 
@@ -196,10 +259,16 @@ public final class CustomDictionaryManager {
                     || magic == AospDictDecoder.MAGIC_AOSP_V4) {
 
                 final AospDictDecoder.DecodedDictionary decoded = AospDictDecoder.decode(tempFile);
-                final String targetLang = (decoded.languageCode != null && !decoded.languageCode.isEmpty())
-                        ? decoded.languageCode : ((fallbackLang != null) ? fallbackLang : "es");
+                final String targetLang = (decoded.languageCode != null && isValidLanguageCode(decoded.languageCode))
+                        ? decoded.languageCode.toLowerCase(java.util.Locale.US)
+                        : ((detectedLang != null) ? detectedLang : (isValidLanguageCode(fallbackLang) ? fallbackLang.toLowerCase(java.util.Locale.US) : null));
 
-                final File targetFile = new File(dictDir, "dict_" + targetLang.toLowerCase() + ".bin");
+                if (targetLang == null) {
+                    return new ImportResult(false, null, 0,
+                            "Could not determine language from .dict metadata or filename");
+                }
+
+                final File targetFile = new File(dictDir, "dict_" + targetLang + ".bin");
                 stagingFile = File.createTempFile("dict_stage_", ".bin", dictDir);
                 BinaryTrieCompiler.compile(decoded.words, stagingFile);
 

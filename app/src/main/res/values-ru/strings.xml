@@ -153,4 +153,22 @@
     <string name="no_blocked_words">Нет заблокированных слов</string>
     <string name="word_added">Слово добавлено</string>
     <string name="word_already_exists">Слово уже существует</string>
+    <string name="block_word">Заблокировать слово</string>
+    <string name="block_word_hint">Введите слово для блокировки</string>
+    <string name="word_blocked">Слово заблокировано</string>
+    <string name="selected_count">Выбрано: %d</string>
+    <string name="select_all">Выбрать всё</string>
+    <string name="deselect_all">Снять выбор</string>
+    <string name="delete_selected">Удалить выбранные</string>
+    <string name="unblock_selected">Разблокировать выбранные</string>
+    <string name="delete_word_confirm">Удалить «%s»?</string>
+    <string name="unblock_word_confirm">Разблокировать «%s»?</string>
+    <string name="delete_selected_confirm">Удалить выбранных слов: %d?</string>
+    <string name="unblock_selected_confirm">Разблокировать выбранных слов: %d?</string>
+    <string name="word_deleted">Слово удалено</string>
+    <string name="word_unblocked">Слово разблокировано</string>
+    <string name="words_deleted">Удалено слов: %d</string>
+    <string name="words_unblocked">Разблокировано слов: %d</string>
+    <string name="clear_learned_words_summary">Удалить все выученные при вводе слова</string>
+    <string name="learned_words_cleared">Выученные слова очищены</string>
 </resources>

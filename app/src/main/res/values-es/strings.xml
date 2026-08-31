@@ -153,6 +153,24 @@
     <string name="no_blocked_words">No hay palabras bloqueadas</string>
     <string name="word_added">Palabra agregada</string>
     <string name="word_already_exists">La palabra ya existe</string>
+    <string name="block_word">Bloquear palabra</string>
+    <string name="block_word_hint">Ingresar palabra a bloquear</string>
+    <string name="word_blocked">Palabra bloqueada</string>
+    <string name="selected_count">%d seleccionados</string>
+    <string name="select_all">Seleccionar todo</string>
+    <string name="deselect_all">Deseleccionar todo</string>
+    <string name="delete_selected">Eliminar seleccionados</string>
+    <string name="unblock_selected">Desbloquear seleccionados</string>
+    <string name="delete_word_confirm">¿Eliminar «%s»?</string>
+    <string name="unblock_word_confirm">¿Desbloquear «%s»?</string>
+    <string name="delete_selected_confirm">¿Eliminar %d palabras seleccionadas?</string>
+    <string name="unblock_selected_confirm">¿Desbloquear %d palabras seleccionadas?</string>
+    <string name="word_deleted">Palabra eliminada</string>
+    <string name="word_unblocked">Palabra desbloqueada</string>
+    <string name="words_deleted">%d palabras eliminadas</string>
+    <string name="words_unblocked">%d palabras desbloqueadas</string>
+    <string name="clear_learned_words_summary">Eliminar todas las palabras aprendidas al escribir</string>
+    <string name="learned_words_cleared">Palabras aprendidas eliminadas</string>
 </resources>
 
 

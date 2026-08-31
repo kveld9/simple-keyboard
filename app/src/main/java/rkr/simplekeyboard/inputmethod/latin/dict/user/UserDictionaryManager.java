@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -143,6 +144,25 @@ public final class UserDictionaryManager {
         return success;
     }
 
+    public boolean removeWords(final List<UserDictionaryEntry> entries) {
+        if (entries == null || entries.isEmpty()) return true;
+        final List<Long> ids = new ArrayList<>(entries.size());
+        for (final UserDictionaryEntry entry : entries) {
+            ids.add(entry.id);
+        }
+        final boolean success = mDatabase.deleteWordsByIds(ids);
+        if (success) {
+            mMainHandler.post(() -> {
+                for (final UserDictionaryListener listener : mListeners) {
+                    for (final UserDictionaryEntry entry : entries) {
+                        listener.onWordRemoved(entry.word, entry.id);
+                    }
+                }
+            });
+        }
+        return success;
+    }
+
     public boolean isLearned(final String word) {
         return mDatabase.isWordLearned(word);
     }
@@ -190,6 +210,25 @@ public final class UserDictionaryManager {
         final boolean success = mDatabase.deleteBlockedWordById(id);
         if (success) {
             notifyWordUnblocked(word, id);
+        }
+        return success;
+    }
+
+    public boolean unblockWords(final List<UserDictionaryEntry> entries) {
+        if (entries == null || entries.isEmpty()) return true;
+        final List<Long> ids = new ArrayList<>(entries.size());
+        for (final UserDictionaryEntry entry : entries) {
+            ids.add(entry.id);
+        }
+        final boolean success = mDatabase.deleteBlockedWordsByIds(ids);
+        if (success) {
+            mMainHandler.post(() -> {
+                for (final UserDictionaryListener listener : mListeners) {
+                    for (final UserDictionaryEntry entry : entries) {
+                        listener.onWordUnblocked(entry.word, entry.id);
+                    }
+                }
+            });
         }
         return success;
     }

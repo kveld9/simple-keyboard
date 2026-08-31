@@ -55,6 +55,7 @@ public final class ViewLayoutUtils {
             marginLayoutParams.setMargins(x, y, -50, 0);
             view.setLayoutParams(marginLayoutParams);
         }
+        view.layout(x, y, x + w, y + h);
     }
 
     public static void updateLayoutHeightOf(final Window window, final int layoutHeight) {

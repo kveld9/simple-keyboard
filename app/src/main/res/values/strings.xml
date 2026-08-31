@@ -263,6 +263,7 @@
     <string name="import_dictionary_success">Successfully imported %1$s dictionary (%2$d words)</string>
     <string name="import_dictionary_failed">Failed to import dictionary: %s</string>
     <string name="file_picker_error">Could not open file picker</string>
+    <string name="select_dictionary_language">Select language for dictionary</string>
     <string name="remove_custom_dict_title">Delete Dictionary</string>
     <string name="remove_custom_dict_message">Delete the imported dictionary for %s?</string>
     <string name="remove_custom_dict_confirm">Delete</string>

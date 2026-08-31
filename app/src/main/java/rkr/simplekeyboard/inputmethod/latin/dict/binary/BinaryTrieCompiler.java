@@ -158,6 +158,8 @@ public final class BinaryTrieCompiler {
 
         try (FileOutputStream fos = new FileOutputStream(outputFile)) {
             fos.write(buffer.array(), 0, buffer.position());
+            fos.flush();
+            fos.getFD().sync();
         }
     }
 }

@@ -206,6 +206,7 @@
     <string name="import_dictionary_success">Diccionario de %1$s importado con éxito (%2$d palabras)</string>
     <string name="import_dictionary_failed">Error al importar diccionario: %s</string>
     <string name="file_picker_error">No se pudo abrir el selector de archivos</string>
+    <string name="select_dictionary_language">Seleccionar idioma del diccionario</string>
     <string name="remove_custom_dict_title">Eliminar diccionario</string>
     <string name="remove_custom_dict_message">¿Deseas eliminar el diccionario importado para %s?</string>
     <string name="remove_custom_dict_confirm">Eliminar</string>

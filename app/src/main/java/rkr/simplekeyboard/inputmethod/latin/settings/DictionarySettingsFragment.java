@@ -115,11 +115,16 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
     private void showClearLearnedWordsDialog() {
         final Context context = getContext();
         if (context == null) return;
+        final UserDictionaryManager manager = UserDictionaryManager.getInstance(context);
+        if (manager.getLearnedWordsCount() == 0) {
+            Toast.makeText(context, R.string.no_learned_words, Toast.LENGTH_SHORT).show();
+            return;
+        }
         new MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.clear_learned_words_title)
                 .setMessage(R.string.clear_learned_words_message)
                 .setPositiveButton(R.string.clear_all, (dialog, which) -> {
-                    UserDictionaryManager.getInstance(context).clearLearnedWords();
+                    manager.clearLearnedWords();
                     Toast.makeText(context, R.string.learned_words_cleared, Toast.LENGTH_SHORT).show();
                     updateWordCounts();
                 })
@@ -130,11 +135,16 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
     private void showClearBlockedWordsDialog() {
         final Context context = getContext();
         if (context == null) return;
+        final UserDictionaryManager manager = UserDictionaryManager.getInstance(context);
+        if (manager.getBlockedWordsCount() == 0) {
+            Toast.makeText(context, R.string.no_blocked_words, Toast.LENGTH_SHORT).show();
+            return;
+        }
         new MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.clear_blocked_words_title)
                 .setMessage(R.string.clear_blocked_words_message)
                 .setPositiveButton(R.string.clear_all, (dialog, which) -> {
-                    UserDictionaryManager.getInstance(context).clearBlockedWords();
+                    manager.clearBlockedWords();
                     Toast.makeText(context, R.string.blocked_words_cleared, Toast.LENGTH_SHORT).show();
                     updateWordCounts();
                 })
@@ -163,14 +173,6 @@ public final class DictionarySettingsFragment extends SubScreenFragment {
             } else {
                 mBlockedWordsPref.setSummary(getString(R.string.blocked_words_summary_count, blockedCount));
             }
-        }
-
-        if (mClearLearnedPref != null) {
-            mClearLearnedPref.setEnabled(learnedCount > 0);
-        }
-
-        if (mClearBlockedPref != null) {
-            mClearBlockedPref.setEnabled(blockedCount > 0);
         }
     }
 }

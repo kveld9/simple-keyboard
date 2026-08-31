@@ -58,6 +58,9 @@ jobs:
           set -euo pipefail
           LATEST_TAG="$(git tag --list 'v*' --sort=-v:refname | head -n 1 || true)"
           if [ -z "$LATEST_TAG" ]; then
+            MAJOR=7
+            MINOR=0
+            PATCH=0
             VERSION="7.0.0"
             PREV_TAG=""
           else

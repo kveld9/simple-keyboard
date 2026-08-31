@@ -83,15 +83,53 @@ public final class PrefixDictionary {
             return true;
         }
 
-        boolean blockWord(final String word) {
+        boolean blockWord(final String word, final String normWord) {
             final String[] w = words;
             for (int i = 0; i < w.length; i++) {
-                if (w[i].equalsIgnoreCase(word)) {
+                if (w[i].equalsIgnoreCase(word) || (normWord != null && StringUtils.toNormalizedLower(w[i]).equals(normWord))) {
                     freqs[i] = -1;
                     return true;
                 }
             }
             return false;
+        }
+
+        boolean unblockWord(final String word, final String normWord) {
+            final String[] w = words;
+            for (int i = 0; i < w.length; i++) {
+                if (w[i].equalsIgnoreCase(word) || (normWord != null && StringUtils.toNormalizedLower(w[i]).equals(normWord))) {
+                    if (freqs[i] == -1) {
+                        freqs[i] = BASE_LEARNED_FREQUENCY;
+                        sortWords();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        boolean removeWord(final String word, final String normWord) {
+            final String[] w = words;
+            int foundIdx = -1;
+            for (int i = 0; i < w.length; i++) {
+                if (w[i].equalsIgnoreCase(word) || (normWord != null && StringUtils.toNormalizedLower(w[i]).equals(normWord))) {
+                    foundIdx = i;
+                    break;
+                }
+            }
+            if (foundIdx == -1) {
+                return false;
+            }
+            final int len = w.length;
+            final String[] newW = new String[len - 1];
+            final short[] newF = new short[len - 1];
+            System.arraycopy(w, 0, newW, 0, foundIdx);
+            System.arraycopy(freqs, 0, newF, 0, foundIdx);
+            System.arraycopy(w, foundIdx + 1, newW, foundIdx, len - foundIdx - 1);
+            System.arraycopy(freqs, foundIdx + 1, newF, foundIdx, len - foundIdx - 1);
+            this.words = newW;
+            this.freqs = newF;
+            return true;
         }
 
         private void sortWords() {
@@ -181,7 +219,7 @@ public final class PrefixDictionary {
 
         final TrieNode node = findPrefixNode(norm);
         if (node != null) {
-            node.blockWord(word);
+            node.blockWord(word, norm);
         }
 
         for (int i = mTopWords.size() - 1; i >= 0; i--) {
@@ -205,6 +243,71 @@ public final class PrefixDictionary {
                 entry.getValue().remove(norm);
             }
         }
+    }
+
+    public synchronized void unblockWord(final String word) {
+        if (word == null || word.isEmpty()) {
+            return;
+        }
+        final String norm = StringUtils.toNormalizedLower(word);
+        mBlockedWords.remove(norm);
+
+        final TrieNode node = findPrefixNode(norm);
+        if (node != null) {
+            node.unblockWord(word, norm);
+        }
+    }
+
+    public synchronized void removeWord(final String word) {
+        if (word == null || word.isEmpty()) {
+            return;
+        }
+        final String norm = StringUtils.toNormalizedLower(word);
+        final TrieNode node = findPrefixNode(norm);
+        if (node != null && node.removeWord(word, norm)) {
+            if (mWordCount > 0) {
+                mWordCount--;
+            }
+        }
+
+        for (int i = mTopWords.size() - 1; i >= 0; i--) {
+            if (StringUtils.toNormalizedLower(mTopWords.get(i).word).equals(norm)) {
+                mTopWords.remove(i);
+            }
+        }
+
+        mBigrams.remove(norm);
+        for (Map<String, Short> nextMap : mBigrams.values()) {
+            nextMap.remove(norm);
+        }
+
+        final java.util.Iterator<Map.Entry<String, Map<String, Short>>> triIt = mTrigrams.entrySet().iterator();
+        while (triIt.hasNext()) {
+            final Map.Entry<String, Map<String, Short>> entry = triIt.next();
+            final String contextKey = entry.getKey();
+            if (contextKey.startsWith(norm + " ") || contextKey.endsWith(" " + norm) || contextKey.equals(norm)) {
+                triIt.remove();
+            } else {
+                entry.getValue().remove(norm);
+            }
+        }
+    }
+
+    public synchronized void clearLearnedWords() {
+        mRoot = new TrieNode();
+        mWordCount = 0;
+        mTrigrams.clear();
+        mBigrams.clear();
+        mTopWords.clear();
+        mScratchRawWords.clear();
+        mScratchScoredWords.clear();
+        mScratchSuggestions.clear();
+        mScratchPredictions.clear();
+        mScratchPredictionsAdded.clear();
+    }
+
+    public synchronized void clearBlockedWords() {
+        mBlockedWords.clear();
     }
 
     public synchronized void copyFrom(final PrefixDictionary other) {

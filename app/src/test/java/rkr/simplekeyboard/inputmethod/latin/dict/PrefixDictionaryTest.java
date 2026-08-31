@@ -505,4 +505,59 @@ public class PrefixDictionaryTest {
         mDict.clear();
         assertFalse(mDict.isBlocked("hola"));
     }
+
+    @Test
+    public void testUnblockWord() {
+        mDict.insert("hola", 100);
+        mDict.blockWord("hola");
+        assertTrue(mDict.isBlocked("hola"));
+
+        mDict.unblockWord("hola");
+        assertFalse(mDict.isBlocked("hola"));
+        assertTrue(mDict.containsWord("hola"));
+        assertTrue(mDict.getWordFrequency("hola") > 0);
+
+        List<CharSequence> suggestions = mDict.getSuggestions("hol", 5);
+        assertTrue(suggestions.contains("hola"));
+    }
+
+    @Test
+    public void testRemoveWord() {
+        mDict.insert("customword", 120);
+        mDict.insert("customother", 80);
+        assertEquals(2, mDict.getWordCount());
+        assertTrue(mDict.containsWord("customword"));
+
+        mDict.removeWord("customword");
+        assertEquals(1, mDict.getWordCount());
+        assertFalse(mDict.containsWord("customword"));
+        assertTrue(mDict.containsWord("customother"));
+
+        List<CharSequence> suggestions = mDict.getSuggestions("custom", 5);
+        assertFalse(suggestions.contains("customword"));
+        assertTrue(suggestions.contains("customother"));
+    }
+
+    @Test
+    public void testClearLearnedWordsAndClearBlockedWordsSeparation() {
+        mDict.insert("learned1", 100);
+        mDict.insert("learned2", 100);
+        mDict.blockWord("blocked1");
+
+        assertTrue(mDict.isBlocked("blocked1"));
+        assertEquals(2, mDict.getWordCount());
+
+        // Clear learned words only
+        mDict.clearLearnedWords();
+        assertEquals(0, mDict.getWordCount());
+        assertFalse(mDict.containsWord("learned1"));
+        // Blocked status should still remain
+        assertTrue(mDict.isBlocked("blocked1"));
+
+        // Clear blocked words only
+        mDict.insert("learned3", 100);
+        mDict.clearBlockedWords();
+        assertFalse(mDict.isBlocked("blocked1"));
+        assertTrue(mDict.containsWord("learned3"));
+    }
 }

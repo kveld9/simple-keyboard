@@ -197,8 +197,6 @@
     <string name="import_dictionary_summary">Cargar un archivo .dict o .bin</string>
     <string name="download_repo_dictionaries_title">Descargar diccionarios del repositorio</string>
     <string name="download_repo_dictionaries_summary">Explorar diccionarios precompilados en GitHub</string>
-    <string name="download_helium314_dictionaries_title">Descargar diccionarios de AOSP (Helium314)</string>
-    <string name="download_helium314_dictionaries_summary">Explorar diccionarios compatibles en Codeberg</string>
     <string name="no_custom_dictionaries_title">No hay diccionarios instalados</string>
     <string name="no_custom_dictionaries_summary">Importa un archivo .dict o .bin para habilitar sugerencias de palabras</string>
     <string name="custom_dict_item_summary">%1$d palabras · %2$s</string>

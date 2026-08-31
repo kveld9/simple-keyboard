@@ -464,14 +464,4 @@ public final class StringUtils {
         }
         return suggestion;
     }
-
-    public static String capitalizeFirst(final String s) {
-        if (s == null || s.isEmpty()) {
-            return s;
-        }
-        if (s.length() == 1) {
-            return s.toUpperCase(java.util.Locale.ROOT);
-        }
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase(java.util.Locale.ROOT);
-    }
 }

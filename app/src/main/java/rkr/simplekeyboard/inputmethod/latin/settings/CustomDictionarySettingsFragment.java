@@ -111,31 +111,9 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
         }
 
         final String detectedLang = CustomDictionaryManager.extractLanguageFromUri(context, uri);
-        if (detectedLang != null && CustomDictionaryManager.isValidLanguageCode(detectedLang)) {
-            executeImport(context, uri, detectedLang);
-        } else {
-            Toast.makeText(context, R.string.importing_dictionary_progress, Toast.LENGTH_SHORT).show();
-            new Thread(() -> {
-                final CustomDictionaryManager.ImportResult preliminary =
-                        CustomDictionaryManager.getInstance().importDictionary(context, uri, null);
-
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        if (preliminary.success) {
-                            final String displayLang = getDisplayNameForLocale(preliminary.languageCode);
-                            final String msg = getString(R.string.import_dictionary_success, displayLang, preliminary.wordCount);
-                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show();
-                            refreshInstalledDictionaries();
-                        } else if (preliminary.message != null && preliminary.message.contains("Could not determine language")) {
-                            showLanguageSelectionDialog(context, uri);
-                        } else {
-                            final String msg = getString(R.string.import_dictionary_failed, preliminary.message);
-                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show();
-                        }
-                    });
-                }
-            }).start();
-        }
+        final String targetLang = (detectedLang != null && CustomDictionaryManager.isValidLanguageCode(detectedLang))
+                ? detectedLang : null;
+        executeImport(context, uri, targetLang, targetLang == null);
     }
 
     private void showLanguageSelectionDialog(final Context context, final Uri uri) {
@@ -173,14 +151,14 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
                 .setItems(items, (dialog, which) -> {
                     if (which >= 0 && which < langList.size()) {
                         final String selectedLang = langList.get(which);
-                        executeImport(context, uri, selectedLang);
+                        executeImport(context, uri, selectedLang, false);
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
-    private void executeImport(final Context context, final Uri uri, final String languageCode) {
+    private void executeImport(final Context context, final Uri uri, final String languageCode, final boolean promptOnUnknownLang) {
         Toast.makeText(context, R.string.importing_dictionary_progress, Toast.LENGTH_SHORT).show();
 
         new Thread(() -> {
@@ -194,6 +172,8 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
                         final String msg = getString(R.string.import_dictionary_success, displayLang, result.wordCount);
                         Toast.makeText(context, msg, Toast.LENGTH_LONG).show();
                         refreshInstalledDictionaries();
+                    } else if (promptOnUnknownLang && result.message != null && result.message.contains("Could not determine language")) {
+                        showLanguageSelectionDialog(context, uri);
                     } else {
                         final String msg = getString(R.string.import_dictionary_failed, result.message);
                         Toast.makeText(context, msg, Toast.LENGTH_LONG).show();

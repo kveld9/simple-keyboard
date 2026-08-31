@@ -233,13 +233,4 @@ public class StringUtilsTest {
         assertTrue(StringUtils.hasInternalUpperCase("NASA"));
         assertTrue(StringUtils.hasInternalUpperCase("McDonalds"));
     }
-
-    @Test
-    public void testCapitalizeFirst() {
-        assertEquals(null, StringUtils.capitalizeFirst(null));
-        assertEquals("", StringUtils.capitalizeFirst(""));
-        assertEquals("A", StringUtils.capitalizeFirst("a"));
-        assertEquals("Hello", StringUtils.capitalizeFirst("hello"));
-        assertEquals("Hello", StringUtils.capitalizeFirst("HELLO"));
-    }
 }

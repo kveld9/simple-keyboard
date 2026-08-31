@@ -325,7 +325,9 @@ public final class RichInputConnection {
                     mTextBeforeCursor = str;
                     return str;
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                Log.w(TAG, "InputConnection failed", ignored);
+            }
         }
         if (mTextBeforeCursor != null && !mTextBeforeCursor.isEmpty()) {
             final int len = Math.min(maxChars, mTextBeforeCursor.length());
@@ -343,7 +345,9 @@ public final class RichInputConnection {
                     mTextAfterCursor = str;
                     return str;
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                Log.w(TAG, "InputConnection failed", ignored);
+            }
         }
         if (mTextAfterCursor != null && !mTextAfterCursor.isEmpty()) {
             final int len = Math.min(maxChars, mTextAfterCursor.length());
@@ -433,7 +437,9 @@ public final class RichInputConnection {
         if (!after.isEmpty() && isConnected()) {
             try {
                 mIC.deleteSurroundingText(0, after.length());
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                Log.w(TAG, "InputConnection failed", ignored);
+            }
         }
         commitText(suggestion.toString() + " ", 1);
     }

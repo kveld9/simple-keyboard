@@ -35,6 +35,7 @@ import rkr.simplekeyboard.inputmethod.latin.common.Constants;
 import rkr.simplekeyboard.inputmethod.latin.common.CoordinateUtils;
 import rkr.simplekeyboard.inputmethod.latin.define.DebugFlags;
 import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
+import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 
 public final class PointerTracker implements PointerTrackerQueue.Element {
     private static final String TAG = PointerTracker.class.getSimpleName();
@@ -693,7 +694,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         if (!isSwipeEligible(oldKey, targetCode, enabled)) {
             return false;
         }
-        final int effectiveStep = Math.max(1, (int)(sPointerStep * Settings.getInstance().getCurrent().mSwipeSensitivity));
+        final SettingsValues sv = Settings.getInstance().getCurrent();
+        final int effectiveStep = Math.max(1, (int)(sPointerStep * sv.mSwipeSensitivity));
         final int steps = (x - mStartX) / effectiveStep;
         if (steps != 0) {
             applySwipeSteps(steps, effectiveStep, checkTimeout, listener);
@@ -715,20 +717,23 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     }
 
     private boolean isSwipeTimeoutActive() {
-        final int swipeIgnoreTime = Settings.getInstance().getCurrent().mKeyLongpressTimeout
+        final SettingsValues sv = Settings.getInstance().getCurrent();
+        final int swipeIgnoreTime = sv.mKeyLongpressTimeout
                 / MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;
         return mStartTime + swipeIgnoreTime >= System.currentTimeMillis();
     }
 
     private boolean handleSpaceSwipe(final int x, final Key oldKey) {
+        final SettingsValues sv = Settings.getInstance().getCurrent();
         return handleSwipe(x, oldKey, Constants.CODE_SPACE,
-                Settings.getInstance().getCurrent().mSpaceSwipeEnabled,
+                sv.mSpaceSwipeEnabled,
                 true /* checkTimeout */, sListener::onMoveCursorPointer);
     }
 
     private boolean handleDeleteSwipe(final int x, final Key oldKey) {
+        final SettingsValues sv = Settings.getInstance().getCurrent();
         return handleSwipe(x, oldKey, Constants.CODE_DELETE,
-                Settings.getInstance().getCurrent().mDeleteSwipeEnabled,
+                sv.mDeleteSwipeEnabled,
                 false /* checkTimeout */, steps -> {
                     sTimerProxy.cancelKeyTimersOf(this);
                     sListener.onMoveDeletePointer(steps);
@@ -1016,7 +1021,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         if (code == Constants.CODE_SHIFT) {
             return sParams.mLongPressShiftLockTimeout;
         }
-        final int longpressTimeout = Settings.getInstance().getCurrent().mKeyLongpressTimeout;
+        final SettingsValues sv = Settings.getInstance().getCurrent();
+        final int longpressTimeout = sv.mKeyLongpressTimeout;
         if (mIsInSlidingKeyInput) {
             // We use longer timeout for sliding finger input started from the modifier key.
             return longpressTimeout * MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;
@@ -1029,7 +1035,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     }
 
     private void detectAndSendKey(final Key key, final int x, final int y) {
-        if (key == null) return;
+        if (key == null) {
+            Log.w(TAG, "PointerTracker: key is null");
+            return;
+        }
 
         final int code = key.getCode();
         callListenerOnCodeInput(key, code, x, y, false /* isKeyRepeat */);
@@ -1037,7 +1046,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     }
 
     private void startRepeatKey(final Key key) {
-        if (key == null) return;
+        if (key == null) {
+            Log.w(TAG, "PointerTracker: key is null");
+            return;
+        }
         if (!key.isRepeatable()) return;
         // Don't start key repeat when we are in the dragging finger mode.
         if (mIsInDraggingFinger) return;

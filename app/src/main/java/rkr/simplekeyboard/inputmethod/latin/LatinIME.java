@@ -1105,6 +1105,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         try {
             mDictExecutor.execute(() -> loadDictionaryTask(currentLang, loadGeneration));
         } catch (java.util.concurrent.RejectedExecutionException ignored) {
+            Log.w(TAG, "Executor rejected", ignored);
             // Executor shutting down or terminated
         }
     }
@@ -2094,7 +2095,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 if (mClipboardHistoryManager != null) {
                     try {
                         mClipboardHistoryManager.start();
-                    } catch (Throwable ignored) {}
+                    } catch (Throwable ignored) {
+                        Log.w(TAG, "Unexpected error", ignored);
+                    }
                 }
             }
         }

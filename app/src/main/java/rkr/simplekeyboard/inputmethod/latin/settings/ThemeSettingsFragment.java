@@ -20,6 +20,7 @@ package rkr.simplekeyboard.inputmethod.latin.settings;
 import android.content.Context;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.preference.Preference;
@@ -47,7 +48,10 @@ public final class ThemeSettingsFragment extends SubScreenFragment
     }
 
     static void updateKeyboardThemeSummary(final Preference pref) {
-        if (pref == null) return;
+        if (pref == null) {
+            Log.w("ThemeSettingsFragment", "ThemeSettingsFragment: pref is null for key");
+            return;
+        }
         final Context context = pref.getContext();
         final Resources res = context.getResources();
         final KeyboardTheme keyboardTheme = KeyboardTheme.getKeyboardTheme(context);
@@ -103,7 +107,10 @@ public final class ThemeSettingsFragment extends SubScreenFragment
 
     private void updateSelected() {
         final PreferenceScreen screen = getPreferenceScreen();
-        if (screen == null) return;
+        if (screen == null) {
+            Log.w("ThemeSettingsFragment", "ThemeSettingsFragment: pref is null for key");
+            return;
+        }
         final int count = screen.getPreferenceCount();
         for (int index = 0; index < count; index++) {
             final Preference preference = screen.getPreference(index);

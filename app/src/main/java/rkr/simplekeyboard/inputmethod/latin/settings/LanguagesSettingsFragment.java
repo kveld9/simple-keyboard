@@ -20,6 +20,7 @@ package rkr.simplekeyboard.inputmethod.latin.settings;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.preference.PreferenceCategory;
@@ -62,9 +63,15 @@ public final class LanguagesSettingsFragment extends SubScreenFragment {
 
     private void buildContent() {
         final Context context = getContext();
-        if (context == null) return;
+        if (context == null) {
+            Log.w("LanguagesSettingsFragment", "LanguagesSettingsFragment: context/imm is null");
+            return;
+        }
         final PreferenceGroup group = getPreferenceScreen();
-        if (group == null) return;
+        if (group == null) {
+            Log.w("LanguagesSettingsFragment", "LanguagesSettingsFragment: context/imm is null");
+            return;
+        }
         group.removeAll();
         mLanguagePreferences.clear();
 

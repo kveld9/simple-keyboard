@@ -671,6 +671,7 @@ public class ClipboardHistoryView extends LinearLayout {
             options.inPreferredConfig = android.graphics.Bitmap.Config.RGB_565;
             return android.graphics.BitmapFactory.decodeFile(path, options);
         } catch (Throwable t) {
+            Log.w(TAG, "Bitmap decode failed", t);
             return null;
         }
     }

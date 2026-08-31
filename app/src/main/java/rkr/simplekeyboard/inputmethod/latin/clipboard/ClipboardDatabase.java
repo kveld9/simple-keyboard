@@ -169,7 +169,9 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
                 if (file.exists() && file.isFile()) {
                     file.delete();
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                Log.w(TAG, "DB cleanup failed", ignored);
+            }
         }
     }
 
@@ -191,7 +193,9 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
             if (c != null) {
                 try {
                     c.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    Log.w(TAG, "DB cleanup failed", ignored);
+                }
             }
         }
         return db.delete(TABLE_NAME, whereClause, whereArgs);
@@ -215,7 +219,9 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
             if (db != null) {
                 try {
                     db.endTransaction();
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    Log.w(TAG, "DB cleanup failed", ignored);
+                }
             }
         }
     }
@@ -310,7 +316,9 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
             if (cursor != null) {
                 try {
                     cursor.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    Log.w(TAG, "DB cleanup failed", ignored);
+                }
             }
         }
         return clips;

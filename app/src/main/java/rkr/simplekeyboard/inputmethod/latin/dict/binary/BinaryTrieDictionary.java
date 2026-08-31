@@ -41,6 +41,69 @@ public class BinaryTrieDictionary {
         return wordCount;
     }
 
+    public boolean validateStructure() {
+        if (wordCount == 0) {
+            return true;
+        }
+        final int capacity = buffer.capacity();
+        if (capacity < 16 || rootOffset < 16 || rootOffset + 16 > capacity) {
+            return false;
+        }
+
+        // BitSet indexed by 16-byte slot (node / 16) -> 80KB for 10MB dict, zero boxing
+        final java.util.BitSet visitedSlots = new java.util.BitSet(capacity / 16 + 1);
+        final java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        queue.add(rootOffset);
+        int validatedWords = 0;
+
+        while (!queue.isEmpty()) {
+            final int node = queue.poll();
+            if (node < 16 || (long) node + 16 > capacity) {
+                return false;
+            }
+            final int slot = node / 16;
+            if (visitedSlots.get(slot)) {
+                return false; // Cycle detected
+            }
+            visitedSlots.set(slot);
+
+            final byte flags = buffer.get(node + 2);
+            final int childCount = buffer.get(node + 4) & 0xFF;
+            final int childrenOffset = buffer.getInt(node + 8);
+            final int wordOffset = buffer.getInt(node + 12);
+
+            if ((flags & 1) != 0) { // Terminal
+                if (wordOffset < 16 || wordOffset >= capacity) {
+                    return false;
+                }
+                // Verify null-terminated UTF-8 string within bounds
+                int strEnd = wordOffset;
+                while (strEnd < capacity && buffer.get(strEnd) != 0 && (strEnd - wordOffset) <= 64) {
+                    strEnd++;
+                }
+                if (strEnd >= capacity || buffer.get(strEnd) != 0) {
+                    return false; // String not null-terminated within bounds
+                }
+                validatedWords++;
+            }
+
+            if ((flags & 2) != 0) { // Has children
+                final long childrenEnd = (long) childrenOffset + ((long) childCount * 16);
+                if (childCount <= 0 || childrenOffset < 16 || childrenEnd > capacity) {
+                    return false;
+                }
+                for (int i = 0; i < childCount; i++) {
+                    final long childNodeLong = (long) childrenOffset + ((long) i * 16);
+                    if (childNodeLong < 16 || childNodeLong + 16 > capacity) {
+                        return false;
+                    }
+                    queue.add((int) childNodeLong);
+                }
+            }
+        }
+        return validatedWords > 0;
+    }
+
     public int getWordFrequency(String word) {
         int node = getNodeForWord(word);
         if (node > 0 && isTerminal(node)) {

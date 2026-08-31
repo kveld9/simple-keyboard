@@ -187,7 +187,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (db != null && db.inTransaction()) {
                 try {
                     db.endTransaction();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
     }
@@ -207,7 +207,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (cursor != null) {
                 try {
                     cursor.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
         return null;
@@ -232,7 +232,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (cursor != null) {
                 try {
                     cursor.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
     }
@@ -276,7 +276,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (cursor != null) {
                 try {
                     cursor.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
         return list;
@@ -296,7 +296,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (cursor != null) {
                 try {
                     cursor.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
         return 0;
@@ -385,7 +385,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (db != null && db.inTransaction()) {
                 try {
                     db.endTransaction();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
     }
@@ -405,7 +405,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (cursor != null) {
                 try {
                     cursor.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
         return null;
@@ -430,7 +430,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (cursor != null) {
                 try {
                     cursor.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
     }
@@ -470,7 +470,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (cursor != null) {
                 try {
                     cursor.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
         return list;
@@ -490,7 +490,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             if (cursor != null) {
                 try {
                     cursor.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
             }
         }
         return 0;

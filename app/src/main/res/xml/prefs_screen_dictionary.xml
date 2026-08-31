@@ -44,4 +44,16 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory
+        android:title="@string/settings_category_custom_dictionaries">
+
+        <Preference
+            android:key="screen_custom_dictionaries"
+            android:title="@string/custom_dictionaries_title"
+            android:summary="@string/custom_dictionaries_summary"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.CustomDictionarySettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+    </PreferenceCategory>
+
 </PreferenceScreen>

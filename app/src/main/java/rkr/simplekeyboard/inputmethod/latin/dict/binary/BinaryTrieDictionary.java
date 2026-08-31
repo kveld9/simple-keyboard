@@ -10,9 +10,13 @@ import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 
 public class BinaryTrieDictionary {
     private final ByteBuffer buffer;
+    private final int wordCount;
     private final int rootOffset;
 
     public BinaryTrieDictionary(ByteBuffer buffer) {
+        if (buffer == null || buffer.capacity() < 16) {
+            throw new IllegalArgumentException("Invalid or too small buffer");
+        }
         this.buffer = buffer;
         this.buffer.order(ByteOrder.LITTLE_ENDIAN);
         
@@ -26,7 +30,15 @@ public class BinaryTrieDictionary {
             throw new IllegalArgumentException("Unsupported version: " + version);
         }
         
+        this.wordCount = this.buffer.getInt(8);
         this.rootOffset = this.buffer.getInt(12);
+        if (this.wordCount > 0 && (this.rootOffset < 16 || this.rootOffset >= this.buffer.capacity())) {
+            throw new IllegalArgumentException("Invalid root offset: " + this.rootOffset);
+        }
+    }
+
+    public int getWordCount() {
+        return wordCount;
     }
 
     public int getWordFrequency(String word) {

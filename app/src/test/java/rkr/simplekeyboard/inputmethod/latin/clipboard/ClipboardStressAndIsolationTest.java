@@ -25,11 +25,11 @@ public class ClipboardStressAndIsolationTest {
 
     @Test
     public void testMassiveQueryMatrix() {
-        String sample = "Prefix https://github.com/LeanBitLab/LeanType user@example.com 100% my_var path\\to\\file a/b/c abc \"quoted\" (parentheses) multi\nline\ntext está aquí mañana ПРИВЕТ мир Ελληνικά 日本語 中文 한국어 🔥 👨‍👩‍👧‍👦 🚀✨ Suffix Mix Español Русский";
+        String sample = "Prefix https://github.com/soyelmismo/simple-keyboard user@example.com 100% my_var path\\to\\file a/b/c abc \"quoted\" (parentheses) multi\nline\ntext está aquí mañana ПРИВЕТ мир Ελληνικά 日本語 中文 한국어 🔥 👨‍👩‍👧‍👦 🚀✨ Suffix Mix Español Русский";
 
         String[] queries = {
             "", " ", "   ", "a", "A", "ab", "abc", "Prefix",
-            "100%", "https://github.com/LeanBitLab/LeanType",
+            "100%", "https://github.com/soyelmismo/simple-keyboard",
             "user@example.com", "my_var", "path\\to\\file", "a/b/c",
             "\"quoted\"", "(parentheses)", "multi\nline\ntext",
             "🔥", "🚀✨", "está aquí", "mañana", "ПРИВЕТ", "мир",

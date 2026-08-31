@@ -414,7 +414,7 @@ public final class PrefixDictionary {
     }
 
     /**
-     * Bonus for long words (>6 characters) inspired by LeanType so typos in longer words
+     * Bonus for long words (>6 characters) so typos in longer words
      * are not unfairly penalized.
      */
     public static float getLongWordCorrectionBonus(final String typed, final String candidate) {

@@ -78,10 +78,12 @@ public class BeamSearchDecoderTest {
     }
     
     private static ByteBuffer createDummyBuffer() {
-        ByteBuffer buf = ByteBuffer.allocate(16);
+        ByteBuffer buf = ByteBuffer.allocate(32);
         buf.order(java.nio.ByteOrder.LITTLE_ENDIAN);
         buf.putInt(0, 0x42444b53); // magic
         buf.putInt(4, 1);          // version
+        buf.putInt(8, 0);          // wordCount
+        buf.putInt(12, 16);        // rootOffset
         return buf;
     }
 

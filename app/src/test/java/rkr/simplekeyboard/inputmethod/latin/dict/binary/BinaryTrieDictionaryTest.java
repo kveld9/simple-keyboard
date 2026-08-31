@@ -38,6 +38,9 @@ public class BinaryTrieDictionaryTest {
     public void testContainsWord() {
         assertTrue("Should contain 'que'", esDict.containsWord("que"));
         assertTrue("Should contain 'qué'", esDict.containsWord("qué"));
+        assertTrue("Should contain 'hay'", esDict.containsWord("hay"));
+        assertTrue("Should contain 'el'", esDict.containsWord("el"));
+        assertTrue("Should contain 'rara'", esDict.containsWord("rara"));
         assertTrue("Should contain 'the'", enDict.containsWord("the"));
         
         assertFalse("Should not contain 'nonexistentword123'", esDict.containsWord("nonexistentword123"));

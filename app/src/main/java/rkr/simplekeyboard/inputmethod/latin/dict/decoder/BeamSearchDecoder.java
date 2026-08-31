@@ -212,6 +212,9 @@ public class BeamSearchDecoder {
         if (!isValidForCorrection(typedWord)) {
             return null;
         }
+        if (dictionary.containsWord(typedWord)) {
+            return null;
+        }
         final BeamHypothesis best = getBestHypothesis();
         if (best == null || best.totalScore < threshold) {
             return null;

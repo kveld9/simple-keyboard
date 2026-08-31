@@ -882,8 +882,8 @@ public final class PrefixDictionary {
             return bestFuzzy.score >= getMinCandidateScore();
         }
         final float dist = computeWeightedDistance(norm, StringUtils.toNormalizedLower(bestFuzzy.word));
-        final boolean isHighFreqValidWord = typedFreq >= 70;
-        if (!isHighFreqValidWord && bestFuzzy.frequency >= (typedFreq * 2) && dist <= 1.0f) {
+        final boolean isLowFreqObscureWord = typedFreq < 30;
+        if (isLowFreqObscureWord && bestFuzzy.frequency >= (typedFreq * 4) && dist <= 1.0f) {
             return true;
         }
         return isValidCorrection(bestFuzzy, word, norm, w1, w2, true);

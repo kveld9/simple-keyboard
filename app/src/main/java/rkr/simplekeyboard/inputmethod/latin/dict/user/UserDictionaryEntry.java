@@ -1,4 +1,6 @@
 package rkr.simplekeyboard.inputmethod.latin.dict.user;
+ 
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 
 public final class UserDictionaryEntry {
     public final long id;
@@ -19,6 +21,6 @@ public final class UserDictionaryEntry {
     }
 
     public UserDictionaryEntry(final String word, final int frequency) {
-        this(-1, word, word != null ? word.toLowerCase() : "", frequency, null, System.currentTimeMillis());
+        this(-1, word, word != null ? StringUtils.toNormalizedLower(word) : "", frequency, null, System.currentTimeMillis());
     }
 }

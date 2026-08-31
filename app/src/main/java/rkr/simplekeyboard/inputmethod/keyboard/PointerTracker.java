@@ -1108,8 +1108,12 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     }
 
     private void startKeyRepeatTimer(final int repeatCount) {
-        final int delay =
-                (repeatCount == 1) ? sParams.mKeyRepeatStartTimeout : sParams.mKeyRepeatInterval;
+        final SettingsValues settingsValues = Settings.getInstance().getCurrent();
+        final int startTimeout = (settingsValues != null && settingsValues.mKeyRepeatStartTimeout > 0)
+                ? settingsValues.mKeyRepeatStartTimeout : sParams.mKeyRepeatStartTimeout;
+        final int repeatInterval = (settingsValues != null && settingsValues.mKeyRepeatInterval > 0)
+                ? settingsValues.mKeyRepeatInterval : sParams.mKeyRepeatInterval;
+        final int delay = (repeatCount == 1) ? startTimeout : repeatInterval;
         sTimerProxy.startKeyRepeatTimerOf(this, repeatCount, delay);
     }
 

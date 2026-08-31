@@ -945,9 +945,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final java.util.List<InlineSuggestion> inlineSuggestions = response.getInlineSuggestions();
         if (inlineSuggestions == null || inlineSuggestions.isEmpty()) {
             Log.i(TAG, "onInlineSuggestionsResponse: empty suggestions (returning false)");
-            // Match LeanType: just return false when empty. The framework handles this
-            // appropriately without falling into the infinite focus loop because we
-            // didn't modify the keyboard layout/view hierarchy here.
+            // Return false when empty so the framework handles it appropriately
+            // without causing unnecessary layout rebuilds or focus loops.
             return false;
         }
         Log.i(TAG, "onInlineSuggestionsResponse: received " + inlineSuggestions.size() + " suggestions");
@@ -1090,15 +1089,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private void loadDictionaryTask(final String currentLang, final int loadGeneration) {
         BinaryTrieDictionary newBinaryDict = null;
         BeamSearchDecoder newDecoder = null;
-        final String primaryAssetName = getDictionaryAssetForLanguage(currentLang);
-        try (InputStream is = getAssets().open(primaryAssetName)) {
-            final byte[] bytes = new byte[is.available()];
-            is.read(bytes);
-            final ByteBuffer buffer = ByteBuffer.wrap(bytes);
-            newBinaryDict = new BinaryTrieDictionary(buffer);
-            newDecoder = new BeamSearchDecoder(newBinaryDict, mSpatialTouchModel);
-        } catch (Exception e) {
-            Log.w(TAG, "Could not load binary trie dictionary asset: " + primaryAssetName, e);
+        final java.io.File customDictFile = rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager.getInstance().getCustomDictionaryFile(this, currentLang);
+        if (customDictFile != null) {
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(customDictFile);
+                 java.nio.channels.FileChannel channel = fis.getChannel()) {
+                final ByteBuffer buffer = channel.map(java.nio.channels.FileChannel.MapMode.READ_ONLY, 0, customDictFile.length());
+                newBinaryDict = new BinaryTrieDictionary(buffer);
+                newDecoder = new BeamSearchDecoder(newBinaryDict, mSpatialTouchModel);
+                Log.i(TAG, "Loaded custom dictionary for " + currentLang + ": " + customDictFile.getAbsolutePath());
+            } catch (Exception e) {
+                Log.w(TAG, "Could not load custom dictionary for " + currentLang, e);
+            }
         }
         try {
             final UserDictionaryManager manager = mUserDictionaryManager != null
@@ -1143,12 +1144,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mLoadedLanguages = new java.util.HashSet<>(enabledLangs);
         final int loadGeneration = ++mDictLoadGeneration;
         executeDictionaryLoad(currentLang, loadGeneration);
-    }
-
-    private String getDictionaryAssetForLanguage(final String lang) {
-        if ("es".equals(lang)) return "dict_es.bin";
-        if ("ru".equals(lang)) return "dict_ru.bin";
-        return "dict_en.bin";
     }
 
     public void updateSuggestions() {

@@ -265,6 +265,22 @@
     <string name="remove_custom_dict_message">Delete the imported dictionary for %s?</string>
     <string name="remove_custom_dict_confirm">Delete</string>
     <string name="custom_dict_removed_toast">%s dictionary removed</string>
+
+    <!-- Backup & Restore -->
+    <string name="settings_screen_backup">Backup &amp; restore</string>
+    <string name="settings_category_backup">Backup</string>
+    <string name="pref_backup_export_title">Create backup</string>
+    <string name="pref_backup_export_summary">Export current preferences to a JSON file</string>
+    <string name="settings_category_restore">Restore</string>
+    <string name="pref_backup_restore_title">Restore backup</string>
+    <string name="pref_backup_restore_summary">Load preferences from a JSON file</string>
+    <string name="backup_confirm_restore_title">Restore preferences</string>
+    <string name="backup_confirm_restore_message">Restoring from a backup will overwrite your current settings. Do you want to continue?</string>
+    <string name="backup_export_success">Backup exported successfully</string>
+    <string name="backup_export_error">Failed to export backup: %s</string>
+    <string name="backup_restore_success">Successfully restored %d preferences</string>
+    <string name="backup_restore_error">Failed to restore backup: %s</string>
+    <string name="backup_in_progress">Processing backup…</string>
 </resources>
 
 

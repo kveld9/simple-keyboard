@@ -208,6 +208,22 @@
     <string name="remove_custom_dict_message">¿Deseas eliminar el diccionario importado para %s?</string>
     <string name="remove_custom_dict_confirm">Eliminar</string>
     <string name="custom_dict_removed_toast">Diccionario de %s eliminado</string>
+
+    <!-- Copia de seguridad y restauración -->
+    <string name="settings_screen_backup">Copia de seguridad</string>
+    <string name="settings_category_backup">Copia de seguridad</string>
+    <string name="pref_backup_export_title">Crear copia de seguridad</string>
+    <string name="pref_backup_export_summary">Exportar configuración actual a un archivo JSON</string>
+    <string name="settings_category_restore">Restauración</string>
+    <string name="pref_backup_restore_title">Restaurar copia de seguridad</string>
+    <string name="pref_backup_restore_summary">Cargar configuración desde un archivo JSON</string>
+    <string name="backup_confirm_restore_title">Restaurar preferencias</string>
+    <string name="backup_confirm_restore_message">La restauración sobrescribirá la configuración actual. ¿Deseas continuar?</string>
+    <string name="backup_export_success">Copia de seguridad exportada correctamente</string>
+    <string name="backup_export_error">Error al exportar la copia de seguridad: %s</string>
+    <string name="backup_restore_success">Se restauraron correctamente %d preferencias</string>
+    <string name="backup_restore_error">Error al restaurar la copia de seguridad: %s</string>
+    <string name="backup_in_progress">Procesando copia de seguridad…</string>
 </resources>
 
 

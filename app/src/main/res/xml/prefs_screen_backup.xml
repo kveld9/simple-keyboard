@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 Simple Keyboard Authors
+     Licensed under the Apache License, Version 2.0 (the "License");
+-->
+
+<PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:title="@string/settings_screen_backup">
+
+    <PreferenceCategory
+        android:title="@string/settings_category_backup">
+
+        <Preference
+            android:key="pref_backup_export"
+            android:title="@string/pref_backup_export_title"
+            android:summary="@string/pref_backup_export_summary"
+            app:widgetLayout="@layout/preference_chevron" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_category_restore">
+
+        <Preference
+            android:key="pref_backup_restore"
+            android:title="@string/pref_backup_restore_title"
+            android:summary="@string/pref_backup_restore_summary"
+            app:widgetLayout="@layout/preference_chevron" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

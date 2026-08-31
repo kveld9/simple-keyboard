@@ -31,7 +31,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: ${{ github.event_name == 'push' && 0 || 1 }}
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -56,6 +57,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           set -euo pipefail
+          git fetch --tags --force origin || true
           LATEST_TAG="$(git tag --list 'v*' --sort=-v:refname | head -n 1 || true)"
           if [ -z "$LATEST_TAG" ]; then
             MAJOR=7

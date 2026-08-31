@@ -206,6 +206,7 @@
     <string name="import_dictionary_success">Словарь для %1$s успешно импортирован (слов: %2$d)</string>
     <string name="import_dictionary_failed">Не удалось импортировать словарь: %s</string>
     <string name="file_picker_error">Не удалось открыть выбор файлов</string>
+    <string name="select_dictionary_language">Выберите язык словаря</string>
     <string name="remove_custom_dict_title">Удалить словарь</string>
     <string name="remove_custom_dict_message">Удалить импортированный словарь для %s?</string>
     <string name="remove_custom_dict_confirm">Удалить</string>

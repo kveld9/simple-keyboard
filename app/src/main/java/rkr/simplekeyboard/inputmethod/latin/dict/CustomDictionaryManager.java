@@ -84,7 +84,15 @@ public final class CustomDictionaryManager {
             return null;
         }
         final String lang = languageCode.toLowerCase();
-        final File dictFile = new File(getDictionaryDir(context), "dict_" + lang + ".bin");
+        final File dictDir = getDictionaryDir(context);
+        final File dictFile = new File(dictDir, "dict_" + lang + ".bin");
+        if (!dictFile.exists()) {
+            // Crash recovery: if target was renamed to .bak and process died before staging was renamed
+            final File backupFile = new File(dictDir, "dict_" + lang + ".bin.bak");
+            if (backupFile.exists() && backupFile.length() > 16) {
+                backupFile.renameTo(dictFile);
+            }
+        }
         if (dictFile.exists() && dictFile.length() > 16) {
             return dictFile;
         }
@@ -93,6 +101,20 @@ public final class CustomDictionaryManager {
 
     public List<CustomDictInfo> getInstalledDictionaries(final Context context) {
         final File dir = getDictionaryDir(context);
+        // Recovery pass for any orphaned .bak files where target .bin was lost in crash window
+        final File[] bakFiles = dir.listFiles((d, name) -> name.startsWith("dict_") && name.endsWith(".bin.bak"));
+        if (bakFiles != null) {
+            for (final File bak : bakFiles) {
+                final String targetName = bak.getName().substring(0, bak.getName().length() - ".bak".length());
+                final File target = new File(dir, targetName);
+                if (!target.exists() && bak.length() > 16) {
+                    bak.renameTo(target);
+                } else if (target.exists()) {
+                    bak.delete(); // Target exists, clean stale backup
+                }
+            }
+        }
+
         final File[] files = dir.listFiles((d, name) -> name.startsWith("dict_") && name.endsWith(".bin"));
         if (files == null || files.length == 0) {
             return Collections.emptyList();
@@ -144,19 +166,85 @@ public final class CustomDictionaryManager {
         if (fileName == null || fileName.trim().isEmpty()) {
             return null;
         }
-        String name = fileName.trim().toLowerCase(java.util.Locale.US);
-        int lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
-        if (lastSlash >= 0 && lastSlash < name.length() - 1) {
-            name = name.substring(lastSlash + 1);
+        String name = fileName.trim();
+        try {
+            name = java.net.URLDecoder.decode(name, "UTF-8");
+        } catch (Exception ignored) {
         }
-        final java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^(?:dict_)?([a-z]{2,3})(?:_[a-z]{2,4})?(?:\\.[a-z0-9]+)?$");
-        final java.util.regex.Matcher matcher = pattern.matcher(name);
-        if (matcher.matches()) {
-            final String candidate = matcher.group(1);
-            if (isValidLanguageCode(candidate)) {
-                return candidate;
+        if (name == null || name.isEmpty()) {
+            name = fileName.trim();
+        }
+        // Normalize path separators and remove directory/URI prefix
+        final int lastColon = name.lastIndexOf(':');
+        final int lastSlash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+        final int lastSep = Math.max(lastColon, lastSlash);
+        if (lastSep >= 0 && lastSep < name.length() - 1) {
+            name = name.substring(lastSep + 1);
+        }
+
+        name = name.trim().toLowerCase(java.util.Locale.US);
+
+        // Strip known trailing download / duplicate suffixes: e.g. " (1)", "(2)"
+        name = name.replaceAll("\\s*\\(\\d+\\)", "");
+
+        // Strip trailing extensions (.bin, .dict, .gz, .combined, .tmp, .txt)
+        while (true) {
+            final int dotIdx = name.lastIndexOf('.');
+            if (dotIdx > 0) {
+                final String ext = name.substring(dotIdx);
+                if (ext.equals(".bin") || ext.equals(".dict") || ext.equals(".gz")
+                        || ext.equals(".combined") || ext.equals(".tmp") || ext.equals(".txt")) {
+                    name = name.substring(0, dotIdx);
+                    continue;
+                }
+            }
+            break;
+        }
+
+        // Strip trailing version/number suffixes like _1, -1, -2 if present
+        name = name.replaceAll("[-_]\\d+$", "");
+
+        // Strip common prefixes
+        final String[] prefixes = {
+                "simple-keyboard-dict-",
+                "simple-keyboard-dict_",
+                "simple_keyboard_dict_",
+                "dict_",
+                "dict-",
+                "main_",
+                "main-",
+                "extra_",
+                "extra-",
+                "dictionary_",
+                "dictionary-",
+                "wordlist_",
+                "wordlist-"
+        };
+        for (final String p : prefixes) {
+            if (name.startsWith(p)) {
+                name = name.substring(p.length());
+                break;
             }
         }
+
+        // Match exact language tags like "es", "en", "es_es", "es-419", "en_us", "pt_br", "zh_hans", "sr_latn"
+        final java.util.regex.Pattern langTagPattern = java.util.regex.Pattern.compile("^([a-z]{2,3})(?:[-_][a-z0-9]{2,4})?$");
+        final java.util.regex.Matcher langTagMatcher = langTagPattern.matcher(name);
+        if (langTagMatcher.matches()) {
+            final String baseLang = langTagMatcher.group(1);
+            if (isValidLanguageCode(baseLang)) {
+                return baseLang;
+            }
+        }
+
+        // Split by delimiter (_, -, .) and check individual tokens
+        final String[] parts = name.split("[-_.]");
+        for (final String part : parts) {
+            if (isValidLanguageCode(part)) {
+                return part;
+            }
+        }
+
         return null;
     }
 
@@ -168,7 +256,7 @@ public final class CustomDictionaryManager {
         if ("content".equalsIgnoreCase(uri.getScheme())) {
             try (android.database.Cursor cursor = context.getContentResolver().query(uri, new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
                 if (cursor != null && cursor.moveToFirst()) {
-                    int nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                    final int nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
                     if (nameIdx >= 0) {
                         fileName = cursor.getString(nameIdx);
                     }
@@ -192,16 +280,11 @@ public final class CustomDictionaryManager {
         File stagingFile = null;
         try {
             tempFile = File.createTempFile("import_dict_", ".tmp", context.getCacheDir());
-            try (InputStream is = context.getContentResolver().openInputStream(uri);
-                 FileOutputStream fos = new FileOutputStream(tempFile)) {
+            try (InputStream is = context.getContentResolver().openInputStream(uri)) {
                 if (is == null) {
                     return new ImportResult(false, null, 0, "Could not open file URI");
                 }
-                final byte[] buffer = new byte[16384];
-                int read;
-                while ((read = is.read(buffer)) != -1) {
-                    fos.write(buffer, 0, read);
-                }
+                copyStreamWithGzipDetection(is, tempFile);
             }
 
             if (tempFile.length() < 16) {
@@ -232,23 +315,20 @@ public final class CustomDictionaryManager {
 
                 final File targetFile = new File(dictDir, "dict_" + targetLang + ".bin");
                 stagingFile = File.createTempFile("dict_stage_", ".bin", dictDir);
-                copyFile(tempFile, stagingFile);
+                copyFileWithSync(tempFile, stagingFile);
 
                 int wordCount = 0;
                 try (FileInputStream fis = new FileInputStream(stagingFile);
                      FileChannel channel = fis.getChannel()) {
                     final ByteBuffer buf = channel.map(FileChannel.MapMode.READ_ONLY, 0, stagingFile.length());
                     final BinaryTrieDictionary dict = new BinaryTrieDictionary(buf);
+                    if (!dict.validateStructure()) {
+                        return new ImportResult(false, null, 0, "Corrupt SKDB dictionary structure or node bounds");
+                    }
                     wordCount = dict.getWordCount();
                 }
 
-                if (targetFile.exists()) {
-                    targetFile.delete();
-                }
-                if (!stagingFile.renameTo(targetFile)) {
-                    copyFile(stagingFile, targetFile);
-                    stagingFile.delete();
-                }
+                publishStagedFile(stagingFile, targetFile);
 
                 return new ImportResult(true, targetLang, wordCount, "Successfully imported SKDB binary dictionary");
             }
@@ -265,20 +345,23 @@ public final class CustomDictionaryManager {
 
                 if (targetLang == null) {
                     return new ImportResult(false, null, 0,
-                            "Could not determine language from .dict metadata or filename");
+                            "Could not determine language for dictionary file (expected name like dict_<lang>.dict)");
                 }
 
                 final File targetFile = new File(dictDir, "dict_" + targetLang + ".bin");
                 stagingFile = File.createTempFile("dict_stage_", ".bin", dictDir);
                 BinaryTrieCompiler.compile(decoded.words, stagingFile);
 
-                if (targetFile.exists()) {
-                    targetFile.delete();
+                try (FileInputStream fis = new FileInputStream(stagingFile);
+                     FileChannel channel = fis.getChannel()) {
+                    final ByteBuffer buf = channel.map(FileChannel.MapMode.READ_ONLY, 0, stagingFile.length());
+                    final BinaryTrieDictionary dict = new BinaryTrieDictionary(buf);
+                    if (!dict.validateStructure()) {
+                        return new ImportResult(false, null, 0, "Corrupt compiled dictionary structure");
+                    }
                 }
-                if (!stagingFile.renameTo(targetFile)) {
-                    copyFile(stagingFile, targetFile);
-                    stagingFile.delete();
-                }
+
+                publishStagedFile(stagingFile, targetFile);
 
                 return new ImportResult(true, targetLang, decoded.words.size(),
                         "Successfully imported and compiled AOSP .dict (" + decoded.words.size() + " words)");
@@ -299,7 +382,41 @@ public final class CustomDictionaryManager {
         }
     }
 
-    private static void copyFile(final File src, final File dst) throws IOException {
+    private static final long MAX_DECOMPRESSED_BYTES = 50L * 1024L * 1024L; // 50 MB hard limit
+
+    private static void copyStreamWithGzipDetection(final InputStream rawIn, final File dst) throws IOException {
+        final File parent = dst.getParentFile();
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs();
+        }
+        final java.io.PushbackInputStream pbis = new java.io.PushbackInputStream(rawIn, 2);
+        final byte[] header = new byte[2];
+        final int read = pbis.read(header);
+        InputStream effectiveIn = pbis;
+        if (read == 2 && header[0] == (byte) 0x1F && header[1] == (byte) 0x8B) {
+            pbis.unread(header);
+            effectiveIn = new java.util.zip.GZIPInputStream(pbis);
+        } else if (read > 0) {
+            pbis.unread(header, 0, read);
+        }
+
+        try (FileOutputStream fos = new FileOutputStream(dst)) {
+            final byte[] buffer = new byte[16384];
+            long totalRead = 0;
+            int len;
+            while ((len = effectiveIn.read(buffer)) != -1) {
+                totalRead += len;
+                if (totalRead > MAX_DECOMPRESSED_BYTES) {
+                    throw new IOException("Dictionary exceeds maximum allowed size (" + (MAX_DECOMPRESSED_BYTES / (1024 * 1024)) + " MB)");
+                }
+                fos.write(buffer, 0, len);
+            }
+            fos.flush();
+            fos.getFD().sync();
+        }
+    }
+
+    private static void copyFileWithSync(final File src, final File dst) throws IOException {
         final File parent = dst.getParentFile();
         if (parent != null && !parent.exists()) {
             parent.mkdirs();
@@ -310,6 +427,46 @@ public final class CustomDictionaryManager {
             int len;
             while ((len = in.read(buf)) > 0) {
                 out.write(buf, 0, len);
+            }
+            out.flush();
+            out.getFD().sync();
+        }
+    }
+
+    public static void publishStagedFile(final File stagingFile, final File targetFile) throws IOException {
+        if (!stagingFile.exists()) {
+            throw new IOException("Staging file does not exist: " + stagingFile.getAbsolutePath());
+        }
+        final File parent = targetFile.getParentFile();
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs();
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            java.nio.file.Files.move(
+                    stagingFile.toPath(),
+                    targetFile.toPath(),
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            );
+        } else {
+            // Atomic rename on same POSIX filesystem
+            if (!stagingFile.renameTo(targetFile)) {
+                // If renameTo fails because target exists on some OS variants:
+                // Safely backup existing target before rename, and restore if second rename fails
+                final File backupFile = new File(parent, targetFile.getName() + ".bak");
+                if (targetFile.exists() && !targetFile.renameTo(backupFile)) {
+                    throw new IOException("Could not backup existing dictionary for atomic replacement");
+                }
+                if (!stagingFile.renameTo(targetFile)) {
+                    if (backupFile.exists()) {
+                        backupFile.renameTo(targetFile); // Restore original target intact
+                    }
+                    throw new IOException("Atomic rename of staging dictionary failed");
+                }
+                if (backupFile.exists()) {
+                    backupFile.delete();
+                }
             }
         }
     }

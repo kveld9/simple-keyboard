@@ -31,9 +31,9 @@ public class ClipboardSearchTest {
 
     @Test
     public void testMatchesQuerySubstring() {
-        assertTrue(ClipboardDatabase.matchesQuery("https://github.com/LeanBitLab/LeanType", "leanbit"));
-        assertTrue(ClipboardDatabase.matchesQuery("https://github.com/LeanBitLab/LeanType", "github.com"));
-        assertFalse(ClipboardDatabase.matchesQuery("https://github.com/LeanBitLab/LeanType", "gitlab"));
+        assertTrue(ClipboardDatabase.matchesQuery("https://github.com/soyelmismo/simple-keyboard", "soyelmismo"));
+        assertTrue(ClipboardDatabase.matchesQuery("https://github.com/soyelmismo/simple-keyboard", "github.com"));
+        assertFalse(ClipboardDatabase.matchesQuery("https://github.com/soyelmismo/simple-keyboard", "gitlab"));
     }
 
     @Test

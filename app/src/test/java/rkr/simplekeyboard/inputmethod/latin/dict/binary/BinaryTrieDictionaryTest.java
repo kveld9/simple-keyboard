@@ -18,14 +18,17 @@ public class BinaryTrieDictionaryTest {
 
     @Before
     public void setUp() throws IOException {
-        esDict = loadDictionary("src/main/assets/dict_es.bin");
-        enDict = loadDictionary("src/main/assets/dict_en.bin");
+        esDict = loadDictionary("dict_es.bin");
+        enDict = loadDictionary("dict_en.bin");
     }
 
-    private BinaryTrieDictionary loadDictionary(String path) throws IOException {
-        File file = new File(path);
+    private BinaryTrieDictionary loadDictionary(String filename) throws IOException {
+        File file = new File("dictionaries/" + filename);
         if (!file.exists()) {
-            throw new RuntimeException("Test dictionary not found: " + path);
+            file = new File("../dictionaries/" + filename);
+        }
+        if (!file.exists()) {
+            throw new RuntimeException("Test dictionary not found: " + filename);
         }
         try (FileInputStream fis = new FileInputStream(file);
              FileChannel channel = fis.getChannel()) {
@@ -43,6 +46,12 @@ public class BinaryTrieDictionaryTest {
         assertTrue("Should contain 'rara'", esDict.containsWord("rara"));
         assertTrue("Should contain 'the'", enDict.containsWord("the"));
         
+        assertTrue("Should contain 'bien'", esDict.containsWord("bien"));
+        assertFalse("Should not contain 'bién'", esDict.containsWord("bién"));
+        assertTrue("Should contain 'hola'", esDict.containsWord("hola"));
+        assertFalse("Should not contain 'holá'", esDict.containsWord("holá"));
+        assertTrue("Should contain 'también'", esDict.containsWord("también"));
+        assertFalse("Should not contain 'tí'", esDict.containsWord("tí"));
         assertFalse("Should not contain 'nonexistentword123'", esDict.containsWord("nonexistentword123"));
     }
 

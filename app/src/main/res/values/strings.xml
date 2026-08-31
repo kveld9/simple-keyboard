@@ -243,6 +243,28 @@
     <string name="learned_words_cleared">Learned words cleared</string>
     <string name="clear_blocked_words_summary">Unblock all blocked words</string>
     <string name="blocked_words_cleared">Blocked words cleared</string>
+
+    <!-- Custom / External Dictionaries -->
+    <string name="settings_category_custom_dictionaries">External Dictionaries</string>
+    <string name="custom_dictionaries_title">Manage Dictionaries</string>
+    <string name="custom_dictionaries_summary">Import, replace or delete .dict and .bin language dictionaries</string>
+    <string name="installed_custom_dictionaries_title">Installed Dictionaries</string>
+    <string name="dictionary_actions_title">Actions</string>
+    <string name="import_dictionary_title">Import dictionary from file</string>
+    <string name="import_dictionary_summary">Load a .dict or .bin file</string>
+    <string name="download_dictionaries_title">Download dictionaries</string>
+    <string name="download_dictionaries_summary">Browse compatible language dictionaries</string>
+    <string name="no_custom_dictionaries_title">No dictionaries installed</string>
+    <string name="no_custom_dictionaries_summary">Import a .dict or .bin file to enable word suggestions</string>
+    <string name="custom_dict_item_summary">%1$d words · %2$s</string>
+    <string name="importing_dictionary_progress">Importing and processing dictionary…</string>
+    <string name="import_dictionary_success">Successfully imported %1$s dictionary (%2$d words)</string>
+    <string name="import_dictionary_failed">Failed to import dictionary: %s</string>
+    <string name="file_picker_error">Could not open file picker</string>
+    <string name="remove_custom_dict_title">Delete Dictionary</string>
+    <string name="remove_custom_dict_message">Delete the imported dictionary for %s?</string>
+    <string name="remove_custom_dict_confirm">Delete</string>
+    <string name="custom_dict_removed_toast">%s dictionary removed</string>
 </resources>
 
 

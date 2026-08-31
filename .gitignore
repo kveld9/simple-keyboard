@@ -49,3 +49,8 @@ RELEASE_SIGNING.md
 .idea
 .reports/
 *.patch
+artifacts/
+artifacts_*/
+tooling/
+__pycache__/
+*.pyc

@@ -270,6 +270,14 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
     private void locatePreviewPlacerView() {
         getLocationInWindow(mOriginCoords);
         mDrawingPreviewPlacerView.setKeyboardViewGeometry(mOriginCoords);
+        final View parent = (View) mDrawingPreviewPlacerView.getParent();
+        if (parent != null && (mDrawingPreviewPlacerView.getWidth() == 0 || mDrawingPreviewPlacerView.getHeight() == 0)) {
+            final int w = parent.getWidth();
+            final int h = parent.getHeight();
+            if (w > 0 && h > 0) {
+                mDrawingPreviewPlacerView.layout(0, 0, w, h);
+            }
+        }
         mDrawingPreviewPlacerView.bringToFront();
     }
 
@@ -287,10 +295,18 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         }
         final ViewGroup currentParent = (ViewGroup) mDrawingPreviewPlacerView.getParent();
         if (currentParent != null) {
+            if (currentParent == windowContentView) {
+                return;
+            }
             currentParent.removeView(mDrawingPreviewPlacerView);
         }
         windowContentView.addView(mDrawingPreviewPlacerView,
                 new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        final int w = windowContentView.getWidth();
+        final int h = windowContentView.getHeight();
+        if (w > 0 && h > 0) {
+            mDrawingPreviewPlacerView.layout(0, 0, w, h);
+        }
     }
 
     // Implements {@link DrawingProxy#onKeyPressed(Key,boolean)}.

@@ -195,8 +195,10 @@
     <string name="dictionary_actions_title">Acciones</string>
     <string name="import_dictionary_title">Importar diccionario desde archivo</string>
     <string name="import_dictionary_summary">Cargar un archivo .dict o .bin</string>
-    <string name="download_dictionaries_title">Descargar diccionarios</string>
-    <string name="download_dictionaries_summary">Explorar diccionarios de idioma compatibles</string>
+    <string name="download_repo_dictionaries_title">Descargar diccionarios del repositorio</string>
+    <string name="download_repo_dictionaries_summary">Explorar diccionarios precompilados en GitHub</string>
+    <string name="download_helium314_dictionaries_title">Descargar diccionarios de AOSP (Helium314)</string>
+    <string name="download_helium314_dictionaries_summary">Explorar diccionarios compatibles en Codeberg</string>
     <string name="no_custom_dictionaries_title">No hay diccionarios instalados</string>
     <string name="no_custom_dictionaries_summary">Importa un archivo .dict o .bin para habilitar sugerencias de palabras</string>
     <string name="custom_dict_item_summary">%1$d palabras · %2$s</string>
@@ -209,9 +211,3 @@
     <string name="remove_custom_dict_confirm">Eliminar</string>
     <string name="custom_dict_removed_toast">Diccionario de %s eliminado</string>
 </resources>
-
-
-
-
-
-

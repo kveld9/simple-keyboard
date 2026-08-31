@@ -341,7 +341,10 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     private void updateSearchTextDisplay() {
-        if (mSearchQueryView == null) return;
+        if (mSearchQueryView == null) {
+            Log.w(TAG, "updateSearchText: mSearchQueryView is null");
+            return;
+        }
         if (mSearchQuery.isEmpty()) {
             mSearchQueryView.setText("");
             mSearchQueryView.setHint(R.string.clipboard_search_hint);
@@ -353,7 +356,10 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     private void executeDbTaskAndReload(final Runnable dbTask) {
-        if (mDatabase == null) return;
+        if (mDatabase == null) {
+            Log.w(TAG, "executeDbTaskAndReload: mDatabase is null");
+            return;
+        }
         final long token = ++mCurrentQueryToken;
         final String query = mIsSearchActive ? mSearchQuery : null;
         try {
@@ -530,7 +536,10 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     private void togglePinClip(final ClipboardHistoryEntry entry) {
-        if (mDatabase == null) return;
+        if (mDatabase == null) {
+            Log.w(TAG, "togglePinClip: mDatabase is null");
+            return;
+        }
         if (!entry.isPinned) {
             mAsyncExecutor.execute(() -> {
                 final boolean success = mDatabase.setPinned(entry.id, true);

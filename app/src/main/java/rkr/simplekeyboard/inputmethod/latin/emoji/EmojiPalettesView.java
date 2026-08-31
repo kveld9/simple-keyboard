@@ -327,10 +327,13 @@ public class EmojiPalettesView extends LinearLayout {
             mRecentEmojiBuilder.append(mRecentEmojis.get(i));
         }
         try {
-            rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat.getDeviceSharedPreferences(getContext())
-                    .edit()
-                    .putString(PREF_RECENT_EMOJIS, mRecentEmojiBuilder.toString())
-                    .apply();
+            final SharedPreferences prefs = rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat.getDeviceSharedPreferences(getContext());
+            final String recentEmojis = mRecentEmojiBuilder.toString();
+            if (!recentEmojis.equals(prefs.getString(PREF_RECENT_EMOJIS, null))) {
+                prefs.edit()
+                        .putString(PREF_RECENT_EMOJIS, recentEmojis)
+                        .apply();
+            }
         } catch (Throwable e) {
             android.util.Log.w("EmojiPalettesView", "Failed to save recent emojis", e);
         }

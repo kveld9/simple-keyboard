@@ -1987,17 +1987,21 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         final String cleanWord = word.trim();
+        final String canonicalWord = (!rkr.simplekeyboard.inputmethod.latin.common.StringUtils.hasInternalUpperCase(cleanWord)
+                && Character.isUpperCase(cleanWord.charAt(0)))
+                ? cleanWord.toLowerCase(java.util.Locale.ROOT)
+                : cleanWord;
         mDictExecutor.execute(() -> {
-            mPrefixDictionary.insert(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+            mPrefixDictionary.insert(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
             if (mUserDictionaryManager != null) {
-                mUserDictionaryManager.addWord(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                mUserDictionaryManager.addWord(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
             } else {
-                UserDictionaryManager.getInstance(this).addWord(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                UserDictionaryManager.getInstance(this).addWord(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
             }
             if (!isWordEmpty(w2)) {
-                mPrefixDictionary.setBigram(w2.trim(), cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                mPrefixDictionary.setBigram(w2.trim(), canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
                 if (!isWordEmpty(w1)) {
-                    mPrefixDictionary.setTrigram(w1.trim(), w2.trim(), cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                    mPrefixDictionary.setTrigram(w1.trim(), w2.trim(), canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
                 }
             }
         });

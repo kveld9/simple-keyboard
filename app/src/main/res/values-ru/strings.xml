@@ -26,6 +26,7 @@
     <string name="settings_screen_key_press">Нажатие клавиш</string>
     <string name="settings_screen_appearance">Внешний вид</string>
     <string name="settings_screen_theme">Тема</string>
+    <string name="settings_screen_advanced">Расширенные настройки</string>
     <string name="version">Версия</string>
     <string name="abbreviation_unit_milliseconds"><xliff:g id="MILLISECONDS">%d</xliff:g> мс</string>
     <string name="settings_system_default">По умолчанию</string>
@@ -49,6 +50,18 @@
     <string name="button_default">По умолчанию</string>
     <string name="prefs_keyboard_height_settings">Высота клавиатуры</string>
     <string name="prefs_bottom_offset_portrait_settings">Нижнее смещение</string>
+    <string name="prefs_bottom_offset_landscape_settings">Нижний отступ (альбомная ориентация)</string>
+    <string name="settings_category_key_repeat">Повтор и удаление клавиш</string>
+    <string name="prefs_key_repeat_start_timeout">Задержка перед началом повтора</string>
+    <string name="prefs_key_repeat_interval">Интервал повтора клавиш</string>
+    <string name="settings_category_vibration">Тактильный отклик</string>
+    <string name="prefs_vibration_duration">Длительность вибрации</string>
+    <string name="settings_category_popup_preview">Всплывающее превью клавиш</string>
+    <string name="prefs_key_preview_linger_timeout">Задержка скрытия превью клавиш</string>
+    <string name="settings_category_appearance_advanced">Экран и отступы</string>
+    <string name="settings_category_clipboard_advanced">Ограничения буфера обмена</string>
+    <string name="prefs_clipboard_max_clips">Лимит сохранённых записей</string>
+    <string name="unit_clips"><xliff:g id="CLIPS">%d</xliff:g> записей</string>
     <string name="show_special_chars">Показать специальные символы</string>
     <string name="show_language_switch_key">Показать кнопку переключения языка</string>
     <string name="show_language_on_spacebar">Показывать язык на пробеле</string>
@@ -173,4 +186,26 @@
     <string name="learned_words_cleared">Выученные слова очищены</string>
     <string name="clear_blocked_words_summary">Разблокировать все заблокированные слова</string>
     <string name="blocked_words_cleared">Заблокированные слова очищены</string>
+
+    <!-- Custom / External Dictionaries -->
+    <string name="settings_category_custom_dictionaries">Внешние словари</string>
+    <string name="custom_dictionaries_title">Управление словарями</string>
+    <string name="custom_dictionaries_summary">Импорт, замена или удаление словарей языка (.dict и .bin)</string>
+    <string name="installed_custom_dictionaries_title">Установленные словари</string>
+    <string name="dictionary_actions_title">Действия</string>
+    <string name="import_dictionary_title">Импортировать словарь из файла</string>
+    <string name="import_dictionary_summary">Загрузить файл .dict или .bin</string>
+    <string name="download_dictionaries_title">Скачать словари</string>
+    <string name="download_dictionaries_summary">Поиск совместимых языковых словарей</string>
+    <string name="no_custom_dictionaries_title">Нет установленных словарей</string>
+    <string name="no_custom_dictionaries_summary">Импортируйте файл .dict или .bin для включения подсказок слов</string>
+    <string name="custom_dict_item_summary">Слов: %1$d · %2$s</string>
+    <string name="importing_dictionary_progress">Импорт и обработка словаря…</string>
+    <string name="import_dictionary_success">Словарь для %1$s успешно импортирован (слов: %2$d)</string>
+    <string name="import_dictionary_failed">Не удалось импортировать словарь: %s</string>
+    <string name="file_picker_error">Не удалось открыть выбор файлов</string>
+    <string name="remove_custom_dict_title">Удалить словарь</string>
+    <string name="remove_custom_dict_message">Удалить импортированный словарь для %s?</string>
+    <string name="remove_custom_dict_confirm">Удалить</string>
+    <string name="custom_dict_removed_toast">Словарь для %s удалён</string>
 </resources>

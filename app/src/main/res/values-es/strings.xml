@@ -186,6 +186,28 @@
     <string name="learned_words_cleared">Palabras aprendidas eliminadas</string>
     <string name="clear_blocked_words_summary">Desbloquear todas las palabras bloqueadas</string>
     <string name="blocked_words_cleared">Palabras bloqueadas restablecidas</string>
+
+    <!-- Custom / External Dictionaries -->
+    <string name="settings_category_custom_dictionaries">Diccionarios externos</string>
+    <string name="custom_dictionaries_title">Administrar diccionarios</string>
+    <string name="custom_dictionaries_summary">Importar, reemplazar o eliminar diccionarios de idioma .dict y .bin</string>
+    <string name="installed_custom_dictionaries_title">Diccionarios instalados</string>
+    <string name="dictionary_actions_title">Acciones</string>
+    <string name="import_dictionary_title">Importar diccionario desde archivo</string>
+    <string name="import_dictionary_summary">Cargar un archivo .dict o .bin</string>
+    <string name="download_dictionaries_title">Descargar diccionarios</string>
+    <string name="download_dictionaries_summary">Explorar diccionarios de idioma compatibles</string>
+    <string name="no_custom_dictionaries_title">No hay diccionarios instalados</string>
+    <string name="no_custom_dictionaries_summary">Importa un archivo .dict o .bin para habilitar sugerencias de palabras</string>
+    <string name="custom_dict_item_summary">%1$d palabras · %2$s</string>
+    <string name="importing_dictionary_progress">Importando y procesando diccionario…</string>
+    <string name="import_dictionary_success">Diccionario de %1$s importado con éxito (%2$d palabras)</string>
+    <string name="import_dictionary_failed">Error al importar diccionario: %s</string>
+    <string name="file_picker_error">No se pudo abrir el selector de archivos</string>
+    <string name="remove_custom_dict_title">Eliminar diccionario</string>
+    <string name="remove_custom_dict_message">¿Deseas eliminar el diccionario importado para %s?</string>
+    <string name="remove_custom_dict_confirm">Eliminar</string>
+    <string name="custom_dict_removed_toast">Diccionario de %s eliminado</string>
 </resources>
 
 

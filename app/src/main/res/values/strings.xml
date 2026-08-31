@@ -185,6 +185,30 @@
     <string name="suggestions_in_urls_summary">Display word suggestions in address bars and email fields</string>
     <string name="forget_word_title">Forget word</string>
     <string name="forget_word_message">Do you want to forget \"%s\"?</string>
+    <string name="settings_screen_dictionary">Dictionary</string>
+    <string name="settings_category_dictionary">Dictionary</string>
+    <string name="auto_learn">Auto-learn</string>
+    <string name="auto_learn_summary">Save new words as you type</string>
+    <string name="learned_words">Learned words</string>
+    <string name="learned_words_summary_zero">No saved words</string>
+    <string name="learned_words_summary_count">%d saved words</string>
+    <string name="blocked_words">Blocked words</string>
+    <string name="blocked_words_summary_zero">No blocked words</string>
+    <string name="blocked_words_summary_count">%d blocked words</string>
+    <string name="add_word">Add word</string>
+    <string name="add_word_hint">Enter word</string>
+    <string name="clear_all">Clear all</string>
+    <string name="clear_learned_words_title">Clear learned words</string>
+    <string name="clear_learned_words_message">Are you sure you want to remove all learned words?</string>
+    <string name="clear_blocked_words_title">Clear blocked words</string>
+    <string name="clear_blocked_words_message">Are you sure you want to unblock all words?</string>
+    <string name="unblock_word">Unblock</string>
+    <string name="delete_word">Delete</string>
+    <string name="search_words_hint">Search words…</string>
+    <string name="no_learned_words">No learned words yet</string>
+    <string name="no_blocked_words">No blocked words</string>
+    <string name="word_added">Word added</string>
+    <string name="word_already_exists">Word already exists</string>
 </resources>
 
 

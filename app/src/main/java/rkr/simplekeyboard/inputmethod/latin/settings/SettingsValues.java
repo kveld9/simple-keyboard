@@ -56,6 +56,7 @@ public class SettingsValues {
     public final boolean mClipboardEnabled;
     public final boolean mClipboardSuggestionsEnabled;
     public final boolean mSuggestScreenshots;
+    public final boolean mAutoLearnEnabled;
     public final boolean mAutoCorrectionEnabled;
     public final float mAutoCorrectionThreshold;
 
@@ -108,6 +109,7 @@ public class SettingsValues {
         mClipboardEnabled = prefs.getBoolean(Settings.PREF_CLIPBOARD_ENABLED, true);
         mClipboardSuggestionsEnabled = prefs.getBoolean(Settings.PREF_CLIPBOARD_SUGGESTIONS, false);
         mSuggestScreenshots = prefs.getBoolean(Settings.PREF_SUGGEST_SCREENSHOTS, false);
+        mAutoLearnEnabled = prefs.getBoolean(Settings.PREF_AUTO_LEARN, true);
         mAutoCorrectionThreshold = Settings.readAutoCorrectionThreshold(prefs);
         mAutoCorrectionEnabled = mAutoCorrectionThreshold > 0.0f;
     }

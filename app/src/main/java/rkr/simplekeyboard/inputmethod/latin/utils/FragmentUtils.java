@@ -22,9 +22,12 @@ import java.util.HashSet;
 
 import rkr.simplekeyboard.inputmethod.latin.settings.AppearanceSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.AutocorrectSettingsFragment;
+import rkr.simplekeyboard.inputmethod.latin.settings.BlockedWordsSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.ClipboardSettingsFragment;
+import rkr.simplekeyboard.inputmethod.latin.settings.DictionarySettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.KeyPressSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.LanguagesSettingsFragment;
+import rkr.simplekeyboard.inputmethod.latin.settings.LearnedWordsSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.PreferencesSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.ThemeSettingsFragment;
@@ -34,6 +37,9 @@ public class FragmentUtils {
     static {
         sLatinImeFragments.add(PreferencesSettingsFragment.class.getName());
         sLatinImeFragments.add(AutocorrectSettingsFragment.class.getName());
+        sLatinImeFragments.add(DictionarySettingsFragment.class.getName());
+        sLatinImeFragments.add(LearnedWordsSettingsFragment.class.getName());
+        sLatinImeFragments.add(BlockedWordsSettingsFragment.class.getName());
         sLatinImeFragments.add(ClipboardSettingsFragment.class.getName());
         sLatinImeFragments.add(KeyPressSettingsFragment.class.getName());
         sLatinImeFragments.add(AppearanceSettingsFragment.class.getName());

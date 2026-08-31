@@ -44,6 +44,14 @@
             app:widgetLayout="@layout/preference_chevron" />
 
         <Preference
+            android:key="screen_dictionary"
+            android:title="@string/settings_screen_dictionary"
+            android:icon="@drawable/ic_dictionary"
+            app:iconTint="?attr/colorOnSurfaceVariant"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.DictionarySettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+        <Preference
             android:key="screen_clipboard"
             android:title="@string/settings_screen_clipboard"
             android:icon="@drawable/ic_content_paste"

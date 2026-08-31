@@ -17,11 +17,10 @@ on:
 
 permissions:
   contents: write
-  actions: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ci:
@@ -57,7 +56,6 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           set -euo pipefail
-          git fetch --tags --force origin || true
           LATEST_TAG="$(git tag --list 'v*' --sort=-v:refname | head -n 1 || true)"
           if [ -z "$LATEST_TAG" ]; then
             MAJOR=7
@@ -114,7 +112,7 @@ jobs:
           fi
 
       # Master Workflow: 3. Single-Pass Build & Tests
-      - name: Test & Assemble Multi-Arch APKs
+      - name: Test & Assemble APKs
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}

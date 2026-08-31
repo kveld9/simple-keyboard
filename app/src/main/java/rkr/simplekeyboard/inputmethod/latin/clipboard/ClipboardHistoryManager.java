@@ -137,9 +137,13 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
             mExecutor.execute(() -> {
                 try {
                     mDatabase.close();
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    Log.w(TAG, "Clipboard op failed", ignored);
+                }
             });
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            Log.w(TAG, "Clipboard op failed", ignored);
+        }
         mExecutor.shutdown();
     }
 
@@ -227,7 +231,9 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
             if (BuildCompatUtils.isAtLeastO() && clip.getDescription() != null && clip.getDescription().getTimestamp() > 0) {
                 clipTimestamp = clip.getDescription().getTimestamp();
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            Log.w(TAG, "Clipboard op failed", ignored);
+        }
 
         storeClipTextIfChanged(currentText, clipTimestamp);
         return currentText;
@@ -258,6 +264,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
                     });
                 });
             } catch (java.util.concurrent.RejectedExecutionException ignored) {
+                Log.w(TAG, "Clipboard op failed", ignored);
                 // Executor shutting down
             }
         } else if (mLastTextTime <= 0) {
@@ -350,7 +357,9 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         if (mScreenshotObserver != null) {
             try {
                 mContext.getContentResolver().unregisterContentObserver(mScreenshotObserver);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+                Log.w(TAG, "Clipboard op failed", ignored);
+            }
             mScreenshotObserver = null;
         }
     }
@@ -537,12 +546,16 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
                     options.inPreferredConfig = Bitmap.Config.RGB_565;
                     bitmap = BitmapFactory.decodeFile(info.fullPath, options);
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+                Log.w(TAG, "Clipboard op failed", ignored);
+            }
         }
         if (bitmap == null && BuildCompatUtils.isAtLeastQ() && info.uri != null) {
             try {
                 bitmap = mContext.getContentResolver().loadThumbnail(info.uri, new Size(64, 64), null);
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+                Log.w(TAG, "Clipboard op failed", ignored);
+            }
         }
         info.cachedThumbnail = bitmap;
         return bitmap;

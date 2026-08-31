@@ -31,6 +31,7 @@ import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import java.util.HashSet;
@@ -515,9 +516,15 @@ public class KeyboardView extends View {
     private void drawKeyIcon(final Key key, final Canvas canvas, final KeyDrawParams params,
             final int keyWidth, final int keyHeight) {
         final Keyboard keyboard = getKeyboard();
-        if (keyboard == null) return;
+        if (keyboard == null) {
+            Log.w("KeyboardView", "KeyboardView: keyboard/icon is null");
+            return;
+        }
         final Drawable icon = key.getIcon(keyboard.mIconsSet, params.mAnimAlpha);
-        if (icon == null) return;
+        if (icon == null) {
+            Log.w("KeyboardView", "KeyboardView: keyboard/icon is null");
+            return;
+        }
 
         final int iconWidth = Math.min(icon.getIntrinsicWidth(), keyWidth);
         final int iconHeight = icon.getIntrinsicHeight();

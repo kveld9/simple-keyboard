@@ -40,7 +40,10 @@ public abstract class SubScreenFragment extends BasePreferenceFragment
         implements OnSharedPreferenceChangeListener {
 
     static void removePreference(final String prefKey, final PreferenceScreen screen) {
-        if (screen == null) return;
+        if (screen == null) {
+            Log.w("SubScreenFragment", "SubScreenFragment: screen/pref is null");
+            return;
+        }
         final Preference preference = screen.findPreference(prefKey);
         if (preference != null) {
             screen.removePreference(preference);
@@ -60,7 +63,10 @@ public abstract class SubScreenFragment extends BasePreferenceFragment
         super.addPreferencesFromResource(preferencesResId);
 
         final Context context = getContext();
-        if (context == null) return;
+        if (context == null) {
+            Log.w("SubScreenFragment", "SubScreenFragment: screen/pref is null");
+            return;
+        }
         final Set<String> restrictionKeys = getSharedPreferences().getStringSet(Settings.ACTIVE_RESTRICTIONS, null);
         if (restrictionKeys != null && !restrictionKeys.isEmpty()) {
             final PreferenceGroup group = getPreferenceScreen();

@@ -74,6 +74,7 @@ public class EmojiPalettesView extends LinearLayout {
     private final List<String> mRecentEmojis = new ArrayList<>();
     private final List<TextView> mCategoryTabViews = new ArrayList<>();
     private boolean mRecentEmojisLoaded = false;
+    private boolean mRecentEmojisDirty = false;
     private final StringBuilder mRecentEmojiBuilder = new StringBuilder();
 
     public EmojiPalettesView(Context context) {
@@ -236,6 +237,7 @@ public class EmojiPalettesView extends LinearLayout {
     }
 
     public void reloadRecentEmojis() {
+        saveRecentEmojis();
         mRecentEmojisLoaded = false;
         loadRecentEmojis(getContext());
         selectCategory(mCurrentCategoryIndex);
@@ -270,7 +272,7 @@ public class EmojiPalettesView extends LinearLayout {
 
     private void loadRecentEmojis(Context context) {
         if (context == null) {
-            android.util.Log.e("EmojiPalettesView", "Context is null in loadRecentEmojis");
+            android.util.Log.w("EmojiPalettesView", "Context is null in loadRecentEmojis");
             return;
         }
         if (mRecentEmojisLoaded) return;
@@ -289,7 +291,7 @@ public class EmojiPalettesView extends LinearLayout {
             }
             mRecentEmojisLoaded = true;
         } catch (Throwable e) {
-            android.util.Log.e("EmojiPalettesView", "Failed to load recent emojis", e);
+            android.util.Log.w("EmojiPalettesView", "Failed to load recent emojis", e);
         }
     }
 
@@ -304,6 +306,20 @@ public class EmojiPalettesView extends LinearLayout {
         if (mRecentEmojis.size() > MAX_RECENT_EMOJIS) {
             mRecentEmojis.remove(mRecentEmojis.size() - 1);
         }
+        mRecentEmojisDirty = true;
+
+        if (mCurrentCategoryIndex == 0) {
+            mGridAdapter.setItems(mRecentEmojis);
+            mEmptyRecentView.setVisibility(mRecentEmojis.isEmpty() ? VISIBLE : GONE);
+            mEmojiGridView.setVisibility(mRecentEmojis.isEmpty() ? GONE : VISIBLE);
+        }
+    }
+
+    public void saveRecentEmojis() {
+        if (!mRecentEmojisDirty) {
+            return;
+        }
+        mRecentEmojisDirty = false;
 
         mRecentEmojiBuilder.setLength(0);
         for (int i = 0; i < mRecentEmojis.size(); i++) {
@@ -316,14 +332,14 @@ public class EmojiPalettesView extends LinearLayout {
                     .putString(PREF_RECENT_EMOJIS, mRecentEmojiBuilder.toString())
                     .apply();
         } catch (Throwable e) {
-            android.util.Log.e("EmojiPalettesView", "Failed to save recent emojis", e);
+            android.util.Log.w("EmojiPalettesView", "Failed to save recent emojis", e);
         }
+    }
 
-        if (mCurrentCategoryIndex == 0) {
-            mGridAdapter.setItems(mRecentEmojis);
-            mEmptyRecentView.setVisibility(mRecentEmojis.isEmpty() ? VISIBLE : GONE);
-            mEmojiGridView.setVisibility(mRecentEmojis.isEmpty() ? GONE : VISIBLE);
-        }
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        saveRecentEmojis();
     }
 
     public void reloadThemeColors() {
@@ -336,6 +352,7 @@ public class EmojiPalettesView extends LinearLayout {
     }
 
     public void deallocateMemory() {
+        saveRecentEmojis();
         mRecentEmojis.clear();
     }
 

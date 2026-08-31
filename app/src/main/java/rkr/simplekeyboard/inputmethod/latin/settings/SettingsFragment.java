@@ -125,12 +125,21 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
     }
 
     public void updateImeBanner() {
-        if (mImeBannerPref == null) return;
+        if (mImeBannerPref == null) {
+            Log.w(TAG, "SettingsFragment: context/imm is null");
+            return;
+        }
         final Context context = getContext();
-        if (context == null) return;
+        if (context == null) {
+            Log.w(TAG, "SettingsFragment: context/imm is null");
+            return;
+        }
 
         final InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (imm == null) return;
+        if (imm == null) {
+            Log.w(TAG, "SettingsFragment: context/imm is null");
+            return;
+        }
 
         final String currentIme = Settings.Secure.getString(
                 context.getContentResolver(),

@@ -52,15 +52,15 @@ public final class KeyPreviewChoreographer {
 
     public KeyPreviewView getKeyPreviewView(final Key key, final ViewGroup placerView) {
         KeyPreviewView keyPreviewView = mShowingKeyPreviewViews.remove(key);
-        if (keyPreviewView != null) {
-            keyPreviewView.setScaleX(1);
-            keyPreviewView.setScaleY(1);
-            return keyPreviewView;
+        if (keyPreviewView == null) {
+            keyPreviewView = mFreeKeyPreviewViews.poll();
         }
-        keyPreviewView = mFreeKeyPreviewViews.poll();
         if (keyPreviewView != null) {
             keyPreviewView.setScaleX(1);
             keyPreviewView.setScaleY(1);
+            if (keyPreviewView.getParent() == null) {
+                placerView.addView(keyPreviewView, ViewLayoutUtils.newLayoutParam(placerView, 0, 0));
+            }
             return keyPreviewView;
         }
         final Context context = placerView.getContext();
@@ -68,6 +68,19 @@ public final class KeyPreviewChoreographer {
         keyPreviewView.setBackgroundResource(mParams.mPreviewBackgroundResId);
         placerView.addView(keyPreviewView, ViewLayoutUtils.newLayoutParam(placerView, 0, 0));
         return keyPreviewView;
+    }
+
+    public void deallocate() {
+        for (final KeyPreviewView view : mShowingKeyPreviewViews.values()) {
+            final Object tag = view.getTag();
+            if (tag instanceof Animator) {
+                ((Animator) tag).cancel();
+            }
+            view.setTag(null);
+            view.setVisibility(View.INVISIBLE);
+        }
+        mShowingKeyPreviewViews.clear();
+        mFreeKeyPreviewViews.clear();
     }
 
     public void dismissKeyPreview(final Key key, final boolean withAnimation) {

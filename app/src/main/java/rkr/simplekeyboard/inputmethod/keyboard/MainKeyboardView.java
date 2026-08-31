@@ -362,6 +362,9 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         mDrawingPreviewPlacerView.removeAllViews();
+        if (mKeyPreviewChoreographer != null) {
+            mKeyPreviewChoreographer.deallocate();
+        }
     }
 
     // Implements {@link DrawingProxy@showMoreKeysKeyboard(Key,PointerTracker)}.
@@ -523,6 +526,9 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         mMoreKeysKeyboardCache.clear();
         if (mDrawingPreviewPlacerView != null) {
             mDrawingPreviewPlacerView.removeAllViews();
+        }
+        if (mKeyPreviewChoreographer != null) {
+            mKeyPreviewChoreographer.deallocate();
         }
     }
 

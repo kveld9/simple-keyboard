@@ -1061,13 +1061,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         final String currentLang = currentLocale.getLanguage();
         final java.io.File customDictFile = rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager.getInstance().getCustomDictionaryFile(this, currentLang);
-        if (customDictFile != null && mBinaryTrieDictionary == null) {
-            return false;
-        }
-        if (customDictFile == null && mBinaryTrieDictionary != null) {
-            return false;
-        }
-        return true;
+        final boolean hasCustomDict = customDictFile != null;
+        final boolean hasBinaryDict = mBinaryTrieDictionary != null;
+        return hasCustomDict == hasBinaryDict;
     }
 
     private boolean isExecutorAvailable() {
@@ -1343,31 +1339,29 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
+    private void appendSuggestions(final java.util.List<CharSequence> source) {
+        if (source == null) {
+            return;
+        }
+        for (final CharSequence s : source) {
+            if (mScratchMerged.size() >= 3) {
+                break;
+            }
+            if (mScratchDeduplicationSet.add(s.toString().toLowerCase(java.util.Locale.US))) {
+                mScratchMerged.add(s);
+            }
+        }
+    }
+
     private java.util.List<CharSequence> getSuggestionsForWord(final String word, final String w1, final String w2) {
         mScratchMerged.clear();
         mScratchDeduplicationSet.clear();
 
         if (mPrefixDictionary != null) {
-            final java.util.List<CharSequence> dictMatches = mPrefixDictionary.getSuggestions(word, 3, w1, w2);
-            if (dictMatches != null) {
-                for (CharSequence d : dictMatches) {
-                    if (mScratchMerged.size() >= 3) break;
-                    if (mScratchDeduplicationSet.add(d.toString().toLowerCase(java.util.Locale.US))) {
-                        mScratchMerged.add(d);
-                    }
-                }
-            }
+            appendSuggestions(mPrefixDictionary.getSuggestions(word, 3, w1, w2));
         }
         if (mBeamSearchDecoder != null && mScratchMerged.size() < 3) {
-            final java.util.List<CharSequence> matches = mBeamSearchDecoder.getSuggestions(word, 3, w2);
-            if (matches != null) {
-                for (CharSequence m : matches) {
-                    if (mScratchMerged.size() >= 3) break;
-                    if (mScratchDeduplicationSet.add(m.toString().toLowerCase(java.util.Locale.US))) {
-                        mScratchMerged.add(m);
-                    }
-                }
-            }
+            appendSuggestions(mBeamSearchDecoder.getSuggestions(word, 3, w2));
         }
         return mScratchMerged;
     }

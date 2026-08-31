@@ -54,7 +54,6 @@ public final class BackupHelper {
 
     public static final String TYPE_BOOLEAN = "boolean";
     public static final String TYPE_INT = "int";
-    public static final String TYPE_LONG = "long";
     public static final String TYPE_FLOAT = "float";
     public static final String TYPE_STRING = "string";
 
@@ -66,7 +65,6 @@ public final class BackupHelper {
     public enum PrefType {
         BOOLEAN(TYPE_BOOLEAN),
         INT(TYPE_INT),
-        LONG(TYPE_LONG),
         FLOAT(TYPE_FLOAT),
         STRING(TYPE_STRING);
 
@@ -191,12 +189,6 @@ public final class BackupHelper {
                 case INT:
                     if (rawValue instanceof Number) {
                         itemObj.put(KEY_VALUE, ((Number) rawValue).intValue());
-                        prefsJson.put(key, itemObj);
-                    }
-                    break;
-                case LONG:
-                    if (rawValue instanceof Number) {
-                        itemObj.put(KEY_VALUE, ((Number) rawValue).longValue());
                         prefsJson.put(key, itemObj);
                     }
                     break;
@@ -388,20 +380,6 @@ public final class BackupHelper {
                     }
                     break;
                 }
-                case LONG: {
-                    final Object val = itemObj.opt(KEY_VALUE);
-                    if (val instanceof Number) {
-                        final double num = ((Number) val).doubleValue();
-                        if (Double.isFinite(num) && Math.floor(num) == num) {
-                            validatedEntries.put(key, ((Number) val).longValue());
-                        } else {
-                            return ValidationResult.error("Invalid long value for key: " + key);
-                        }
-                    } else {
-                        return ValidationResult.error("Invalid long value for key: " + key);
-                    }
-                    break;
-                }
                 case FLOAT: {
                     final Object val = itemObj.opt(KEY_VALUE);
                     if (val instanceof Number) {
@@ -446,25 +424,37 @@ public final class BackupHelper {
             return false;
         }
 
+        final Map<String, ?> existing = prefs.getAll();
         final SharedPreferences.Editor editor = prefs.edit();
+        boolean changed = false;
+
         for (Map.Entry<String, Object> entry : result.validatedEntries.entrySet()) {
             final String key = entry.getKey();
             final Object value = entry.getValue();
+            final Object oldVal = existing.get(key);
+
+            if (value != null && value.equals(oldVal)) {
+                continue;
+            }
 
             if (value instanceof Boolean) {
                 editor.putBoolean(key, (Boolean) value);
+                changed = true;
             } else if (value instanceof Integer) {
                 editor.putInt(key, (Integer) value);
-            } else if (value instanceof Long) {
-                editor.putLong(key, (Long) value);
+                changed = true;
             } else if (value instanceof Float) {
                 editor.putFloat(key, (Float) value);
+                changed = true;
             } else if (value instanceof String) {
                 editor.putString(key, (String) value);
+                changed = true;
             }
         }
 
-        editor.apply();
+        if (changed) {
+            editor.apply();
+        }
         return true;
     }
 }

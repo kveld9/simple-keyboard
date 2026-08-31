@@ -32,9 +32,9 @@ import static org.junit.Assert.assertTrue;
 public class AsyncDictionaryAndClipboardValidationTest {
 
     private byte[] loadAssetBytes(String filename) throws IOException {
-        File file = new File("src/main/assets/" + filename);
+        File file = new File("dictionaries/" + filename);
         if (!file.exists()) {
-            file = new File("app/src/main/assets/" + filename);
+            file = new File("../dictionaries/" + filename);
         }
         try (FileInputStream fis = new FileInputStream(file)) {
             byte[] b = new byte[(int) file.length()];

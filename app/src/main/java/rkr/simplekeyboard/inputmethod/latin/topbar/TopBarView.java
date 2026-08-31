@@ -404,8 +404,8 @@ public class TopBarView extends FrameLayout {
                 Log.i(TAG, "setExternalView(null) called, clearing external view.");
                 mIsExternalActive = false;
                 mSuggestionsContainer.removeAllViews();
-                // Match LeanType: do NOT add the standard slots back immediately,
-                // to avoid changing the layout geometry and breaking the autofill session.
+                // Do not add the standard slots back immediately to avoid
+                // changing layout geometry and breaking autofill sessions.
             }
         } else {
             Log.i(TAG, "setExternalView(View) called, setting external view.");

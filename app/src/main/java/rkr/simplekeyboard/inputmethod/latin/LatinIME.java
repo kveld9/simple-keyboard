@@ -1055,9 +1055,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private boolean isDictionaryAlreadyLoaded(final Locale currentLocale,
             final java.util.Set<String> enabledLangs) {
-        return currentLocale != null && currentLocale.equals(mLoadedLocale)
-                && enabledLangs.equals(mLoadedLanguages)
-                && mPrefixDictionary.getWordCount() > 0;
+        if (currentLocale == null || !currentLocale.equals(mLoadedLocale)
+                || !enabledLangs.equals(mLoadedLanguages)) {
+            return false;
+        }
+        final String currentLang = currentLocale.getLanguage();
+        final java.io.File customDictFile = rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager.getInstance().getCustomDictionaryFile(this, currentLang);
+        if (customDictFile != null && mBinaryTrieDictionary == null) {
+            return false;
+        }
+        if (customDictFile == null && mBinaryTrieDictionary != null) {
+            return false;
+        }
+        return true;
     }
 
     private boolean isExecutorAvailable() {
@@ -1069,11 +1079,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (loadGeneration != mDictLoadGeneration) {
             return;
         }
-        if (binaryDict != null) {
-            mBinaryTrieDictionary = binaryDict;
-            mBeamSearchDecoder = decoder;
-            mPrefixDictionary.setBinaryDictionary(binaryDict);
-        }
+        mBinaryTrieDictionary = binaryDict;
+        mBeamSearchDecoder = decoder;
+        mPrefixDictionary.setBinaryDictionary(binaryDict);
         final SettingsValues currentSettings = mSettings.getCurrent();
         if (currentSettings != null) {
             mPrefixDictionary.setAutoCorrectionThreshold(currentSettings.mAutoCorrectionThreshold);
@@ -1339,25 +1347,24 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mScratchMerged.clear();
         mScratchDeduplicationSet.clear();
 
-        if (mBeamSearchDecoder != null) {
-            final java.util.List<CharSequence> matches = mBeamSearchDecoder.getSuggestions(word, 3, w2);
-            if (matches != null) {
-                for (CharSequence m : matches) {
-                    if (mScratchMerged.size() >= 3) break;
-                    if (mScratchDeduplicationSet.add(m.toString().toLowerCase())) {
-                        mScratchMerged.add(m);
-                    }
-                }
-                if (mScratchMerged.size() >= 3) return mScratchMerged;
-            }
-        }
         if (mPrefixDictionary != null) {
             final java.util.List<CharSequence> dictMatches = mPrefixDictionary.getSuggestions(word, 3, w1, w2);
             if (dictMatches != null) {
                 for (CharSequence d : dictMatches) {
                     if (mScratchMerged.size() >= 3) break;
-                    if (mScratchDeduplicationSet.add(d.toString().toLowerCase())) {
+                    if (mScratchDeduplicationSet.add(d.toString().toLowerCase(java.util.Locale.US))) {
                         mScratchMerged.add(d);
+                    }
+                }
+            }
+        }
+        if (mBeamSearchDecoder != null && mScratchMerged.size() < 3) {
+            final java.util.List<CharSequence> matches = mBeamSearchDecoder.getSuggestions(word, 3, w2);
+            if (matches != null) {
+                for (CharSequence m : matches) {
+                    if (mScratchMerged.size() >= 3) break;
+                    if (mScratchDeduplicationSet.add(m.toString().toLowerCase(java.util.Locale.US))) {
+                        mScratchMerged.add(m);
                     }
                 }
             }
@@ -1980,17 +1987,21 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         final String cleanWord = word.trim();
+        final String canonicalWord = (!rkr.simplekeyboard.inputmethod.latin.common.StringUtils.hasInternalUpperCase(cleanWord)
+                && Character.isUpperCase(cleanWord.charAt(0)))
+                ? cleanWord.toLowerCase(java.util.Locale.ROOT)
+                : cleanWord;
         mDictExecutor.execute(() -> {
-            mPrefixDictionary.insert(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+            mPrefixDictionary.insert(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
             if (mUserDictionaryManager != null) {
-                mUserDictionaryManager.addWord(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                mUserDictionaryManager.addWord(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
             } else {
-                UserDictionaryManager.getInstance(this).addWord(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                UserDictionaryManager.getInstance(this).addWord(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
             }
             if (!isWordEmpty(w2)) {
-                mPrefixDictionary.setBigram(w2.trim(), cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                mPrefixDictionary.setBigram(w2.trim(), canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
                 if (!isWordEmpty(w1)) {
-                    mPrefixDictionary.setTrigram(w1.trim(), w2.trim(), cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                    mPrefixDictionary.setTrigram(w1.trim(), w2.trim(), canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
                 }
             }
         });

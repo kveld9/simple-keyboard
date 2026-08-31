@@ -209,12 +209,29 @@ public class StringUtilsTest {
         assertEquals("IPhone", StringUtils.applyCasing("Iphone", "iPhone"));
         assertEquals("A", StringUtils.applyCasing("A", "a"));
 
-        // Lowercase / other typed preserves native dictionary casing
+        // Lowercase typed adapts single-capital words to lowercase
         assertEquals("canción", StringUtils.applyCasing("cancion", "canción"));
-        assertEquals("Carlos", StringUtils.applyCasing("carlos", "Carlos"));
-        assertEquals("México", StringUtils.applyCasing("mexico", "México"));
+        assertEquals("hola", StringUtils.applyCasing("hol", "Hola"));
+        assertEquals("atardecer", StringUtils.applyCasing("ata", "Atardecer"));
+        assertEquals("carlos", StringUtils.applyCasing("carlos", "Carlos"));
+
+        // Lowercase typed preserves acronyms and camelCase
         assertEquals("NASA", StringUtils.applyCasing("nasa", "NASA"));
         assertEquals("iPhone", StringUtils.applyCasing("iphone", "iPhone"));
+        assertEquals("McDonalds", StringUtils.applyCasing("mcd", "McDonalds"));
+    }
+
+    @Test
+    public void testHasInternalUpperCase() {
+        assertFalse(StringUtils.hasInternalUpperCase(null));
+        assertFalse(StringUtils.hasInternalUpperCase(""));
+        assertFalse(StringUtils.hasInternalUpperCase("A"));
+        assertFalse(StringUtils.hasInternalUpperCase("a"));
+        assertFalse(StringUtils.hasInternalUpperCase("Hola"));
+        assertFalse(StringUtils.hasInternalUpperCase("atardecer"));
+        assertTrue(StringUtils.hasInternalUpperCase("iPhone"));
+        assertTrue(StringUtils.hasInternalUpperCase("NASA"));
+        assertTrue(StringUtils.hasInternalUpperCase("McDonalds"));
     }
 
     @Test

@@ -122,15 +122,35 @@ public class BinaryTrieDictionary {
     }
     
     private void collectSuggestions(int node, List<CharSequence> result, int limit) {
-        if (result.size() >= limit) return;
-        if (isTerminal(node)) {
-            result.add(getNodeWord(node));
-        }
-        int childCount = buffer.get(node + 4) & 0xFF;
-        int childrenOffset = buffer.getInt(node + 8);
-        for (int i = 0; i < childCount; i++) {
-            if (result.size() >= limit) break;
-            collectSuggestions(childrenOffset + i * 16, result, limit);
+        if (node <= 0 || result.size() >= limit) return;
+
+        final int maxQueue = 512;
+        final int[] queue = new int[maxQueue];
+        int head = 0;
+        int tail = 0;
+
+        queue[tail++] = node;
+
+        while (head < tail && result.size() < limit) {
+            int current = queue[head++];
+            if (isTerminal(current)) {
+                final String word = getNodeWord(current);
+                if (word != null) {
+                    result.add(word);
+                    if (result.size() >= limit) {
+                        break;
+                    }
+                }
+            }
+            int childCount = buffer.get(current + 4) & 0xFF;
+            if (childCount > 0) {
+                int childrenOffset = buffer.getInt(current + 8);
+                for (int i = 0; i < childCount; i++) {
+                    if (tail < maxQueue) {
+                        queue[tail++] = childrenOffset + i * 16;
+                    }
+                }
+            }
         }
     }
 
@@ -214,72 +234,70 @@ public class BinaryTrieDictionary {
         void accept(String word, int frequency);
     }
 
-    private void addCandidateIfTerminal(final int nodeOffset, final String target, final int targetIdx, final List<rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord> candidates) {
-        if (targetIdx == target.length() && isTerminal(nodeOffset)) {
-            final String word = getNodeWord(nodeOffset);
-            if (word != null) {
-                final int freq = getNodeFrequency(nodeOffset);
-                candidates.add(new rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord(word, freq));
-            }
-        }
-    }
-
-    private int calculateCost(final char normC, final String target, final int targetIdx, final int remainingDistance) {
-        if (targetIdx < target.length() && normC == StringUtils.foldChar(target.charAt(targetIdx))) {
-            return 0;
-        }
-        return (remainingDistance > 0) ? 1 : -1;
-    }
-
-    private int calculateNextTargetIndex(final String target, final int targetIdx, final int remainingDistance) {
-        if (targetIdx < target.length()) {
-            return targetIdx + 1;
-        }
-        return (remainingDistance > 0) ? targetIdx : -1;
-    }
-
-    private void processFuzzyChild(final int childNode, final StringBuilder currentPath, final String target, final int targetIdx, final int remainingDistance, final List<rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord> candidates) {
-        final char c = (char) (buffer.getShort(childNode) & 0xFFFF);
-        final char normC = StringUtils.foldChar(c);
-        final int cost = calculateCost(normC, target, targetIdx, remainingDistance);
-        if (cost < 0 || remainingDistance < cost) {
-            return;
-        }
-        final int nextTargetIdx = calculateNextTargetIndex(target, targetIdx, remainingDistance);
-        currentPath.append(c);
-        searchFuzzy(childNode, currentPath, target, nextTargetIdx, remainingDistance - cost, candidates);
-        currentPath.setLength(currentPath.length() - 1);
-    }
-
-    private void searchFuzzyChildren(final int nodeOffset, final StringBuilder currentPath, final String target, final int targetIdx, final int remainingDistance, final List<rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord> candidates) {
-        final int childCount = buffer.get(nodeOffset + 4) & 0xFF;
-        if (childCount == 0) {
-            return;
-        }
-        final int childrenOffset = buffer.getInt(nodeOffset + 8);
-        for (int i = 0; i < childCount; i++) {
-            if (candidates.size() >= 40) {
-                break;
-            }
-            final int childNode = childrenOffset + i * 16;
-            processFuzzyChild(childNode, currentPath, target, targetIdx, remainingDistance, candidates);
-        }
-    }
-
     public void searchFuzzy(int nodeOffset, StringBuilder currentPath, String target, int targetIdx, int remainingDistance, List<rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord> candidates) {
         if (remainingDistance < 0 || candidates.size() >= 40) {
             return;
         }
 
-        addCandidateIfTerminal(nodeOffset, target, targetIdx, candidates);
+        if (targetIdx == target.length() && isTerminal(nodeOffset)) {
+            final String word = getNodeWord(nodeOffset);
+            final int freq = getNodeFrequency(nodeOffset);
+            candidates.add(new rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord(word, freq));
+            return;
+        }
 
-        // 1. Deletion from target (extra character typed by user)
+        // 1. Deletion from target (extra character typed by user, Cost 1)
         if (targetIdx < target.length() && remainingDistance > 0) {
             searchFuzzy(nodeOffset, currentPath, target, targetIdx + 1, remainingDistance - 1, candidates);
         }
 
-        // 2. Child nodes traversal (match, substitution, insertion)
-        searchFuzzyChildren(nodeOffset, currentPath, target, targetIdx, remainingDistance, candidates);
+        final int childCount = buffer.get(nodeOffset + 4) & 0xFF;
+        if (childCount == 0 || candidates.size() >= 40) {
+            return;
+        }
+        final int childrenOffset = buffer.getInt(nodeOffset + 8);
+
+        // 2. Exact match on children (Cost 0)
+        final char targetChar = (targetIdx < target.length()) ? StringUtils.foldChar(target.charAt(targetIdx)) : '\0';
+        if (targetIdx < target.length()) {
+            for (int i = 0; i < childCount; i++) {
+                final int childNode = childrenOffset + i * 16;
+                final char c = (char) (buffer.getShort(childNode) & 0xFFFF);
+                if (StringUtils.foldChar(c) == targetChar) {
+                    currentPath.append(c);
+                    searchFuzzy(childNode, currentPath, target, targetIdx + 1, remainingDistance, candidates);
+                    currentPath.setLength(currentPath.length() - 1);
+                }
+            }
+        }
+
+        if (remainingDistance <= 0 || candidates.size() >= 40) {
+            return;
+        }
+
+        // 3. Substitutions and Insertions (Cost 1)
+        for (int i = 0; i < childCount; i++) {
+            if (candidates.size() >= 40) {
+                break;
+            }
+            final int childNode = childrenOffset + i * 16;
+            final char c = (char) (buffer.getShort(childNode) & 0xFFFF);
+            final boolean isExactMatch = (targetIdx < target.length() && StringUtils.foldChar(c) == targetChar);
+
+            currentPath.append(c);
+
+            // 3a. Substitution (advance targetIdx, only for non-exact children)
+            if (targetIdx < target.length() && !isExactMatch) {
+                searchFuzzy(childNode, currentPath, target, targetIdx + 1, remainingDistance - 1, candidates);
+            }
+
+            // 3b. Insertion (keep targetIdx)
+            if (candidates.size() < 40) {
+                searchFuzzy(childNode, currentPath, target, targetIdx, remainingDistance - 1, candidates);
+            }
+
+            currentPath.setLength(currentPath.length() - 1);
+        }
     }
 
     public void forEachWord(WordConsumer consumer) {

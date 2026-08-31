@@ -404,8 +404,7 @@ public class TopBarView extends FrameLayout {
                 Log.i(TAG, "setExternalView(null) called, clearing external view.");
                 mIsExternalActive = false;
                 mSuggestionsContainer.removeAllViews();
-                // Do not add the standard slots back immediately to avoid
-                // changing layout geometry and breaking autofill sessions.
+                restoreStandardSlots();
             }
         } else {
             Log.i(TAG, "setExternalView(View) called, setting external view.");
@@ -413,6 +412,27 @@ public class TopBarView extends FrameLayout {
             mSuggestionsContainer.removeAllViews();
             mSuggestionsContainer.addView(view, new LinearLayout.LayoutParams(
                     LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        }
+    }
+
+    private void restoreStandardSlots() {
+        if (mSuggestionsContainer == null) {
+            return;
+        }
+        if (mLeftSlot != null && mLeftSlot.getParent() == null) {
+            mSuggestionsContainer.addView(mLeftSlot);
+        }
+        if (mDivider1 != null && mDivider1.getParent() == null) {
+            mSuggestionsContainer.addView(mDivider1);
+        }
+        if (mCenterSlot != null && mCenterSlot.getParent() == null) {
+            mSuggestionsContainer.addView(mCenterSlot);
+        }
+        if (mDivider2 != null && mDivider2.getParent() == null) {
+            mSuggestionsContainer.addView(mDivider2);
+        }
+        if (mRightSlot != null && mRightSlot.getParent() == null) {
+            mSuggestionsContainer.addView(mRightSlot);
         }
     }
 

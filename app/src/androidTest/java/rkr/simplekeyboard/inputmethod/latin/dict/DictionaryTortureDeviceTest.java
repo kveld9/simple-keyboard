@@ -187,7 +187,7 @@ public class DictionaryTortureDeviceTest {
             executor.execute(() -> {
                 try {
                     for (int i = 0; i < ITERATIONS; i++) {
-                        final String lang = "test_" + (threadId % 2);
+                        final String lang = (threadId % 2 == 0) ? "es" : "en";
                         if (i % 2 == 0) {
                             final CustomDictionaryManager.ImportResult res =
                                     mManager.importDictionary(mContext, Uri.fromFile(sampleFile), lang);

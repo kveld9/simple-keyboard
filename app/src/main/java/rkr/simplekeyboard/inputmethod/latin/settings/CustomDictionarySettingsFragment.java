@@ -110,11 +110,82 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
             return;
         }
 
+        final String detectedLang = CustomDictionaryManager.extractLanguageFromUri(context, uri);
+        if (detectedLang != null && CustomDictionaryManager.isValidLanguageCode(detectedLang)) {
+            executeImport(context, uri, detectedLang);
+        } else {
+            Toast.makeText(context, R.string.importing_dictionary_progress, Toast.LENGTH_SHORT).show();
+            new Thread(() -> {
+                final CustomDictionaryManager.ImportResult preliminary =
+                        CustomDictionaryManager.getInstance().importDictionary(context, uri, null);
+
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (preliminary.success) {
+                            final String displayLang = getDisplayNameForLocale(preliminary.languageCode);
+                            final String msg = getString(R.string.import_dictionary_success, displayLang, preliminary.wordCount);
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show();
+                            refreshInstalledDictionaries();
+                        } else if (preliminary.message != null && preliminary.message.contains("Could not determine language")) {
+                            showLanguageSelectionDialog(context, uri);
+                        } else {
+                            final String msg = getString(R.string.import_dictionary_failed, preliminary.message);
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }).start();
+        }
+    }
+
+    private void showLanguageSelectionDialog(final Context context, final Uri uri) {
+        final List<String> supportedLocales = rkr.simplekeyboard.inputmethod.latin.utils.SubtypeLocaleUtils.getSupportedLocales();
+        final java.util.LinkedHashSet<String> langSet = new java.util.LinkedHashSet<>();
+        final String systemLang = Locale.getDefault().getLanguage();
+        if (CustomDictionaryManager.isValidLanguageCode(systemLang)) {
+            langSet.add(systemLang);
+        }
+        for (final String locStr : supportedLocales) {
+            String lang = locStr;
+            if (lang.contains("_")) {
+                lang = lang.substring(0, lang.indexOf('_'));
+            }
+            if (CustomDictionaryManager.isValidLanguageCode(lang)) {
+                langSet.add(lang);
+            }
+        }
+        final String[] commonLangs = {"es", "en", "ru", "pt", "fr", "de", "it", "ca", "gl", "eu", "pl", "uk", "nl", "tr", "ar", "hi", "zh", "ja", "ko"};
+        for (final String lang : commonLangs) {
+            if (CustomDictionaryManager.isValidLanguageCode(lang)) {
+                langSet.add(lang);
+            }
+        }
+
+        final List<String> langList = new java.util.ArrayList<>(langSet);
+        final CharSequence[] items = new CharSequence[langList.size()];
+        for (int i = 0; i < langList.size(); i++) {
+            final String code = langList.get(i);
+            items[i] = getDisplayNameForLocale(code) + " (" + code + ")";
+        }
+
+        new MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.select_dictionary_language)
+                .setItems(items, (dialog, which) -> {
+                    if (which >= 0 && which < langList.size()) {
+                        final String selectedLang = langList.get(which);
+                        executeImport(context, uri, selectedLang);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void executeImport(final Context context, final Uri uri, final String languageCode) {
         Toast.makeText(context, R.string.importing_dictionary_progress, Toast.LENGTH_SHORT).show();
 
         new Thread(() -> {
             final CustomDictionaryManager.ImportResult result =
-                    CustomDictionaryManager.getInstance().importDictionary(context, uri, null);
+                    CustomDictionaryManager.getInstance().importDictionary(context, uri, languageCode);
 
             if (getActivity() != null) {
                 getActivity().runOnUiThread(() -> {

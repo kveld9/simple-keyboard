@@ -66,7 +66,7 @@ public final class AospDictDecoder {
     }
 
     private static final int MAX_PARSE_DEPTH = 64;
-    private static final int MAX_DECODED_WORDS = 500_000;
+    private static final int MAX_DECODED_WORDS = 250_000;
     private static final int MAX_WORD_LENGTH = 64;
 
     public static DecodedDictionary decode(final ByteBuffer buffer) throws IOException {
@@ -89,23 +89,24 @@ public final class AospDictDecoder {
             final String dictId = attributes.get("dictionary");
             if (dictId != null && dictId.contains(":")) {
                 locale = dictId.substring(dictId.indexOf(':') + 1);
-            } else {
-                locale = "es";
             }
         }
 
-        String languageCode = locale;
-        if (languageCode.contains("_")) {
-            languageCode = languageCode.substring(0, languageCode.indexOf('_'));
+        String languageCode = null;
+        if (locale != null && !locale.isEmpty()) {
+            languageCode = locale;
+            if (languageCode.contains("_")) {
+                languageCode = languageCode.substring(0, languageCode.indexOf('_'));
+            }
+            if (languageCode.contains("-")) {
+                languageCode = languageCode.substring(0, languageCode.indexOf('-'));
+            }
+            languageCode = languageCode.toLowerCase(java.util.Locale.US);
         }
-        if (languageCode.contains("-")) {
-            languageCode = languageCode.substring(0, languageCode.indexOf('-'));
-        }
-        languageCode = languageCode.toLowerCase();
 
         final List<BinaryTrieCompiler.WordEntry> words = new ArrayList<>();
         final StringBuilder prefixBuilder = new StringBuilder(64);
-        final java.util.HashSet<Integer> visitedOffsets = new java.util.HashSet<>();
+        final java.util.BitSet visitedOffsets = new java.util.BitSet(buffer.capacity());
         parsePtNodeArray(buffer, headerSize, prefixBuilder, words, visitedOffsets, 0);
 
         return new DecodedDictionary(locale, languageCode, version, attributes, words);
@@ -196,7 +197,7 @@ public final class AospDictDecoder {
     private static void parsePtNodeArray(final ByteBuffer buffer, final int groupOffset,
                                          final StringBuilder prefix,
                                          final List<BinaryTrieCompiler.WordEntry> words,
-                                         final java.util.Set<Integer> visitedOffsets,
+                                         final java.util.BitSet visitedOffsets,
                                          final int depth) {
         if (depth > MAX_PARSE_DEPTH || words.size() >= MAX_DECODED_WORDS) {
             return;
@@ -204,9 +205,10 @@ public final class AospDictDecoder {
         if (groupOffset <= 0 || groupOffset >= buffer.capacity()) {
             return;
         }
-        if (!visitedOffsets.add(groupOffset)) {
+        if (visitedOffsets.get(groupOffset)) {
             return; // Cycle detected, prevent infinite loop
         }
+        visitedOffsets.set(groupOffset);
 
         final int[] posRef = new int[]{groupOffset};
         final int count = readPtNodeCount(buffer, posRef);
@@ -285,7 +287,7 @@ public final class AospDictDecoder {
                 }
             }
 
-            if (childrenPos > 0 && childrenPos < buffer.capacity() && !visitedOffsets.contains(childrenPos)) {
+            if (childrenPos > 0 && childrenPos < buffer.capacity() && !visitedOffsets.get(childrenPos)) {
                 childrenToVisit.add(new int[]{childrenPos});
                 childPrefixes.add(prefix.toString());
             }

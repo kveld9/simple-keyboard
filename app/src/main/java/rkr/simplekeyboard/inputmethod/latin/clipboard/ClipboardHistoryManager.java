@@ -402,20 +402,21 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     private void handleScreenshotFound(final long id, final String fileName, final long dateAdded) {
         final Uri contentUri = ContentUris.withAppendedId(
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
+        if (!isNewScreenshot(contentUri)) {
+            return;
+        }
         final String cachedPath = cacheImage(contentUri);
         final String targetPath = cachedPath != null ? cachedPath : contentUri.toString();
 
-        if (isNewScreenshot(contentUri)) {
-            recycleCachedScreenshotInfo();
-            mCachedScreenshotInfo = new ScreenshotInfo(contentUri, fileName, targetPath, dateAdded);
-            mLatestScreenshotUsed = false;
+        recycleCachedScreenshotInfo();
+        mCachedScreenshotInfo = new ScreenshotInfo(contentUri, fileName, targetPath, dateAdded);
+        mLatestScreenshotUsed = false;
 
-            final long retentionMinutes = getRetentionMinutes();
-            mDatabase.deleteExpiredClips(retentionMinutes);
-            mDatabase.insertClip("[Screenshot]", false, dateAdded, targetPath);
+        final long retentionMinutes = getRetentionMinutes();
+        mDatabase.deleteExpiredClips(retentionMinutes);
+        mDatabase.insertClip("[Screenshot]", false, dateAdded, targetPath);
 
-            notifyScreenshotChange();
-        }
+        notifyScreenshotChange();
     }
 
     private boolean processScreenshotRow(final Cursor cursor, final ScreenshotColumnIndices indices) {

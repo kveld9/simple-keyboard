@@ -58,6 +58,9 @@ public final class SeekBarDialogPreference extends DialogPreference
 
         @Override
         public void writeValue(final int value, final String key) {
+            if (mPrefs.contains(key) && mPrefs.getInt(key, 0) == value) {
+                return;
+            }
             mPrefs.edit().putInt(key, value).apply();
         }
 
@@ -92,7 +95,11 @@ public final class SeekBarDialogPreference extends DialogPreference
 
         @Override
         public void writeValue(final int value, final String key) {
-            mPrefs.edit().putFloat(key, getValueFromPercentage(value)).apply();
+            final float floatValue = getValueFromPercentage(value);
+            if (mPrefs.contains(key) && Float.compare(mPrefs.getFloat(key, 0.0f), floatValue) == 0) {
+                return;
+            }
+            mPrefs.edit().putFloat(key, floatValue).apply();
         }
 
         @Override

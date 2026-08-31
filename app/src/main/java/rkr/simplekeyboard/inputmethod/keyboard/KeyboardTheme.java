@@ -99,7 +99,10 @@ public final class KeyboardTheme {
     }
 
     public static void saveKeyboardThemeId(final int themeId, final SharedPreferences prefs) {
-        prefs.edit().putString(KEYBOARD_THEME_KEY, Integer.toString(themeId)).apply();
+        final String themeStr = Integer.toString(themeId);
+        if (!themeStr.equals(prefs.getString(KEYBOARD_THEME_KEY, null))) {
+            prefs.edit().putString(KEYBOARD_THEME_KEY, themeStr).apply();
+        }
     }
 
     public static KeyboardTheme getKeyboardTheme(final Context context) {

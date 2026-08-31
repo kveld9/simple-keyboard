@@ -292,14 +292,23 @@ public final class RichInputConnection {
      * @param newCursorPosition The new cursor position around the text.
      */
     public void commitText(final CharSequence text, final int newCursorPosition) {
-        RichInputMethodManager.getInstance().resetSubtypeCycleOrder();
+        if (mLatinIME.mRichImm != null) {
+            mLatinIME.mRichImm.resetSubtypeCycleOrder();
+        }
         mTextBeforeCursor += text;
         // TODO: the following is exceedingly error-prone. Right now when the cursor is in the
         // middle of the composing word mComposingText only holds the part of the composing text
         // that is before the cursor, so this actually works, but it's terribly confusing. Fix this.
         advanceExpectedSelection(text.length());
         if (isConnected()) {
-            mIC.commitText(text, newCursorPosition);
+            final EditorInfo editorInfo = mLatinIME.getCurrentInputEditorInfo();
+            if (editorInfo != null && editorInfo.inputType == android.text.InputType.TYPE_NULL) {
+                for (int i = 0; i < text.length(); i++) {
+                    mLatinIME.sendKeyChar(text.charAt(i));
+                }
+            } else {
+                mIC.commitText(text, newCursorPosition);
+            }
         }
     }
 
@@ -484,7 +493,9 @@ public final class RichInputConnection {
         }
         mTextAfterCursor = text + textAfterCursor.substring(numCharsSelected);
 
-        RichInputMethodManager.getInstance().resetSubtypeCycleOrder();
+        if (mLatinIME.mRichImm != null) {
+            mLatinIME.mRichImm.resetSubtypeCycleOrder();
+        }
 
         if (BuildCompatUtils.isAtLeastUpsideDownCake()) {
             mIC.replaceText(startPosition, endPosition, text, 0, null);
@@ -599,7 +610,9 @@ public final class RichInputConnection {
     }
 
     public void sendKeyEvent(final KeyEvent keyEvent) {
-        RichInputMethodManager.getInstance().resetSubtypeCycleOrder();
+        if (mLatinIME.mRichImm != null) {
+            mLatinIME.mRichImm.resetSubtypeCycleOrder();
+        }
         if (keyEvent.getAction() == KeyEvent.ACTION_DOWN) {
             // This method is only called for enter or backspace when speaking to old applications
             // (target SDK <= 15 (Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1)), or for digits.
@@ -654,7 +667,9 @@ public final class RichInputConnection {
 
         updateCachedTextForSelection(start, end);
 
-        RichInputMethodManager.getInstance().resetSubtypeCycleOrder();
+        if (mLatinIME.mRichImm != null) {
+            mLatinIME.mRichImm.resetSubtypeCycleOrder();
+        }
 
         mExpectedSelStart = start;
         mExpectedSelEnd = end;

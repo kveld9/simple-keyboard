@@ -25,6 +25,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.inputmethod.InputMethodManager;
 
 import androidx.annotation.Nullable;
@@ -97,7 +98,8 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
                         false,
                         mSettingsObserver
                 );
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Log.e(TAG, "Error registering content observers", e);
             }
         }
         updateImeBanner();
@@ -110,7 +112,8 @@ public final class SettingsFragment extends InputMethodSettingsFragment {
         if (context != null) {
             try {
                 context.getContentResolver().unregisterContentObserver(mSettingsObserver);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Log.e(TAG, "Error unregistering content observer", e);
             }
         }
     }

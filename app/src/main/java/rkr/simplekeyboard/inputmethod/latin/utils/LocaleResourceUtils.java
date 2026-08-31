@@ -71,16 +71,14 @@ public final class LocaleResourceUtils {
 
         final String[] exceptionalLocaleInRootLocale = res.getStringArray(
                 R.array.locale_displayed_in_root_locale);
-        for (int i = 0; i < exceptionalLocaleInRootLocale.length; i++) {
-            final String localeString = exceptionalLocaleInRootLocale[i];
+        for (final String localeString : exceptionalLocaleInRootLocale) {
             final String resourceName = LOCALE_NAME_RESOURCE_IN_ROOT_LOCALE_PREFIX + localeString;
             final int resId = res.getIdentifier(resourceName, null, RESOURCE_PACKAGE_NAME);
             sExceptionalLocaleDisplayedInRootLocale.put(localeString, resId);
         }
 
         final String[] exceptionalLocales = res.getStringArray(R.array.locale_exception_keys);
-        for (int i = 0; i < exceptionalLocales.length; i++) {
-            final String localeString = exceptionalLocales[i];
+        for (final String localeString : exceptionalLocales) {
             final String resourceName = LOCALE_NAME_RESOURCE_PREFIX + localeString;
             final int resId = res.getIdentifier(resourceName, null, RESOURCE_PACKAGE_NAME);
             sExceptionalLocaleToNameIdsMap.put(localeString, resId);

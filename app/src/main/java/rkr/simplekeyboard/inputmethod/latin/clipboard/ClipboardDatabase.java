@@ -97,7 +97,8 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
             if (cursor != null && cursor.moveToFirst()) {
                 return cursor.getInt(0) == 1;
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking if clip is pinned", e);
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -136,7 +137,9 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         if (db != null) {
             try {
                 db.endTransaction();
-            } catch (Throwable ignored) {}
+            } catch (Throwable e) {
+                Log.e(TAG, "Error ending transaction", e);
+            }
         }
     }
 

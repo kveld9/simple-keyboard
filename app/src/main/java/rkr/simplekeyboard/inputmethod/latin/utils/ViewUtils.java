@@ -144,8 +144,15 @@ public final class ViewUtils {
         return iv;
     }
 
+    private static final ThreadLocal<android.util.TypedValue> sTypedValue = new ThreadLocal<android.util.TypedValue>() {
+        @Override
+        protected android.util.TypedValue initialValue() {
+            return new android.util.TypedValue();
+        }
+    };
+
     public static int getThemeColor(final Context context, final int attrResId, final int defaultColor) {
-        final TypedValue typedValue = new TypedValue();
+        final android.util.TypedValue typedValue = sTypedValue.get();
         if (context.getTheme().resolveAttribute(attrResId, typedValue, true)) {
             return typedValue.data;
         }

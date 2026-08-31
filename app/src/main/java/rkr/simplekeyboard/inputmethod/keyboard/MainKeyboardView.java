@@ -314,6 +314,9 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
             return;
         }
 
+        if (mDrawingPreviewPlacerView.getParent() == null) {
+            installPreviewPlacerView();
+        }
         locatePreviewPlacerView();
         final int backgroundColor = Color.TRANSPARENT;
         final float cornerRadius = rkr.simplekeyboard.inputmethod.keyboard.internal.KeyShapeHelper.getCornerRadius(getContext(), mKeyShape);

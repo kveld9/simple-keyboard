@@ -346,8 +346,10 @@ public class PrefixDictionaryTest {
         assertEquals("HELLO", StringUtils.applyCasing("HEL", "hello"));
         assertEquals("Hello", StringUtils.applyCasing("He", "hello"));
         assertEquals("HELLO", StringUtils.applyCasing("he", "HELLO"));
-        assertEquals("Carlos", StringUtils.applyCasing("carlos", "Carlos"));
-        assertEquals("México", StringUtils.applyCasing("mexico", "México"));
+        assertEquals("carlos", StringUtils.applyCasing("carlos", "Carlos"));
+        assertEquals("Carlos", StringUtils.applyCasing("Carlos", "Carlos"));
+        assertEquals("méxico", StringUtils.applyCasing("mexico", "México"));
+        assertEquals("México", StringUtils.applyCasing("Mexico", "México"));
         assertEquals("NASA", StringUtils.applyCasing("nasa", "NASA"));
 
         mDict.insert("árbol", 100);

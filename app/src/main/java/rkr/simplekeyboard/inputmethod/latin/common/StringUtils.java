@@ -437,15 +437,30 @@ public final class StringUtils {
         return Character.isLetter(codePoint) || codePoint == '\'' || codePoint == '-';
     }
 
+    public static boolean hasInternalUpperCase(final String s) {
+        if (s == null || s.length() <= 1) {
+            return false;
+        }
+        for (int i = 1; i < s.length(); i++) {
+            if (Character.isUpperCase(s.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static String applyCasing(final String typed, final String suggestion) {
         if (typed == null || typed.isEmpty() || suggestion == null || suggestion.isEmpty()) {
             return suggestion;
         }
         if (isAllUpperCase(typed)) {
-            return suggestion.toUpperCase();
+            return suggestion.toUpperCase(java.util.Locale.ROOT);
         }
         if (Character.isUpperCase(typed.charAt(0))) {
             return Character.toUpperCase(suggestion.charAt(0)) + suggestion.substring(1);
+        }
+        if (Character.isUpperCase(suggestion.charAt(0)) && !hasInternalUpperCase(suggestion)) {
+            return Character.toLowerCase(suggestion.charAt(0)) + suggestion.substring(1);
         }
         return suggestion;
     }
@@ -455,8 +470,8 @@ public final class StringUtils {
             return s;
         }
         if (s.length() == 1) {
-            return s.toUpperCase();
+            return s.toUpperCase(java.util.Locale.ROOT);
         }
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase(java.util.Locale.ROOT);
     }
 }

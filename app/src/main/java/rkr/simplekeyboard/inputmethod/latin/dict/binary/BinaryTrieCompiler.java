@@ -124,7 +124,7 @@ public final class BinaryTrieCompiler {
         buffer.putInt(root.offset);
 
         // Sort nodes by offset to write sequentially
-        allNodes.sort((a, b) -> Integer.compare(a.offset, b.offset));
+        Collections.sort(allNodes, (a, b) -> Integer.compare(a.offset, b.offset));
 
         for (final BuildNode node : allNodes) {
             final short charVal = (short) node.character;

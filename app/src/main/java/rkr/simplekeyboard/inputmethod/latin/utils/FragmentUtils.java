@@ -23,6 +23,7 @@ import java.util.HashSet;
 import rkr.simplekeyboard.inputmethod.latin.settings.AdvancedSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.AppearanceSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.AutocorrectSettingsFragment;
+import rkr.simplekeyboard.inputmethod.latin.settings.BackupSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.BlockedWordsSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.ClipboardSettingsFragment;
 import rkr.simplekeyboard.inputmethod.latin.settings.DictionarySettingsFragment;
@@ -48,6 +49,7 @@ public class FragmentUtils {
         sLatinImeFragments.add(ThemeSettingsFragment.class.getName());
         sLatinImeFragments.add(SettingsFragment.class.getName());
         sLatinImeFragments.add(LanguagesSettingsFragment.class.getName());
+        sLatinImeFragments.add(BackupSettingsFragment.class.getName());
     }
 
 

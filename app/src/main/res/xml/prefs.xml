@@ -83,6 +83,14 @@
             android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.AdvancedSettingsFragment"
             app:widgetLayout="@layout/preference_chevron" />
 
+        <Preference
+            android:key="screen_backup"
+            android:title="@string/settings_screen_backup"
+            android:icon="@drawable/ic_backup"
+            app:iconTint="?attr/colorOnSurfaceVariant"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.BackupSettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
     </PreferenceCategory>
 
     <PreferenceCategory

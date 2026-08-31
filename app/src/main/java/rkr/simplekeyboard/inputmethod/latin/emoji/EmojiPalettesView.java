@@ -23,6 +23,7 @@ import android.graphics.drawable.Drawable;
 import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -43,6 +44,7 @@ import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils;
 
 public class EmojiPalettesView extends LinearLayout {
+    private static final String TAG = EmojiPalettesView.class.getSimpleName();
 
     public interface EmojiListener {
         void onSelectEmoji(String emoji);
@@ -272,7 +274,7 @@ public class EmojiPalettesView extends LinearLayout {
 
     private void loadRecentEmojis(Context context) {
         if (context == null) {
-            android.util.Log.w("EmojiPalettesView", "Context is null in loadRecentEmojis");
+            Log.w(TAG, "Context is null in loadRecentEmojis");
             return;
         }
         if (mRecentEmojisLoaded) return;
@@ -291,7 +293,7 @@ public class EmojiPalettesView extends LinearLayout {
             }
             mRecentEmojisLoaded = true;
         } catch (Throwable e) {
-            android.util.Log.w("EmojiPalettesView", "Failed to load recent emojis", e);
+            Log.w(TAG, "Failed to load recent emojis", e);
         }
     }
 
@@ -335,7 +337,7 @@ public class EmojiPalettesView extends LinearLayout {
                         .apply();
             }
         } catch (Throwable e) {
-            android.util.Log.w("EmojiPalettesView", "Failed to save recent emojis", e);
+            Log.w(TAG, "Failed to save recent emojis", e);
         }
     }
 

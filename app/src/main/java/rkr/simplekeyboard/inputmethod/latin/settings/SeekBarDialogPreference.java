@@ -21,6 +21,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.SeekBar;
@@ -36,6 +37,7 @@ import rkr.simplekeyboard.inputmethod.R;
 
 public final class SeekBarDialogPreference extends DialogPreference
         implements SeekBar.OnSeekBarChangeListener {
+    private static final String TAG = SeekBarDialogPreference.class.getSimpleName();
     public interface ValueProxy {
         int readValue(final String key);
         int readDefaultValue(final String key);
@@ -141,7 +143,10 @@ public final class SeekBarDialogPreference extends DialogPreference
     }
 
     public void showDialog(@NonNull final Context context) {
-        if (mValueProxy == null) return;
+        if (mValueProxy == null) {
+            Log.w(TAG, "showDialog: mValueProxy is null");
+            return;
+        }
         final View view = LayoutInflater.from(context).inflate(R.layout.seek_bar_dialog, null);
         mSeekBar = view.findViewById(R.id.seek_bar_dialog_bar);
         mSeekBar.setMax(mMaxValue - mMinValue);

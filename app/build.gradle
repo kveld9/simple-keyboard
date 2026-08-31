@@ -104,6 +104,9 @@ android {
             signingConfig signingConfigs.release
         }
     }
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
     buildFeatures {
         buildConfig = true
     }

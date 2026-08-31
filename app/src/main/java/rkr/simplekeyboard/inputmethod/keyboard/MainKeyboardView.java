@@ -86,6 +86,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
     // Drawing preview placer view
     private final DrawingPreviewPlacerView mDrawingPreviewPlacerView;
     private final int[] mOriginCoords = CoordinateUtils.newInstance();
+    private final int[] mScratchCoordinates = CoordinateUtils.newInstance();
 
     // Key preview
     private final KeyPreviewDrawParams mKeyPreviewDrawParams;
@@ -406,7 +407,7 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         final boolean keyPreviewEnabled = mKeyPreviewDrawParams.isPopupEnabled()
                 && !key.noKeyPreview();
         if (mConfigShowMoreKeysKeyboardAtTouchedPoint && !keyPreviewEnabled) {
-            final int[] lastCoords = CoordinateUtils.newInstance();
+            final int[] lastCoords = mScratchCoordinates;
             tracker.getLastCoordinates(lastCoords);
             return CoordinateUtils.x(lastCoords);
         }

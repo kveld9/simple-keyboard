@@ -155,6 +155,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
     private AudioAndHapticFeedbackManager mFeedbackManager;
+    private UserDictionaryManager mUserDictionaryManager;
 
     private AlertDialog mOptionsDialog;
 
@@ -339,6 +340,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         KeyboardSwitcher.init(this);
         AudioAndHapticFeedbackManager.init(this);
         mFeedbackManager = AudioAndHapticFeedbackManager.getInstance();
+        mUserDictionaryManager = UserDictionaryManager.getInstance(this);
         super.onCreate();
 
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
@@ -360,7 +362,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         filter.addAction(Intent.ACTION_USER_UNLOCKED);
         registerReceiver(mRingerModeChangeReceiver, filter);
 
-        UserDictionaryManager.getInstance(this).addListener(mUserDictListener);
+        mUserDictionaryManager.addListener(mUserDictListener);
     }
 
     private final UserDictionaryManager.UserDictionaryListener mUserDictListener =
@@ -417,14 +419,22 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mSettings.loadSettings(inputAttributes);
         rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet.clearKeyboardCache();
         final SettingsValues currentSettingsValues = mSettings.getCurrent();
-        AudioAndHapticFeedbackManager.getInstance().onSettingsChanged(currentSettingsValues);
+        if (mFeedbackManager != null) {
+            mFeedbackManager.onSettingsChanged(currentSettingsValues);
+        } else {
+            AudioAndHapticFeedbackManager.getInstance().onSettingsChanged(currentSettingsValues);
+        }
         mPrefixDictionary.setAutoCorrectionThreshold(currentSettingsValues.mAutoCorrectionThreshold);
         loadDictionaryForLocale(mLocale);
     }
 
     @Override
     public void onDestroy() {
-        UserDictionaryManager.getInstance(this).removeListener(mUserDictListener);
+        if (mUserDictionaryManager != null) {
+            mUserDictionaryManager.removeListener(mUserDictListener);
+        } else {
+            UserDictionaryManager.getInstance(this).removeListener(mUserDictListener);
+        }
         if (mRichImm != null) {
             mRichImm.setSubtypeChangeHandler(null);
         }
@@ -525,6 +535,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     @Override
                     public void onSuggestionLongClicked(CharSequence text) {
                         if (mInputView == null) {
+                            Log.w(TAG, "onSuggestionLongClicked: mInputView is null");
                             return;
                         }
                         final String cleanWord = StringUtils.stripEnclosingQuotes(text);
@@ -641,6 +652,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private void showSecondaryView(final View secondaryView, final Runnable prepareAction) {
         if (secondaryView == null || mInputView == null) {
+            Log.w(TAG, "showSecondaryView: secondaryView or mInputView is null");
             return;
         }
         if (prepareAction != null) {
@@ -862,6 +874,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
         if (mainKeyboardView == null) {
+            Log.e(TAG, "onStartInputViewInternal: mainKeyboardView is null");
             return;
         }
 
@@ -1088,7 +1101,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             Log.w(TAG, "Could not load binary trie dictionary asset: " + primaryAssetName, e);
         }
         try {
-            final UserDictionaryManager manager = UserDictionaryManager.getInstance(this);
+            final UserDictionaryManager manager = mUserDictionaryManager != null
+                    ? mUserDictionaryManager
+                    : UserDictionaryManager.getInstance(this);
             final java.util.List<UserDictionaryEntry> blocked = manager.getBlockedWords();
             for (final UserDictionaryEntry b : blocked) {
                 mPrefixDictionary.blockWord(b.word);
@@ -1267,10 +1282,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     public void onImageSelected(final String imageUri) {
         if (imageUri == null || imageUri.trim().isEmpty()) {
+            Log.w(TAG, "onImageSelected: imageUri is null or empty");
             return;
         }
         final EditorInfo editorInfo = getCurrentInputEditorInfo();
         if (editorInfo == null) {
+            Log.w(TAG, "onImageSelected: editorInfo is null");
             return;
         }
 
@@ -1280,7 +1297,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 contentUri = Uri.parse(imageUri);
             } else {
                 final File file = new File(imageUri);
-                if (!file.exists()) return;
+                if (!file.exists()) {
+                    Log.w(TAG, "onImageSelected: file does not exist: " + imageUri);
+                    return;
+                }
                 final Context context = PreferenceManagerCompat.getDeviceContext(this);
                 contentUri = FileProvider.getUriForFile(context, getPackageName() + ".fileprovider", file);
             }
@@ -1295,6 +1315,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
             final android.view.inputmethod.InputConnection ic = getCurrentInputConnection();
             if (ic == null) {
+                Log.w(TAG, "onImageSelected: ic is null");
                 return;
             }
 
@@ -1622,10 +1643,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private void showForgetWordDialog(final String word) {
         if (mInputView == null) {
+            Log.w(TAG, "showForgetWordDialog: mInputView or windowToken is null");
             return;
         }
         final android.os.IBinder windowToken = mInputView.getWindowToken();
         if (windowToken == null) {
+            Log.w(TAG, "showForgetWordDialog: mInputView or windowToken is null");
             return;
         }
 
@@ -1637,7 +1660,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         builder.setPositiveButton(android.R.string.ok, (dialog, which) -> {
             mPrefixDictionary.blockWord(word);
             if (isExecutorAvailable()) {
-                mDictExecutor.execute(() -> UserDictionaryManager.getInstance(this).blockWord(word));
+                mDictExecutor.execute(() -> {
+                    if (mUserDictionaryManager != null) {
+                        mUserDictionaryManager.blockWord(word);
+                    } else {
+                        UserDictionaryManager.getInstance(this).blockWord(word);
+                    }
+                });
             }
             updateSuggestions();
             dialog.dismiss();
@@ -1958,7 +1987,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final String cleanWord = word.trim();
         mDictExecutor.execute(() -> {
             mPrefixDictionary.insert(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
-            UserDictionaryManager.getInstance(this).addWord(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+            if (mUserDictionaryManager != null) {
+                mUserDictionaryManager.addWord(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+            } else {
+                UserDictionaryManager.getInstance(this).addWord(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+            }
             if (!isWordEmpty(w2)) {
                 mPrefixDictionary.setBigram(w2.trim(), cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
                 if (!isWordEmpty(w1)) {
@@ -2092,7 +2125,11 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         public void onReceive(final Context context, final Intent intent) {
             final String action = intent.getAction();
             if (AudioManager.RINGER_MODE_CHANGED_ACTION.equals(action)) {
-                AudioAndHapticFeedbackManager.getInstance().onRingerModeChanged();
+                if (mFeedbackManager != null) {
+                    mFeedbackManager.onRingerModeChanged();
+                } else {
+                    AudioAndHapticFeedbackManager.getInstance().onRingerModeChanged();
+                }
             } else if (Intent.ACTION_USER_UNLOCKED.equals(action)) {
                 if (mClipboardHistoryManager != null) {
                     try {

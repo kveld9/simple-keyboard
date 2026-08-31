@@ -119,16 +119,41 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
             return false;
         }
         final String normWord = StringUtils.toNormalizedLower(cleanWord);
+        final int targetFreq = Math.max(1, frequency);
+        final String targetShortcut = (shortcut != null && !shortcut.trim().isEmpty()) ? shortcut.trim() : null;
         final long timestamp = System.currentTimeMillis();
 
+        Cursor cursor = null;
         try {
             final SQLiteDatabase db = getWritableDatabase();
+            cursor = db.query(TABLE_WORDS, new String[]{COL_WORDS_WORD, COL_WORDS_FREQ, COL_WORDS_SHORTCUT},
+                    COL_WORDS_NORM + "=?", new String[]{normWord}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                final String existingWord = cursor.getString(0);
+                final int existingFreq = cursor.getInt(1);
+                final String existingShortcut = cursor.getString(2);
+                final String normExistingShortcut = (existingShortcut != null && !existingShortcut.trim().isEmpty())
+                        ? existingShortcut.trim() : null;
+
+                final boolean wordMatches = cleanWord.equals(existingWord);
+                final boolean shortcutMatches = (targetShortcut == null && normExistingShortcut == null)
+                        || (targetShortcut != null && targetShortcut.equals(normExistingShortcut));
+
+                if (wordMatches && shortcutMatches && existingFreq >= targetFreq) {
+                    return false;
+                }
+            }
+            if (cursor != null) {
+                cursor.close();
+                cursor = null;
+            }
+
             final ContentValues values = new ContentValues();
             values.put(COL_WORDS_WORD, cleanWord);
             values.put(COL_WORDS_NORM, normWord);
-            values.put(COL_WORDS_FREQ, Math.max(1, frequency));
-            if (shortcut != null && !shortcut.trim().isEmpty()) {
-                values.put(COL_WORDS_SHORTCUT, shortcut.trim());
+            values.put(COL_WORDS_FREQ, targetFreq);
+            if (targetShortcut != null) {
+                values.put(COL_WORDS_SHORTCUT, targetShortcut);
             }
             values.put(COL_WORDS_TIMESTAMP, timestamp);
 
@@ -137,6 +162,12 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
         } catch (Throwable e) {
             Log.e(TAG, "Error inserting/updating word", e);
             return false;
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
+            }
         }
     }
 
@@ -323,8 +354,19 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
         final String normWord = StringUtils.toNormalizedLower(cleanWord);
         final long timestamp = System.currentTimeMillis();
 
+        Cursor cursor = null;
         try {
             final SQLiteDatabase db = getWritableDatabase();
+            cursor = db.query(TABLE_BLOCKED, new String[]{COL_BLOCKED_ID}, COL_BLOCKED_NORM + "=?",
+                    new String[]{normWord}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                return false;
+            }
+            if (cursor != null) {
+                cursor.close();
+                cursor = null;
+            }
+
             final ContentValues values = new ContentValues();
             values.put(COL_BLOCKED_WORD, cleanWord);
             values.put(COL_BLOCKED_NORM, normWord);
@@ -335,6 +377,12 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
         } catch (Throwable e) {
             Log.e(TAG, "Error inserting blocked word", e);
             return false;
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
+            }
         }
     }
 

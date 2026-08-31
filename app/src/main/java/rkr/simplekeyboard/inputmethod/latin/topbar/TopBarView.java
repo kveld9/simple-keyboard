@@ -5,6 +5,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -21,6 +22,7 @@ import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils;
 
 public class TopBarView extends FrameLayout {
+    private static final String TAG = TopBarView.class.getSimpleName();
     public static final int MODE_NORMAL = 0;
     public static final int MODE_TOOL_TRAY = 1;
 
@@ -45,6 +47,28 @@ public class TopBarView extends FrameLayout {
     private ImageView mLanguageButton;
 
     private TopBarListener mListener;
+
+    private final OnClickListener mSlotClickListener = v -> {
+        if (v instanceof TextView) {
+            final TextView tv = (TextView) v;
+            final CharSequence text = tv.getText();
+            if (!TextUtils.isEmpty(text)) {
+                handleSuggestionClick(text);
+            }
+        }
+    };
+
+    private final OnLongClickListener mSlotLongClickListener = v -> {
+        if (v instanceof TextView) {
+            final TextView tv = (TextView) v;
+            final CharSequence text = tv.getText();
+            if (!TextUtils.isEmpty(text) && mListener != null) {
+                mListener.onSuggestionLongClicked(StringUtils.stripEnclosingQuotes(text));
+                return true;
+            }
+        }
+        return false;
+    };
 
     private int mTextColor = 0xFFCCCCCC;
 
@@ -164,6 +188,8 @@ public class TopBarView extends FrameLayout {
         tv.setFocusable(false);
         tv.setVisibility(View.INVISIBLE);
         ViewUtils.applySelectableItemBackground(tv, false);
+        tv.setOnClickListener(mSlotClickListener);
+        tv.setOnLongClickListener(mSlotLongClickListener);
         return tv;
     }
 
@@ -346,8 +372,8 @@ public class TopBarView extends FrameLayout {
         slot.setTypeface(Typeface.DEFAULT);
         slot.setAlpha(0.85f);
         slot.setVisibility(View.INVISIBLE);
-        slot.setOnClickListener(null);
-        slot.setOnLongClickListener(null);
+        slot.setOnClickListener(mSlotClickListener);
+        slot.setOnLongClickListener(mSlotLongClickListener);
     }
 
     private void applySlotStyle(TextView slot, boolean isHighlighted) {
@@ -370,26 +396,19 @@ public class TopBarView extends FrameLayout {
         slot.setText(text);
         slot.setVisibility(View.VISIBLE);
         applySlotStyle(slot, isHighlighted);
-        slot.setOnClickListener(v -> handleSuggestionClick(text));
-        slot.setOnLongClickListener(v -> {
-            if (mListener != null) {
-                mListener.onSuggestionLongClicked(StringUtils.stripEnclosingQuotes(text));
-            }
-            return true;
-        });
     }
     
     public void setExternalView(View view) {
         if (view == null) {
             if (mIsExternalActive) {
-                android.util.Log.i("LatinIME", "setExternalView(null) called, clearing external view.");
+                Log.i(TAG, "setExternalView(null) called, clearing external view.");
                 mIsExternalActive = false;
                 mSuggestionsContainer.removeAllViews();
                 // Match LeanType: do NOT add the standard slots back immediately,
                 // to avoid changing the layout geometry and breaking the autofill session.
             }
         } else {
-            android.util.Log.i("LatinIME", "setExternalView(View) called, setting external view.");
+            Log.i(TAG, "setExternalView(View) called, setting external view.");
             mIsExternalActive = true;
             mSuggestionsContainer.removeAllViews();
             mSuggestionsContainer.addView(view, new LinearLayout.LayoutParams(

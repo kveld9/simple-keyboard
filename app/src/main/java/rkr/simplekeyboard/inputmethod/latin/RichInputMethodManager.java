@@ -26,6 +26,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.inputmethodservice.InputMethodService;
 import android.os.IBinder;
+import android.util.Log;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
@@ -713,6 +714,7 @@ public class RichInputMethodManager {
                                    final InputMethodService context) {
         final IBinder token = context.getWindow().getWindow().getAttributes().token;
         if (token == null) {
+            Log.w(TAG, "switchToTargetIme: window token is null");
             return;
         }
         final InputMethodManager imm = mImmService;

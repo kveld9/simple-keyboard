@@ -50,7 +50,14 @@ public final class KeyDrawParams {
 
     public KeyDrawParams() {}
 
-    private KeyDrawParams(final KeyDrawParams copyFrom) {
+    public KeyDrawParams(final KeyDrawParams copyFrom) {
+        copyFrom(copyFrom);
+    }
+
+    public void copyFrom(final KeyDrawParams copyFrom) {
+        if (copyFrom == null) {
+            return;
+        }
         mTypeface = copyFrom.mTypeface;
 
         mLetterSize = copyFrom.mLetterSize;

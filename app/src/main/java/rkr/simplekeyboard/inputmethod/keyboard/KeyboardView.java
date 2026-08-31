@@ -31,7 +31,6 @@ import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
 
 import java.util.HashSet;
@@ -101,6 +100,7 @@ public class KeyboardView extends View {
     // TODO: Consider having a dummy keyboard object to make this @NonNull
     private Keyboard mKeyboard;
     private final KeyDrawParams mKeyDrawParams = new KeyDrawParams();
+    private final KeyDrawParams mScratchKeyDrawParams = new KeyDrawParams();
 
     // Drawing
     /** True if all keys should be drawn */
@@ -356,7 +356,14 @@ public class KeyboardView extends View {
         canvas.translate(keyDrawX, keyDrawY);
 
         final KeyVisualAttributes attr = key.getVisualAttributes();
-        final KeyDrawParams params = mKeyDrawParams.mayCloneAndUpdateParams(key.getHeight(), attr);
+        final KeyDrawParams params;
+        if (attr == null) {
+            params = mKeyDrawParams;
+        } else {
+            params = mScratchKeyDrawParams;
+            params.copyFrom(mKeyDrawParams);
+            params.updateParams(key.getHeight(), attr);
+        }
         params.mAnimAlpha = Constants.Color.ALPHA_OPAQUE;
 
         if (!key.isSpacer()) {
@@ -517,12 +524,10 @@ public class KeyboardView extends View {
             final int keyWidth, final int keyHeight) {
         final Keyboard keyboard = getKeyboard();
         if (keyboard == null) {
-            Log.w("KeyboardView", "KeyboardView: keyboard/icon is null");
             return;
         }
         final Drawable icon = key.getIcon(keyboard.mIconsSet, params.mAnimAlpha);
         if (icon == null) {
-            Log.w("KeyboardView", "KeyboardView: keyboard/icon is null");
             return;
         }
 

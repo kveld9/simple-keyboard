@@ -85,6 +85,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     public static final String KEY_SHAPE_BORDERLESS = "borderless";
     public static final String PREF_SHOW_SUGGESTIONS = "pref_show_suggestions";
     public static final String PREF_SUGGESTIONS_IN_URLS = "pref_suggestions_in_urls";
+    public static final String PREF_AUTO_LEARN = "pref_auto_learn";
     public static final String PREF_AUTO_CORRECTION_THRESHOLD = "auto_correction_threshold";
     public static final String AUTO_CORRECTION_THRESHOLD_DEFAULT = "1";
     public static final float AUTO_CORRECTION_THRESHOLD_OFF = 0.0f;

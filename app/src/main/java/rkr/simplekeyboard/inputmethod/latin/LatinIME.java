@@ -85,6 +85,8 @@ import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPalettesView;
 import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder;
+import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryEntry;
+import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryManager;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
@@ -355,7 +357,56 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         filter.addAction(AudioManager.RINGER_MODE_CHANGED_ACTION);
         filter.addAction(Intent.ACTION_USER_UNLOCKED);
         registerReceiver(mRingerModeChangeReceiver, filter);
+
+        UserDictionaryManager.getInstance(this).addListener(mUserDictListener);
     }
+
+    private final UserDictionaryManager.UserDictionaryListener mUserDictListener =
+            new UserDictionaryManager.UserDictionaryListener() {
+        @Override
+        public void onWordAdded(final UserDictionaryEntry entry) {
+            if (entry != null && entry.word != null) {
+                mPrefixDictionary.insert(entry.word, entry.frequency);
+                mHandler.post(LatinIME.this::updateSuggestions);
+            }
+        }
+
+        @Override
+        public void onWordRemoved(final String word, final long id) {
+            if (word != null) {
+                mPrefixDictionary.removeWord(word);
+                mHandler.post(LatinIME.this::updateSuggestions);
+            }
+        }
+
+        @Override
+        public void onAllLearnedWordsCleared() {
+            mPrefixDictionary.clearLearnedWords();
+            mHandler.post(LatinIME.this::updateSuggestions);
+        }
+
+        @Override
+        public void onWordBlocked(final String word) {
+            if (word != null) {
+                mPrefixDictionary.blockWord(word);
+                mHandler.post(LatinIME.this::updateSuggestions);
+            }
+        }
+
+        @Override
+        public void onWordUnblocked(final String word, final long id) {
+            if (word != null) {
+                mPrefixDictionary.unblockWord(word);
+                mHandler.post(LatinIME.this::updateSuggestions);
+            }
+        }
+
+        @Override
+        public void onAllBlockedWordsCleared() {
+            mPrefixDictionary.clearBlockedWords();
+            mHandler.post(LatinIME.this::updateSuggestions);
+        }
+    };
 
     private void loadSettings() {
         mLocale = mRichImm.getCurrentSubtype().getLocaleObject();
@@ -371,6 +422,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onDestroy() {
+        UserDictionaryManager.getInstance(this).removeListener(mUserDictListener);
         if (mRichImm != null) {
             mRichImm.setSubtypeChangeHandler(null);
         }
@@ -1034,6 +1086,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         } catch (Exception e) {
             Log.w(TAG, "Could not load binary trie dictionary asset: " + primaryAssetName, e);
         }
+        try {
+            final UserDictionaryManager manager = UserDictionaryManager.getInstance(this);
+            final java.util.List<UserDictionaryEntry> blocked = manager.getBlockedWords();
+            for (final UserDictionaryEntry b : blocked) {
+                mPrefixDictionary.blockWord(b.word);
+            }
+            final java.util.List<UserDictionaryEntry> learned = manager.getLearnedWords();
+            for (final UserDictionaryEntry l : learned) {
+                mPrefixDictionary.insert(l.word, l.frequency);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not hydrate user dictionary in loadDictionaryTask", e);
+        }
         postDictionaryLoadResult(newBinaryDict, newDecoder, loadGeneration);
     }
 
@@ -1569,6 +1634,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         builder.setMessage(getString(R.string.forget_word_message, word));
         builder.setPositiveButton(android.R.string.ok, (dialog, which) -> {
             mPrefixDictionary.blockWord(word);
+            if (isExecutorAvailable()) {
+                mDictExecutor.execute(() -> UserDictionaryManager.getInstance(this).blockWord(word));
+            }
             updateSuggestions();
             dialog.dismiss();
         });
@@ -1882,9 +1950,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (settings != null && settings.mInputAttributes != null && settings.mInputAttributes.mNoPersonalizedLearning) {
             return;
         }
+        if (settings != null && !settings.mAutoLearnEnabled) {
+            return;
+        }
         final String cleanWord = word.trim();
         mDictExecutor.execute(() -> {
             mPrefixDictionary.insert(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+            UserDictionaryManager.getInstance(this).addWord(cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
             if (!isWordEmpty(w2)) {
                 mPrefixDictionary.setBigram(w2.trim(), cleanWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
                 if (!isWordEmpty(w1)) {

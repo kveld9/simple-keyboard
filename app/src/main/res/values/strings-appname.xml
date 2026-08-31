@@ -25,4 +25,5 @@
     <string name="license_url" translatable="false">https://github.com/soyelmismo/simple-keyboard/blob/master/LICENSE</string>
     <string name="check_for_updates_url" translatable="false">https://github.com/soyelmismo/simple-keyboard/releases/latest</string>
     <string name="dictionaries_download_url" translatable="false">https://github.com/soyelmismo/simple-keyboard/tree/master/dictionaries</string>
+    <string name="dictionaries_helium314_download_url" translatable="false">https://codeberg.org/Helium314/aosp-dictionaries</string>
 </resources>

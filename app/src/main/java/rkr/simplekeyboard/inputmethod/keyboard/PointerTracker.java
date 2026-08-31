@@ -103,6 +103,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     //private int mStartY;
     private long mStartTime;
     private boolean mCursorMoved = false;
+    // Cached per gesture at onDownEventInternal to avoid singleton lookups in hot paths.
+    private SettingsValues mGestureSettings;
 
     // true if keyboard layout has been changed.
     private boolean mKeyboardLayoutHasBeenChanged;
@@ -554,6 +556,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     }
 
     private void onDownEventInternal(final int x, final int y) {
+        mGestureSettings = Settings.getInstance().getCurrent();
         final Key key = onDownKey(x, y);
         mIsAllowedDraggingFinger = isDraggingFingerAllowed(key);
         mKeyboardLayoutHasBeenChanged = false;
@@ -689,12 +692,24 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         void onSwipe(final int steps);
     }
 
+    private SettingsValues getGestureSettings() {
+        SettingsValues sv = mGestureSettings;
+        if (sv == null) {
+            sv = Settings.getInstance().getCurrent();
+            mGestureSettings = sv;
+        }
+        return sv;
+    }
+
     private boolean handleSwipe(final int x, final Key oldKey, final int targetCode,
             final boolean enabled, final boolean checkTimeout, final SwipeListener listener) {
         if (!isSwipeEligible(oldKey, targetCode, enabled)) {
             return false;
         }
-        final SettingsValues sv = Settings.getInstance().getCurrent();
+        final SettingsValues sv = getGestureSettings();
+        if (sv == null) {
+            return false;
+        }
         final int effectiveStep = Math.max(1, (int)(sPointerStep * sv.mSwipeSensitivity));
         final int steps = (x - mStartX) / effectiveStep;
         if (steps != 0) {
@@ -717,23 +732,26 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
     }
 
     private boolean isSwipeTimeoutActive() {
-        final SettingsValues sv = Settings.getInstance().getCurrent();
+        final SettingsValues sv = getGestureSettings();
+        if (sv == null) {
+            return false;
+        }
         final int swipeIgnoreTime = sv.mKeyLongpressTimeout
                 / MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;
         return mStartTime + swipeIgnoreTime >= System.currentTimeMillis();
     }
 
     private boolean handleSpaceSwipe(final int x, final Key oldKey) {
-        final SettingsValues sv = Settings.getInstance().getCurrent();
+        final SettingsValues sv = getGestureSettings();
         return handleSwipe(x, oldKey, Constants.CODE_SPACE,
-                sv.mSpaceSwipeEnabled,
+                sv != null && sv.mSpaceSwipeEnabled,
                 true /* checkTimeout */, sListener::onMoveCursorPointer);
     }
 
     private boolean handleDeleteSwipe(final int x, final Key oldKey) {
-        final SettingsValues sv = Settings.getInstance().getCurrent();
+        final SettingsValues sv = getGestureSettings();
         return handleSwipe(x, oldKey, Constants.CODE_DELETE,
-                sv.mDeleteSwipeEnabled,
+                sv != null && sv.mDeleteSwipeEnabled,
                 false /* checkTimeout */, steps -> {
                     sTimerProxy.cancelKeyTimersOf(this);
                     sListener.onMoveDeletePointer(steps);
@@ -1021,8 +1039,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element {
         if (code == Constants.CODE_SHIFT) {
             return sParams.mLongPressShiftLockTimeout;
         }
-        final SettingsValues sv = Settings.getInstance().getCurrent();
-        final int longpressTimeout = sv.mKeyLongpressTimeout;
+        final SettingsValues sv = getGestureSettings();
+        final int longpressTimeout = sv != null ? sv.mKeyLongpressTimeout : sParams.mLongPressShiftLockTimeout;
         if (mIsInSlidingKeyInput) {
             // We use longer timeout for sliding finger input started from the modifier key.
             return longpressTimeout * MULTIPLIER_FOR_LONG_PRESS_TIMEOUT_IN_SLIDING_INPUT;

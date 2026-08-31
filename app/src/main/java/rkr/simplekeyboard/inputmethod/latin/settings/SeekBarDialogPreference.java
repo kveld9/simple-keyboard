@@ -65,7 +65,9 @@ public final class SeekBarDialogPreference extends DialogPreference
 
         @Override
         public void writeDefaultValue(final String key) {
-            mPrefs.edit().remove(key).apply();
+            if (mPrefs.contains(key)) {
+                mPrefs.edit().remove(key).apply();
+            }
         }
 
         @Override
@@ -102,7 +104,9 @@ public final class SeekBarDialogPreference extends DialogPreference
 
         @Override
         public void writeDefaultValue(final String key) {
-            mPrefs.edit().remove(key).apply();
+            if (mPrefs.contains(key)) {
+                mPrefs.edit().remove(key).apply();
+            }
         }
 
         @Override

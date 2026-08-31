@@ -166,52 +166,79 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
                 prefs.edit().remove(ACTIVE_RESTRICTIONS).apply();
             }
         } else {
+            final Set<String> activeRestrictions = prefs.getStringSet(ACTIVE_RESTRICTIONS, null);
+            boolean changed = activeRestrictions == null || !activeRestrictions.equals(restrictionKeys);
             final SharedPreferences.Editor prefsEditor = prefs.edit();
             for (final String key : restrictionKeys) {
-                applySingleRestriction(key, appRestrictions, prefsEditor);
+                if (applySingleRestriction(key, appRestrictions, prefs, prefsEditor)) {
+                    changed = true;
+                }
             }
-            prefsEditor.putStringSet(ACTIVE_RESTRICTIONS, restrictionKeys);
-            prefsEditor.apply();
+            if (changed) {
+                prefsEditor.putStringSet(ACTIVE_RESTRICTIONS, restrictionKeys);
+                prefsEditor.apply();
+            }
         }
         return restrictionKeys;
     }
 
     @FunctionalInterface
     private interface RestrictionApplier {
-        void apply(String key, Bundle appRestrictions, SharedPreferences.Editor prefsEditor);
+        boolean apply(String key, Bundle appRestrictions, SharedPreferences prefs, SharedPreferences.Editor prefsEditor);
     }
 
     private static final Map<String, RestrictionApplier> RESTRICTION_APPLIERS = createRestrictionAppliers();
 
     private static Map<String, RestrictionApplier> createRestrictionAppliers() {
         final Map<String, RestrictionApplier> map = new HashMap<>();
-        final RestrictionApplier stringApplier = (key, bundle, editor) -> {
+        final RestrictionApplier stringApplier = (key, bundle, prefs, editor) -> {
             final String val = bundle.getString(key);
-            Log.i(TAG, "Loading restriction: " + key + "=" + val);
-            editor.putString(key, val);
+            if (val != null && !val.equals(prefs.getString(key, null))) {
+                Log.i(TAG, "Loading restriction: " + key + "=" + val);
+                editor.putString(key, val);
+                return true;
+            }
+            return false;
         };
-        final RestrictionApplier boolApplier = (key, bundle, editor) -> {
+        final RestrictionApplier boolApplier = (key, bundle, prefs, editor) -> {
             final boolean val = bundle.getBoolean(key);
-            Log.i(TAG, "Loading restriction: " + key + "=" + val);
-            editor.putBoolean(key, val);
+            if (!prefs.contains(key) || prefs.getBoolean(key, !val) != val) {
+                Log.i(TAG, "Loading restriction: " + key + "=" + val);
+                editor.putBoolean(key, val);
+                return true;
+            }
+            return false;
         };
-        final RestrictionApplier percentFloatApplier = (key, bundle, editor) -> {
+        final RestrictionApplier percentFloatApplier = (key, bundle, prefs, editor) -> {
             final int val = bundle.getInt(key);
-            Log.i(TAG, "Loading restriction: " + key + "=" + val);
-            editor.putFloat(key, val / 100f);
+            final float floatVal = val / 100f;
+            if (!prefs.contains(key) || Float.compare(prefs.getFloat(key, Float.NaN), floatVal) != 0) {
+                Log.i(TAG, "Loading restriction: " + key + "=" + val);
+                editor.putFloat(key, floatVal);
+                return true;
+            }
+            return false;
         };
-        final RestrictionApplier intApplier = (key, bundle, editor) -> {
+        final RestrictionApplier intApplier = (key, bundle, prefs, editor) -> {
             final int val = bundle.getInt(key);
-            Log.i(TAG, "Loading restriction: " + key + "=" + val);
-            editor.putInt(key, val);
+            if (!prefs.contains(key) || prefs.getInt(key, Integer.MIN_VALUE) != val) {
+                Log.i(TAG, "Loading restriction: " + key + "=" + val);
+                editor.putInt(key, val);
+                return true;
+            }
+            return false;
         };
 
         map.put(PREF_ENABLED_SUBTYPES, stringApplier);
         map.put(PREF_AUTO_CORRECTION_THRESHOLD, stringApplier);
-        map.put(SCREEN_THEME, (key, bundle, editor) -> {
+        map.put(SCREEN_THEME, (key, bundle, prefs, editor) -> {
             final String val = bundle.getString(key);
-            Log.i(TAG, "Loading restriction: " + key + "=" + val);
-            editor.putString(KeyboardTheme.KEYBOARD_THEME_KEY, val);
+            if (val != null && !val.equals(prefs.getString(KeyboardTheme.KEYBOARD_THEME_KEY, null))) {
+                Log.i(TAG, "Loading restriction: " + key + "=" + val);
+                editor.putString(KeyboardTheme.KEYBOARD_THEME_KEY, val);
+                return true;
+            }
+            return false;
         });
 
         map.put(PREF_AUTO_CAP, boolApplier);
@@ -241,12 +268,13 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
         return Collections.unmodifiableMap(map);
     }
 
-    private static void applySingleRestriction(final String key, final Bundle appRestrictions, final SharedPreferences.Editor prefsEditor) {
+    private static boolean applySingleRestriction(final String key, final Bundle appRestrictions, final SharedPreferences prefs, final SharedPreferences.Editor prefsEditor) {
         final RestrictionApplier applier = RESTRICTION_APPLIERS.get(key);
         if (applier != null) {
-            applier.apply(key, appRestrictions, prefsEditor);
+            return applier.apply(key, appRestrictions, prefs, prefsEditor);
         } else {
             Log.e(TAG, "Unhandled restriction: " + key);
+            return false;
         }
     }
 

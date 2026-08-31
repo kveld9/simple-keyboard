@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 Simple Keyboard Authors -->
+
+<PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:title="@string/settings_screen_dictionary">
+
+    <PreferenceCategory
+        android:title="@string/settings_category_typing">
+
+        <SwitchPreferenceCompat
+            android:key="pref_auto_learn"
+            android:title="@string/auto_learn"
+            android:summary="@string/auto_learn_summary"
+            android:defaultValue="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/settings_category_dictionary">
+
+        <Preference
+            android:key="screen_learned_words"
+            android:title="@string/learned_words"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.LearnedWordsSettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+        <Preference
+            android:key="screen_blocked_words"
+            android:title="@string/blocked_words"
+            android:fragment="rkr.simplekeyboard.inputmethod.latin.settings.BlockedWordsSettingsFragment"
+            app:widgetLayout="@layout/preference_chevron" />
+
+        <Preference
+            android:key="pref_clear_all_learned_words"
+            android:title="@string/clear_learned_words_title"
+            android:summary="@string/clear_learned_words_summary" />
+
+        <Preference
+            android:key="pref_clear_all_blocked_words"
+            android:title="@string/clear_blocked_words_title"
+            android:summary="@string/clear_blocked_words_summary" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

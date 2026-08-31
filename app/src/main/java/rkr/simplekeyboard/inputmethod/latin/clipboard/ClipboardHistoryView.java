@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -26,6 +27,7 @@ import rkr.simplekeyboard.inputmethod.latin.utils.ResourceUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.ViewUtils;
 
 public class ClipboardHistoryView extends LinearLayout {
+    private static final String TAG = "ClipboardHistoryView";
 
     public interface ClipboardHistoryListener {
         void onPasteText(CharSequence text);
@@ -574,7 +576,9 @@ public class ClipboardHistoryView extends LinearLayout {
             if (isTextMatching(currentSystemText, deletedText) && cm != null) {
                 clearPrimaryClip(cm);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.e(TAG, "Error clearing system clipboard", e);
+        }
     }
 
     private CharSequence getPrimaryClipText(final android.content.ClipboardManager cm) {

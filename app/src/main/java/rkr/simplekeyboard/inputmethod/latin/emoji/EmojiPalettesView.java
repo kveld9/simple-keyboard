@@ -73,6 +73,8 @@ public class EmojiPalettesView extends LinearLayout {
     private int mCurrentCategoryIndex = 1; // Default to Smileys
     private final List<String> mRecentEmojis = new ArrayList<>();
     private final List<TextView> mCategoryTabViews = new ArrayList<>();
+    private boolean mRecentEmojisLoaded = false;
+    private final StringBuilder mRecentEmojiBuilder = new StringBuilder();
 
     public EmojiPalettesView(Context context) {
         super(context);
@@ -234,6 +236,7 @@ public class EmojiPalettesView extends LinearLayout {
     }
 
     public void reloadRecentEmojis() {
+        mRecentEmojisLoaded = false;
         loadRecentEmojis(getContext());
         selectCategory(mCurrentCategoryIndex);
     }
@@ -266,7 +269,12 @@ public class EmojiPalettesView extends LinearLayout {
     }
 
     private void loadRecentEmojis(Context context) {
-        if (context == null) return;
+        if (context == null) {
+            android.util.Log.e("EmojiPalettesView", "Context is null in loadRecentEmojis");
+            return;
+        }
+        if (mRecentEmojisLoaded) return;
+        
         mRecentEmojis.clear();
         try {
             SharedPreferences prefs = rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat.getDeviceSharedPreferences(context);
@@ -279,28 +287,37 @@ public class EmojiPalettesView extends LinearLayout {
                     }
                 }
             }
-        } catch (Throwable ignored) {}
+            mRecentEmojisLoaded = true;
+        } catch (Throwable e) {
+            android.util.Log.e("EmojiPalettesView", "Failed to load recent emojis", e);
+        }
     }
 
     private void recordRecentEmoji(String emoji) {
         loadRecentEmojis(getContext());
+        if (!mRecentEmojis.isEmpty() && emoji.equals(mRecentEmojis.get(0))) {
+            return; // No change in order, skip redundant disk I/O
+        }
+        
         mRecentEmojis.remove(emoji);
         mRecentEmojis.add(0, emoji);
         if (mRecentEmojis.size() > MAX_RECENT_EMOJIS) {
             mRecentEmojis.remove(mRecentEmojis.size() - 1);
         }
 
-        StringBuilder sb = new StringBuilder();
+        mRecentEmojiBuilder.setLength(0);
         for (int i = 0; i < mRecentEmojis.size(); i++) {
-            if (i > 0) sb.append(",");
-            sb.append(mRecentEmojis.get(i));
+            if (i > 0) mRecentEmojiBuilder.append(",");
+            mRecentEmojiBuilder.append(mRecentEmojis.get(i));
         }
         try {
             rkr.simplekeyboard.inputmethod.compat.PreferenceManagerCompat.getDeviceSharedPreferences(getContext())
                     .edit()
-                    .putString(PREF_RECENT_EMOJIS, sb.toString())
+                    .putString(PREF_RECENT_EMOJIS, mRecentEmojiBuilder.toString())
                     .apply();
-        } catch (Throwable ignored) {}
+        } catch (Throwable e) {
+            android.util.Log.e("EmojiPalettesView", "Failed to save recent emojis", e);
+        }
 
         if (mCurrentCategoryIndex == 0) {
             mGridAdapter.setItems(mRecentEmojis);

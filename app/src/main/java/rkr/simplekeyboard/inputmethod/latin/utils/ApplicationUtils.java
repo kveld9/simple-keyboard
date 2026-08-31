@@ -91,6 +91,7 @@ public final class ApplicationUtils {
 
     public static void openUrl(final Context context, final String uri) {
         if (context == null || uri == null) {
+            Log.w(TAG, "Cannot open URL: context or uri is null");
             return;
         }
         try {

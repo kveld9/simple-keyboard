@@ -152,7 +152,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private final java.util.List<CharSequence> mScratchMerged = new java.util.ArrayList<>(3);
     private final java.util.Set<String> mScratchDeduplicationSet = new java.util.HashSet<>();
 
-    private RichInputMethodManager mRichImm;
+    RichInputMethodManager mRichImm;
     final KeyboardSwitcher mKeyboardSwitcher;
 
     private AlertDialog mOptionsDialog;
@@ -440,9 +440,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private boolean isImeSuppressedByHardwareKeyboard() {
-        final KeyboardSwitcher switcher = KeyboardSwitcher.getInstance();
-        return !onEvaluateInputViewShown() && switcher.isImeSuppressedByHardwareKeyboard(
-                mSettings.getCurrent(), switcher.getKeyboardSwitchState());
+        return !onEvaluateInputViewShown() && mKeyboardSwitcher.isImeSuppressedByHardwareKeyboard(
+                mSettings.getCurrent(), mKeyboardSwitcher.getKeyboardSwitchState());
     }
 
     @Override

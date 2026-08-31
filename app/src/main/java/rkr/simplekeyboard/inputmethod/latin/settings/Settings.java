@@ -316,6 +316,7 @@ public final class Settings extends BroadcastReceiver implements SharedPreferenc
     }
 
     public static void writePrefSubtypes(final SharedPreferences prefs, final String prefSubtypes) {
+        if (prefSubtypes.equals(prefs.getString(PREF_ENABLED_SUBTYPES, null))) return;
         prefs.edit().putString(PREF_ENABLED_SUBTYPES, prefSubtypes).apply();
     }
 

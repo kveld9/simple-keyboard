@@ -37,7 +37,6 @@ import rkr.simplekeyboard.inputmethod.latin.InputView;
 import rkr.simplekeyboard.inputmethod.latin.LatinIME;
 import rkr.simplekeyboard.inputmethod.latin.RichInputMethodManager;
 import rkr.simplekeyboard.inputmethod.latin.common.Constants;
-import rkr.simplekeyboard.inputmethod.latin.settings.Settings;
 import rkr.simplekeyboard.inputmethod.latin.settings.SettingsValues;
 import rkr.simplekeyboard.inputmethod.latin.utils.CapsModeUtils;
 import rkr.simplekeyboard.inputmethod.latin.utils.LanguageOnSpacebarUtils;
@@ -54,6 +53,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private KeyboardState mState;
 
     private KeyboardLayoutSet mKeyboardLayoutSet;
+    private SettingsValues mCurrentSettingsValues;
     // TODO: The following {@link KeyboardTextsSet} should be in {@link KeyboardLayoutSet}.
     private final KeyboardTextsSet mKeyboardTextsSet = new KeyboardTextsSet();
 
@@ -111,6 +111,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
     public void loadKeyboard(final EditorInfo editorInfo, final SettingsValues settingsValues,
             final int currentAutoCapsState, final int currentRecapitalizeState) {
+        mCurrentSettingsValues = settingsValues;
         final KeyboardLayoutSet.Builder builder = new KeyboardLayoutSet.Builder(
                 mThemeContext, editorInfo);
         final Resources res = mThemeContext.getResources();
@@ -141,10 +142,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
 
     private void setKeyboard(
             final int keyboardId,
-            final KeyboardSwitchState toggleState) {
-        final SettingsValues currentSettingsValues = Settings.getInstance().getCurrent();
+            final KeyboardSwitchState toggleState,
+            final SettingsValues currentSettingsValues) {
         setMainKeyboardFrame(currentSettingsValues, toggleState);
-        // TODO: pass this object to setKeyboard instead of getting the current values.
         final MainKeyboardView keyboardView = mKeyboardView;
         final Keyboard oldKeyboard = keyboardView.getKeyboard();
         final Keyboard newKeyboard = mKeyboardLayoutSet.getKeyboard(keyboardId);
@@ -211,7 +211,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setAlphabetKeyboard");
         }
-        setKeyboard(KeyboardId.ELEMENT_ALPHABET, KeyboardSwitchState.OTHER);
+        setKeyboard(KeyboardId.ELEMENT_ALPHABET, KeyboardSwitchState.OTHER, mCurrentSettingsValues);
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -220,7 +220,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setAlphabetManualShiftedKeyboard");
         }
-        setKeyboard(KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED, KeyboardSwitchState.OTHER);
+        setKeyboard(KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED, KeyboardSwitchState.OTHER, mCurrentSettingsValues);
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -229,7 +229,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setAlphabetAutomaticShiftedKeyboard");
         }
-        setKeyboard(KeyboardId.ELEMENT_ALPHABET_AUTOMATIC_SHIFTED, KeyboardSwitchState.OTHER);
+        setKeyboard(KeyboardId.ELEMENT_ALPHABET_AUTOMATIC_SHIFTED, KeyboardSwitchState.OTHER, mCurrentSettingsValues);
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -238,7 +238,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setAlphabetShiftLockedKeyboard");
         }
-        setKeyboard(KeyboardId.ELEMENT_ALPHABET_SHIFT_LOCKED, KeyboardSwitchState.OTHER);
+        setKeyboard(KeyboardId.ELEMENT_ALPHABET_SHIFT_LOCKED, KeyboardSwitchState.OTHER, mCurrentSettingsValues);
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -247,7 +247,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setSymbolsKeyboard");
         }
-        setKeyboard(KeyboardId.ELEMENT_SYMBOLS, KeyboardSwitchState.OTHER);
+        setKeyboard(KeyboardId.ELEMENT_SYMBOLS, KeyboardSwitchState.OTHER, mCurrentSettingsValues);
     }
 
     // Implements {@link KeyboardState.SwitchActions}.
@@ -256,7 +256,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         if (DEBUG_ACTION) {
             Log.d(TAG, "setSymbolsShiftedKeyboard");
         }
-        setKeyboard(KeyboardId.ELEMENT_SYMBOLS_SHIFTED, KeyboardSwitchState.SYMBOLS_SHIFTED);
+        setKeyboard(KeyboardId.ELEMENT_SYMBOLS_SHIFTED, KeyboardSwitchState.SYMBOLS_SHIFTED, mCurrentSettingsValues);
     }
 
     public boolean isImeSuppressedByHardwareKeyboard(

@@ -32,12 +32,15 @@ import static org.junit.Assert.assertTrue;
 public class AsyncDictionaryAndClipboardValidationTest {
 
     private byte[] loadAssetBytes(String filename) throws IOException {
-        File file = new File("dictionaries/" + filename);
-        if (!file.exists()) {
-            file = new File("../dictionaries/" + filename);
-        }
-        try (FileInputStream fis = new FileInputStream(file)) {
-            byte[] b = new byte[(int) file.length()];
+        final List<rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieCompiler.WordEntry> words = new ArrayList<>();
+        words.add(new rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieCompiler.WordEntry("hola", 200));
+        words.add(new rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieCompiler.WordEntry("que", 250));
+        words.add(new rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieCompiler.WordEntry("the", 250));
+        final File tmp = File.createTempFile("test_async_dict_", ".bin");
+        tmp.deleteOnExit();
+        rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieCompiler.compile(words, tmp);
+        try (FileInputStream fis = new FileInputStream(tmp)) {
+            byte[] b = new byte[(int) tmp.length()];
             int read = 0;
             while (read < b.length) {
                 int r = fis.read(b, read, b.length - read);

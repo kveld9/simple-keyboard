@@ -54,3 +54,5 @@ artifacts_*/
 tooling/
 __pycache__/
 *.pyc
+dictionaries/
+*.bin

@@ -55,4 +55,6 @@ tooling/
 __pycache__/
 *.pyc
 dictionaries/
+raw_dicts/
+raw_dictionaries/
 *.bin

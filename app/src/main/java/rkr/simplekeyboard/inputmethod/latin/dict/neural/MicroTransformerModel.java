@@ -46,6 +46,8 @@ public final class MicroTransformerModel {
     private byte[][] mMlpDownW;        // [n_layers][d_model * d_ff]
     private float[][] mGamma1Fused;    // [n_layers][d_model]
     private float[][] mGamma2Fused;    // [n_layers][d_model]
+    private float[] mScaleProj;        // [n_layers]
+    private float[] mScaleDown;        // [n_layers]
 
     // BPE Vocabulary & Trie
     private String[] mBpeVocab;
@@ -240,9 +242,25 @@ public final class MicroTransformerModel {
             mMlpDownW = new byte[mNLayers][mDModel * dFf];
             mGamma1Fused = new float[mNLayers][mDModel];
             mGamma2Fused = new float[mNLayers][mDModel];
+            mScaleProj = new float[mNLayers];
+            mScaleDown = new float[mNLayers];
 
-            buffer.position(offLayer0);
+            int qkvPackedBytes = ((3 * mDModel) * mDModel + 3) / 4;
+            int projPackedBytes = (mDModel * mDModel + 3) / 4;
+            int mlpUpPackedBytes = (dFf * mDModel + 3) / 4;
+            int mlpDownPackedBytes = (mDModel * dFf + 3) / 4;
+            int rawLayerBytes = qkvPackedBytes + projPackedBytes + mlpUpPackedBytes + mlpDownPackedBytes +
+                    (mDModel * 4) + (mDModel * 4) + 4 + 4;
+            int layerStride = (rawLayerBytes + 63) & ~63;
+
             for (int l = 0; l < mNLayers; l++) {
+                int layerStart = offLayer0 + l * layerStride;
+                if (layerStart + rawLayerBytes > fileSize) {
+                    Log.e(TAG, "loadModel: Layer " + l + " exceeds file bounds: " + layerStart);
+                    return false;
+                }
+                buffer.position(layerStart);
+
                 // 1. QKV weights (Ternary 2-bit packed)
                 int qkvCount = (3 * mDModel) * mDModel;
                 readTernaryWeights(buffer, mQkvW[l], qkvCount);
@@ -268,6 +286,10 @@ public final class MicroTransformerModel {
                 for (int i = 0; i < mDModel; i++) {
                     mGamma2Fused[l][i] = buffer.getFloat();
                 }
+
+                // 7. Scale Proj & Scale Down (1 float each)
+                mScaleProj[l] = buffer.getFloat();
+                mScaleDown[l] = buffer.getFloat();
             }
 
             // 6. Pre-allocate intermediate buffers for 0-allocation forward execution
@@ -361,6 +383,8 @@ public final class MicroTransformerModel {
         mMlpDownW = null;
         mGamma1Fused = null;
         mGamma2Fused = null;
+        mScaleProj = null;
+        mScaleDown = null;
 
         mBpeVocab = null;
         mBpeTrieRoot = null;
@@ -592,9 +616,10 @@ public final class MicroTransformerModel {
                 }
             }
 
-            // 2d. Output projection + Residual: mX += mAttnOut * proj_weight^T (Ternary additions/subtractions)
+            // 2d. Output projection + Residual: mX += (mAttnOut * proj_weight^T) * s_proj
             // proj_weight has shape (D, D), row-major, elements in {-1, 0, +1}
             byte[] projW = mProjW[layer];
+            final float sProj = (mScaleProj != null && layer < mScaleProj.length) ? mScaleProj[layer] : 1.0f;
             for (int t = 0; t < T; t++) {
                 int attnOffset = t * D;
                 int xOffset = t * D;
@@ -609,7 +634,7 @@ public final class MicroTransformerModel {
                             sum -= mAttnOut[attnOffset + k];
                         }
                     }
-                    mX[xOffset + j] += sum;
+                    mX[xOffset + j] += sum * sProj;
                 }
             }
 
@@ -652,8 +677,9 @@ public final class MicroTransformerModel {
 
             // down = mMlpHid * mlp_down^T (shape: T x D, Ternary additions/subtractions)
             // mlp_down has shape (D, d_ff), elements in {-1, 0, +1}
-            // Residual: mX += down
+            // Residual: mX += down * s_down
             byte[] mlpDownW = mMlpDownW[layer];
+            final float sDown = (mScaleDown != null && layer < mScaleDown.length) ? mScaleDown[layer] : 1.0f;
             for (int t = 0; t < T; t++) {
                 int hidOffset = t * dFf;
                 int xOffset = t * D;
@@ -668,7 +694,7 @@ public final class MicroTransformerModel {
                             sum -= mMlpHid[hidOffset + k];
                         }
                     }
-                    mX[xOffset + j] += sum;
+                    mX[xOffset + j] += sum * sDown;
                 }
             }
         }

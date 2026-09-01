@@ -84,9 +84,10 @@ public class MicroTransformerModelTest {
         int projPacked = (dModel * dModel + 3) / 4;
         int mlpUpPacked = (dFf * dModel + 3) / 4;
         int mlpDownPacked = (dModel * dFf + 3) / 4;
-        int layerSize = qkvPacked + projPacked + mlpUpPacked + mlpDownPacked + (dModel * 4) + (dModel * 4);
+        int layerSize = qkvPacked + projPacked + mlpUpPacked + mlpDownPacked + (dModel * 4) + (dModel * 4) + 4 + 4;
+        int layerStride = align64(layerSize);
 
-        int totalFileSize = offLayer0 + nLayers * layerSize;
+        int totalFileSize = offLayer0 + nLayers * layerStride;
 
         ByteBuffer buffer = ByteBuffer.allocate(totalFileSize);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -150,9 +151,9 @@ public class MicroTransformerModelTest {
         }
 
         // --- Write Layers (at offLayer0) with packed 2-bit weights ---
-        buffer.position(offLayer0);
         byte defaultPacked = (byte) (0x01 | (0x01 << 2) | (0x01 << 4) | (0x01 << 6)); // all +1.0f
         for (int l = 0; l < nLayers; l++) {
+            buffer.position(offLayer0 + l * layerStride);
             // 1. QKV weights
             if (qkvWeights != null) {
                 int toWrite = Math.min(qkvWeights.length, qkvPacked);
@@ -200,6 +201,10 @@ public class MicroTransformerModelTest {
                 float g = (gamma2 != null && i < gamma2.length) ? gamma2[i] : 1.0f;
                 buffer.putFloat(g);
             }
+
+            // 7. Scale Proj & Scale Down
+            buffer.putFloat(1.0f);
+            buffer.putFloat(1.0f);
         }
 
         try (FileOutputStream fos = new FileOutputStream(file)) {

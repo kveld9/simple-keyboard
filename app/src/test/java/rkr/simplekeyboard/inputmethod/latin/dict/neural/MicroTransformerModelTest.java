@@ -507,4 +507,63 @@ public class MicroTransformerModelTest {
         assertEquals("Plain token should remain unchanged", "plain", model.getTokenText(4));
         assertEquals("Out of bounds token ID should return empty string", "", model.getTokenText(999));
     }
+
+    @Test
+    public void testTokenizeTail() throws IOException {
+        final String[] vocab = new String[16];
+        vocab[0] = "<pad>";
+        vocab[1] = "<unk>";
+        vocab[2] = "\u2581hola";
+        vocab[3] = "\u2581amigo";
+        vocab[4] = "\u2581mundo";
+        for (int i = 5; i < 16; i++) {
+            vocab[i] = "tok" + i;
+        }
+
+        final File modelFile = mTempFolder.newFile("tokenize_tail.trf2");
+        createTestTRF1File(modelFile, 16, 4, 2, vocab, null);
+
+        final MicroTransformerModel model = new MicroTransformerModel();
+        assertTrue(model.loadModel(modelFile));
+
+        final int[] outTokens = new int[2];
+        // "hola amigo mundo" -> 3 tokens: [2, 3, 4]. Tail of 2 should be [3, 4]
+        int count = model.tokenizeTail("hola amigo mundo", outTokens, 2);
+        assertEquals(2, count);
+        assertEquals(3, outTokens[0]);
+        assertEquals(4, outTokens[1]);
+    }
+
+    @Test
+    public void testForwardLongContextUsesTail() throws IOException {
+        final String[] vocab = new String[16];
+        vocab[0] = "<pad>";
+        vocab[1] = "<unk>";
+        for (int i = 2; i < 16; i++) {
+            vocab[i] = "tok" + i;
+        }
+
+        final File modelFile = mTempFolder.newFile("forward_long_context.trf2");
+        createTestTRF1File(modelFile, 16, 4, 2, vocab, null);
+
+        final MicroTransformerModel model = new MicroTransformerModel();
+        assertTrue(model.loadModel(modelFile));
+
+        // Create an array of 20 tokens: 0..19
+        final int[] longTokens = new int[20];
+        for (int i = 0; i < 20; i++) {
+            longTokens[i] = (i % 14) + 2;
+        }
+
+        final float[] outHiddenLong = new float[4];
+        assertTrue(model.forward(longTokens, 20, outHiddenLong));
+
+        // Forward with only the last 16 tokens should produce exact same output
+        final int[] tailTokens = new int[16];
+        System.arraycopy(longTokens, 4, tailTokens, 0, 16);
+        final float[] outHiddenTail = new float[4];
+        assertTrue(model.forward(tailTokens, 16, outHiddenTail));
+
+        assertArrayEquals(outHiddenTail, outHiddenLong, 1e-5f);
+    }
 }

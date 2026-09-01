@@ -467,9 +467,37 @@ public final class MicroTransformerModel {
 
         return count;
     }
-
     public synchronized int tokenize(CharSequence text, int[] outTokens, int maxTokens) {
         return tokenize(text, outTokens, 0, maxTokens);
+    }
+
+    private final int[] mTailScratch = new int[256];
+
+    /**
+     * Tokenizes text and stores only the trailing tokens (the most recent context),
+     * avoiding allocations in the hot path.
+     *
+     * @param text The input sequence.
+     * @param outTokens Array where the tail tokens will be written.
+     * @param maxTokens Maximum number of tail tokens to return.
+     * @return Number of tokens written to outTokens.
+     */
+    public synchronized int tokenizeTail(CharSequence text, int[] outTokens, int maxTokens) {
+        if (!mIsLoaded || text == null || maxTokens <= 0 || outTokens == null) return 0;
+        int len = text.length();
+        while (len > 0 && Character.isWhitespace(text.charAt(len - 1))) {
+            len--;
+        }
+        if (len <= 0) return 0;
+        CharSequence trimmed = text.subSequence(0, len);
+        int n = tokenize(trimmed, mTailScratch, 0, mTailScratch.length);
+        if (n <= 0) return 0;
+        int keep = Math.min(n, Math.min(maxTokens, outTokens.length));
+        int srcStart = n - keep;
+        for (int i = 0; i < keep; i++) {
+            outTokens[i] = mTailScratch[srcStart + i];
+        }
+        return keep;
     }
 
     /**
@@ -480,21 +508,22 @@ public final class MicroTransformerModel {
      * @return Array of token IDs of length at most maxTokens.
      */
     public synchronized int[] tokenize(String text, int maxTokens) {
-        if (!mIsLoaded || text == null || text.isEmpty() || maxTokens <= 0) {
+        if (!mIsLoaded || text == null || maxTokens <= 0) {
             return new int[0];
         }
-        final int[] buffer = (maxTokens <= mScratchTokenIds.length) ? mScratchTokenIds : new int[maxTokens];
-        final int count = tokenize(text, buffer, 0, maxTokens);
+        int[] buffer = new int[maxTokens];
+        int count = tokenize(text, buffer, 0, maxTokens);
         return Arrays.copyOf(buffer, count);
     }
 
     /**
-     * Executes the transformer forward pass and computes the hidden state h_T for the last token.
+     * Executes the forward pass of the micro-transformer and writes the final hidden state vector
+     * h_T into outHidden.
      *
-     * @param contextTokens Array of BPE token IDs (1 to 16 tokens).
+     * @param contextTokens Array of BPE token IDs.
      * @param numTokens Number of valid tokens in contextTokens.
-     * @param outHidden Output buffer of size at least d_model to receive the hidden state.
-     * @return true if successful, false otherwise.
+     * @param outHidden Output buffer for h_T (size at least d_model).
+     * @return True if successful, false on error.
      */
     public synchronized boolean forward(int[] contextTokens, int numTokens, float[] outHidden) {
         if (!mIsLoaded) {
@@ -506,15 +535,17 @@ public final class MicroTransformerModel {
             return false;
         }
 
-        int T = Math.min(numTokens, MAX_SEQ_LEN);
-        int D = mDModel;
-        int H = mNHeads;
-        int dk = D / H;
-        int dFf = 2 * D;
+        final int start = Math.max(0, numTokens - MAX_SEQ_LEN);
+        final int T = numTokens - start;
+        final int D = mDModel;
+        final float invD = 1.0f / (float) D;
+        final int H = mNHeads;
+        final int dk = D / H;
+        final int dFf = 2 * D;
 
-        // 1. Token Embeddings + Positional Embeddings
+        // 1. Token Embeddings + Positional Embeddings (taking tail of contextTokens)
         for (int t = 0; t < T; t++) {
-            int tok = contextTokens[t];
+            int tok = contextTokens[start + t];
             if (tok < 0 || tok >= mVocabSize) {
                 tok = UNK_TOKEN_ID;
             }
@@ -537,7 +568,7 @@ public final class MicroTransformerModel {
                     float val = mX[offset + d];
                     sumSq += val * val;
                 }
-                float invRms = (float) (1.0 / Math.sqrt(sumSq / D + 1e-5f));
+                float invRms = (float) (1.0 / Math.sqrt(sumSq * invD + 1e-5f));
                 for (int d = 0; d < D; d++) {
                     mNormed[offset + d] = mX[offset + d] * invRms * gamma1[d];
                 }
@@ -647,7 +678,7 @@ public final class MicroTransformerModel {
                     float val = mX[offset + d];
                     sumSq += val * val;
                 }
-                float invRms = (float) (1.0 / Math.sqrt(sumSq / D + 1e-5f));
+                float invRms = (float) (1.0 / Math.sqrt(sumSq * invD + 1e-5f));
                 for (int d = 0; d < D; d++) {
                     mNormed[offset + d] = mX[offset + d] * invRms * gamma2[d];
                 }
@@ -706,7 +737,7 @@ public final class MicroTransformerModel {
             float val = mX[lastTokenOffset + d];
             sumSq += val * val;
         }
-        float invRms = (float) (1.0 / Math.sqrt(sumSq / D + 1e-5f));
+        float invRms = (float) (1.0 / Math.sqrt(sumSq * invD + 1e-5f));
         for (int d = 0; d < D; d++) {
             outHidden[d] = mX[lastTokenOffset + d] * invRms;
         }

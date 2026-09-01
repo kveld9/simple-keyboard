@@ -202,6 +202,11 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
                     if (currentText != null) {
                         return currentText;
                     }
+                } else {
+                    mLastText = null;
+                    mLastTextTime = 0L;
+                    mLastTextUsed = true;
+                    return null;
                 }
             } catch (Exception e) {
                 Log.w(TAG, "Error getting latest clip text", e);
@@ -577,6 +582,50 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         return prefs.getBoolean(Settings.PREF_CLIPBOARD_ENABLED, true);
     }
 
+    public void clearClipIfMatches(final String deletedText) {
+        if (deletedText == null || (mLastText != null && mLastText.equals(deletedText))) {
+            mLastText = null;
+            mLastTextTime = 0L;
+            mLastTextUsed = true;
+            try {
+                if (mClipboardManager != null && mClipboardManager.hasPrimaryClip()) {
+                    final ClipData clip = mClipboardManager.getPrimaryClip();
+                    if (clip != null && clip.getItemCount() > 0) {
+                        final ClipData.Item item = clip.getItemAt(0);
+                        final CharSequence text = item != null ? item.coerceToText(mContext) : null;
+                        if (deletedText == null || (text != null && deletedText.contentEquals(text))) {
+                            if (BuildCompatUtils.isAtLeastP()) {
+                                mClipboardManager.clearPrimaryClip();
+                            } else {
+                                mClipboardManager.setPrimaryClip(ClipData.newPlainText("", ""));
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Failed to clear primary clip", t);
+            }
+            mMainHandler.post(() -> {
+                if (mOnPrimaryClipChangeListener != null) {
+                    mOnPrimaryClipChangeListener.run();
+                }
+            });
+        }
+    }
+
+    public synchronized void clearScreenshotIfMatches(final String uriString) {
+        if (uriString == null || (mCachedScreenshotInfo != null &&
+                (uriString.equals(mCachedScreenshotInfo.fullPath) || uriString.equals(mCachedScreenshotInfo.uri.toString())))) {
+            recycleCachedScreenshotInfo();
+            mLatestScreenshotUsed = true;
+            mMainHandler.post(() -> {
+                if (mOnScreenshotChangeListener != null) {
+                    mOnScreenshotChangeListener.run();
+                }
+            });
+        }
+    }
+
     @Override
     public void onPrimaryClipChanged() {
         if (mClipboardManager == null || !isClipboardEnabled()) return;
@@ -584,6 +633,15 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         try {
             if (mClipboardManager.hasPrimaryClip()) {
                 processPrimaryClip(mClipboardManager.getPrimaryClip());
+            } else {
+                mLastText = null;
+                mLastTextTime = 0L;
+                mLastTextUsed = true;
+                mMainHandler.post(() -> {
+                    if (mOnPrimaryClipChangeListener != null) {
+                        mOnPrimaryClipChangeListener.run();
+                    }
+                });
             }
         } catch (Exception e) {
             Log.w(TAG, "Error handling clipboard change", e);

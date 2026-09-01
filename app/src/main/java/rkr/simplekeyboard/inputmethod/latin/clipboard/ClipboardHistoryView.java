@@ -37,6 +37,7 @@ public class ClipboardHistoryView extends LinearLayout {
     }
 
     private ClipboardDatabase mDatabase;
+    private ClipboardHistoryManager mClipboardHistoryManager;
     private ClipboardHistoryListener mListener;
     private int mTargetHeight = 0;
 
@@ -85,6 +86,11 @@ public class ClipboardHistoryView extends LinearLayout {
 
     public void setDatabase(ClipboardDatabase database) {
         mDatabase = database;
+    }
+
+    public void setClipboardHistoryManager(ClipboardHistoryManager manager) {
+        mClipboardHistoryManager = manager;
+        mDatabase = manager != null ? manager.getDatabase() : null;
     }
 
     public void setListener(ClipboardHistoryListener listener) {
@@ -382,7 +388,10 @@ public class ClipboardHistoryView extends LinearLayout {
     private void clearUnpinned() {
         executeDbTaskAndReload(() -> {
             mDatabase.clearUnpinned();
-            clearSystemClipboardIfMatches(null);
+            if (mClipboardHistoryManager != null) {
+                mClipboardHistoryManager.clearClipIfMatches(null);
+                mClipboardHistoryManager.clearScreenshotIfMatches(null);
+            }
         });
     }
 
@@ -573,47 +582,14 @@ public class ClipboardHistoryView extends LinearLayout {
     private void deleteClip(ClipboardHistoryEntry entry) {
         executeDbTaskAndReload(() -> {
             mDatabase.deleteClip(entry.id);
-            clearSystemClipboardIfMatches(entry.text);
-        });
-    }
-
-    private void clearSystemClipboardIfMatches(final String deletedText) {
-        try {
-            final android.content.ClipboardManager cm = (android.content.ClipboardManager)
-                    getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-            final CharSequence currentSystemText = getPrimaryClipText(cm);
-            if (isTextMatching(currentSystemText, deletedText) && cm != null) {
-                clearPrimaryClip(cm);
+            if (mClipboardHistoryManager != null) {
+                if (entry.uri != null && !entry.uri.isEmpty()) {
+                    mClipboardHistoryManager.clearScreenshotIfMatches(entry.uri);
+                } else {
+                    mClipboardHistoryManager.clearClipIfMatches(entry.text);
+                }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error clearing system clipboard", e);
-        }
-    }
-
-    private CharSequence getPrimaryClipText(final android.content.ClipboardManager cm) {
-        if (cm == null || !cm.hasPrimaryClip()) {
-            return null;
-        }
-        final android.content.ClipData primaryClip = cm.getPrimaryClip();
-        if (primaryClip == null || primaryClip.getItemCount() == 0) {
-            return null;
-        }
-        return primaryClip.getItemAt(0).getText();
-    }
-
-    private boolean isTextMatching(final CharSequence currentText, final String targetText) {
-        if (targetText == null) {
-            return true;
-        }
-        return currentText != null && targetText.contentEquals(currentText);
-    }
-
-    private void clearPrimaryClip(final android.content.ClipboardManager cm) {
-        if (BuildCompatUtils.isAtLeastP()) {
-            cm.clearPrimaryClip();
-        } else {
-            cm.setPrimaryClip(android.content.ClipData.newPlainText("", ""));
-        }
+        });
     }
 
     private Drawable getOrCreateCardBackground() {

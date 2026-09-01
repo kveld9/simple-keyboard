@@ -709,7 +709,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             hideEmojiView();
             if (mClipboardHistoryManager != null) {
                 mClipboardHistoryManager.updateCurrentClip();
-                mClipboardHistoryView.setDatabase(mClipboardHistoryManager.getDatabase());
+                mClipboardHistoryView.setClipboardHistoryManager(mClipboardHistoryManager);
             }
             mClipboardHistoryView.reloadClips();
         });

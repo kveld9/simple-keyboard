@@ -270,6 +270,8 @@
     <!-- Backup & Restore -->
     <string name="settings_screen_backup">Backup &amp; restore</string>
     <string name="settings_category_backup">Backup</string>
+    <string name="pref_backup_include_user_dictionary_title">Include personal dictionary</string>
+    <string name="pref_backup_include_user_dictionary_summary">Backup and restore learned words and blocked words</string>
     <string name="pref_backup_export_title">Create backup</string>
     <string name="pref_backup_export_summary">Export current preferences to a JSON file</string>
     <string name="settings_category_restore">Restore</string>
@@ -280,6 +282,7 @@
     <string name="backup_export_success">Backup exported successfully</string>
     <string name="backup_export_error">Failed to export backup: %s</string>
     <string name="backup_restore_success">Successfully restored %d preferences</string>
+    <string name="backup_restore_success_words">Successfully restored %1$d preferences and %2$d personal words</string>
     <string name="backup_restore_error">Failed to restore backup: %s</string>
     <string name="backup_in_progress">Processing backup…</string>
 </resources>

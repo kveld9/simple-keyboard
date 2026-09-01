@@ -209,4 +209,23 @@
     <string name="remove_custom_dict_message">Удалить импортированный словарь для %s?</string>
     <string name="remove_custom_dict_confirm">Удалить</string>
     <string name="custom_dict_removed_toast">Словарь для %s удалён</string>
+
+    <!-- Резервное копирование и восстановление -->
+    <string name="settings_screen_backup">Резервное копирование</string>
+    <string name="settings_category_backup">Резервное копирование</string>
+    <string name="pref_backup_include_user_dictionary_title">Включить личный словарь</string>
+    <string name="pref_backup_include_user_dictionary_summary">Резервное копирование выученных и заблокированных слов</string>
+    <string name="pref_backup_export_title">Создать резервную копию</string>
+    <string name="pref_backup_export_summary">Экспорт настроек в файл JSON</string>
+    <string name="settings_category_restore">Восстановление</string>
+    <string name="pref_backup_restore_title">Восстановить из копии</string>
+    <string name="pref_backup_restore_summary">Загрузка настроек из файла JSON</string>
+    <string name="backup_confirm_restore_title">Восстановление настроек</string>
+    <string name="backup_confirm_restore_message">Восстановление перезапишет текущие настройки. Продолжить?</string>
+    <string name="backup_export_success">Резервная копия успешно создана</string>
+    <string name="backup_export_error">Ошибка создания резервной копии: %s</string>
+    <string name="backup_restore_success">Успешно восстановлено настроек: %d</string>
+    <string name="backup_restore_success_words">Успешно восстановлено настроек: %1$d, личных слов: %2$d</string>
+    <string name="backup_restore_error">Ошибка восстановления: %s</string>
+    <string name="backup_in_progress">Обработка резервной копии…</string>
 </resources>

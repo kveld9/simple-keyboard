@@ -256,11 +256,11 @@ public class BackupHelperTest {
 
     @Test
     public void testRejectOversizedStream() {
-        final byte[] hugeData = new byte[600 * 1024]; // 600 KB > 512 KB
+        final byte[] hugeData = new byte[3 * 1024 * 1024]; // 3 MB > 2 MB
         final ByteArrayInputStream bais = new ByteArrayInputStream(hugeData);
         final BackupHelper.ValidationResult result = BackupHelper.validateAndParseStream(bais);
         assertFalse(result.success);
-        assertTrue(result.errorMessage.contains("512 KB"));
+        assertTrue(result.errorMessage.contains("2 MB"));
     }
 
     @Test
@@ -360,5 +360,48 @@ public class BackupHelperTest {
         assertEquals(false, prefs.getBoolean(Settings.PREF_AUTO_CAP, true));
         assertEquals(0.8f, prefs.getFloat(Settings.PREF_KEYBOARD_HEIGHT, 1.0f), 0.001f);
         assertEquals(200, prefs.getInt(Settings.PREF_KEY_LONGPRESS_TIMEOUT, 0));
+    }
+
+    @Test
+    public void testParseLearnedAndBlockedWords() {
+        final String jsonWithWords = "{\n" +
+                "  \"version\": 1,\n" +
+                "  \"app\": \"rkr.simplekeyboard.inputmethod\",\n" +
+                "  \"preferences\": {\n" +
+                "    \"auto_cap\": {\"type\": \"boolean\", \"value\": true}\n" +
+                "  },\n" +
+                "  \"learned_words\": [\n" +
+                "    {\"word\": \"antigravity\", \"frequency\": 250, \"shortcut\": \"ag\"},\n" +
+                "    \"simpleword\"\n" +
+                "  ],\n" +
+                "  \"blocked_words\": [\n" +
+                "    \"badword\",\n" +
+                "    {\"word\": \"blocked2\"}\n" +
+                "  ]\n" +
+                "}";
+
+        final BackupHelper.ValidationResult result = BackupHelper.validateAndParseJson(jsonWithWords);
+        assertTrue(result.success);
+        assertEquals(1, result.validEntriesCount);
+        assertTrue(result.hasUserWords());
+        assertEquals(2, result.learnedWords.size());
+        assertEquals("antigravity", result.learnedWords.get(0).word);
+        assertEquals(250, result.learnedWords.get(0).frequency);
+        assertEquals("ag", result.learnedWords.get(0).shortcut);
+        assertEquals("simpleword", result.learnedWords.get(1).word);
+        assertEquals(2, result.blockedWords.size());
+        assertEquals("badword", result.blockedWords.get(0));
+        assertEquals("blocked2", result.blockedWords.get(1));
+    }
+
+    @Test
+    public void testExportWithoutUserDictionaryDoesNotContainWords() throws JSONException {
+        final Map<String, Object> storage = new HashMap<>();
+        storage.put(Settings.PREF_AUTO_CAP, true);
+        final SharedPreferences prefs = createFakePreferences(storage);
+
+        final String json = BackupHelper.exportToJson(prefs);
+        assertFalse(json.contains("learned_words"));
+        assertFalse(json.contains("blocked_words"));
     }
 }

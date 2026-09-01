@@ -213,6 +213,8 @@
     <!-- Copia de seguridad y restauración -->
     <string name="settings_screen_backup">Copia de seguridad</string>
     <string name="settings_category_backup">Copia de seguridad</string>
+    <string name="pref_backup_include_user_dictionary_title">Incluir diccionario personal</string>
+    <string name="pref_backup_include_user_dictionary_summary">Respaldar y restaurar palabras aprendidas y bloqueadas</string>
     <string name="pref_backup_export_title">Crear copia de seguridad</string>
     <string name="pref_backup_export_summary">Exportar configuración actual a un archivo JSON</string>
     <string name="settings_category_restore">Restauración</string>
@@ -223,6 +225,7 @@
     <string name="backup_export_success">Copia de seguridad exportada correctamente</string>
     <string name="backup_export_error">Error al exportar la copia de seguridad: %s</string>
     <string name="backup_restore_success">Se restauraron correctamente %d preferencias</string>
+    <string name="backup_restore_success_words">Se restauraron correctamente %1$d preferencias y %2$d palabras personales</string>
     <string name="backup_restore_error">Error al restaurar la copia de seguridad: %s</string>
     <string name="backup_in_progress">Procesando copia de seguridad…</string>
 </resources>

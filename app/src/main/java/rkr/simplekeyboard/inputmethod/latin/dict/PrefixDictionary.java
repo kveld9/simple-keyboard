@@ -682,10 +682,38 @@ public final class PrefixDictionary {
                             }
                         }
                         trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, n, mScratchNeuralLogits);
-                        // Boost scored words by transformer logit, keeping OOV neutral
+                        // Robust Z-score normalization with outlier clamping
+                        float sum = 0.0f;
+                        int validCount = 0;
                         for (int i = 0; i < n; i++) {
-                            if (mScratchNeuralLogits[i] > -10000.0f) {
-                                mScratchScoredWords.get(i).score += mScratchNeuralLogits[i] * 40.0f;
+                            final float logit = mScratchNeuralLogits[i];
+                            if (logit > -10000.0f) {
+                                sum += logit;
+                                validCount++;
+                            }
+                        }
+                        if (validCount > 1) {
+                            final float mean = sum / (float) validCount;
+                            float sumSq = 0.0f;
+                            for (int i = 0; i < n; i++) {
+                                final float logit = mScratchNeuralLogits[i];
+                                if (logit > -10000.0f) {
+                                    final float diff = logit - mean;
+                                    sumSq += diff * diff;
+                                }
+                            }
+                            final float std = (float) Math.sqrt(sumSq / (float) validCount);
+                            if (std > 1e-4f) {
+                                final float invStd = 1.0f / std;
+                                for (int i = 0; i < n; i++) {
+                                    final float logit = mScratchNeuralLogits[i];
+                                    if (logit > -10000.0f) {
+                                        float z = (logit - mean) * invStd;
+                                        if (z > 2.5f) z = 2.5f;
+                                        else if (z < -2.5f) z = -2.5f;
+                                        mScratchScoredWords.get(i).score += z * 60.0f;
+                                    }
+                                }
                             }
                         }
                         Collections.sort(mScratchScoredWords);
@@ -1326,64 +1354,157 @@ public final class PrefixDictionary {
         }
         mScratchPredictions.clear();
         mScratchPredictionsAdded.clear();
+        mScratchRawWords.clear();
+        mScratchScoredWords.clear();
 
-        predictTrigrams(w1, w2, mScratchPredictions, mScratchPredictionsAdded, limit);
-        if (mScratchPredictions.size() < limit) {
-            predictBigrams(w2, mScratchPredictions, mScratchPredictionsAdded, limit);
+        // 1. Gather candidate words from Trigrams (User history)
+        if (StringUtils.isNotBlank(w1)) {
+            final String triKey = StringUtils.toNormalizedLower(w1.trim()) + " " + StringUtils.toNormalizedLower(w2.trim());
+            final Map<String, Short> triMap = mTrigrams.get(triKey);
+            if (triMap != null) {
+                for (Map.Entry<String, Short> entry : triMap.entrySet()) {
+                    final String canonical = getCanonicalWord(entry.getKey());
+                    final String word = (canonical != null) ? canonical : entry.getKey();
+                    if (!isBlocked(word)) {
+                        mScratchRawWords.add(new ScoredWord(word, entry.getValue(), 800.0f + entry.getValue() * 3.0f));
+                    }
+                }
+            }
         }
 
+        // 2. Gather candidate words from Bigrams (User history + Trie dictionary)
+        final String biKey = StringUtils.toNormalizedLower(w2.trim());
+        final Map<String, Short> biMap = mBigrams.get(biKey);
+        if (biMap != null) {
+            for (Map.Entry<String, Short> entry : biMap.entrySet()) {
+                final String canonical = getCanonicalWord(entry.getKey());
+                final String word = (canonical != null) ? canonical : entry.getKey();
+                if (!isBlocked(word)) {
+                    mScratchRawWords.add(new ScoredWord(word, entry.getValue(), 400.0f + entry.getValue() * 2.0f));
+                }
+            }
+        }
+
+        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+        if (bin != null) {
+            final List<CharSequence> binPreds = bin.getNextWordPredictions(w2.trim(), 20);
+            if (binPreds != null) {
+                for (CharSequence s : binPreds) {
+                    final String word = s.toString();
+                    if (!isBlocked(word)) {
+                        final int freq = bin.getBigramFrequency(w2.trim(), word);
+                        mScratchRawWords.add(new ScoredWord(word, freq, freq));
+                    }
+                }
+            }
+        }
+
+        // Deduplicate in mScratchScoredWords keeping highest initial score, capped at 60 candidates
+        for (int i = 0; i < mScratchRawWords.size(); i++) {
+            final ScoredWord sw = mScratchRawWords.get(i);
+            final String lower = sw.word.toLowerCase();
+            if (mScratchPredictionsAdded.add(lower)) {
+                mScratchScoredWords.add(sw);
+                if (mScratchScoredWords.size() >= 60) break;
+            }
+        }
+        mScratchPredictionsAdded.clear();
+
+        // 3. Neural Scoring and Unified Re-Ranking
         final MicroTransformerModel trf = mTransformerModel;
-        if (trf != null && trf.isLoaded() && mScratchPredictions.size() < limit) {
-            final String context = (w1 != null ? w1 + " " : "") + (w2 != null ? w2 : "");
+        if (trf != null && trf.isLoaded()) {
+            final String context = (w1 != null ? w1 + " " : "") + w2;
             final String trimmedContext = context.trim();
             if (!trimmedContext.isEmpty()) {
                 final int numTokens = trf.tokenize(trimmedContext, mScratchNeuralTokens, 0, mScratchNeuralTokens.length);
                 if (numTokens > 0 && trf.forward(mScratchNeuralTokens, numTokens, mScratchNeuralHidden)) {
-                    final int vocabSize = trf.getVocabSize();
-                    int candCount = 0;
-                    final int maxCand = Math.min(vocabSize, mScratchNeuralCandIds.length);
-                    for (int i = 2; i < vocabSize && candCount < maxCand; i++) {
-                        final String piece = trf.getTokenText(i);
-                        if (piece != null && piece.length() > 1 && (piece.charAt(0) == ' ' || piece.charAt(0) == '\u2581')) {
-                            boolean hasLetter = false;
-                            for (int k = 1; k < piece.length(); k++) {
-                                if (Character.isLetter(piece.charAt(k))) {
-                                    hasLetter = true;
-                                    break;
-                                }
-                            }
-                            if (hasLetter) {
-                                mScratchNeuralCandIds[candCount++] = i;
-                            }
+                    final int n = Math.min(mScratchScoredWords.size(), mScratchNeuralCandIds.length);
+                    for (int i = 0; i < n; i++) {
+                        final String word = mScratchScoredWords.get(i).word;
+                        final int wordCount = trf.tokenize(word, mScratchNeuralCandIds, mScratchNeuralCandIds.length - 2, 2);
+                        if (wordCount != 1) {
+                            mScratchNeuralCandIds[i] = MicroTransformerModel.UNK_TOKEN_ID;
+                        } else {
+                            mScratchNeuralCandIds[i] = mScratchNeuralCandIds[mScratchNeuralCandIds.length - 2];
                         }
                     }
-                    if (candCount > 0) {
-                        trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, candCount, mScratchNeuralLogits);
-                        // Find top predictions not already in the list
-                        for (int pick = 0; pick < limit - mScratchPredictions.size() + 1 && pick < candCount; pick++) {
-                            int bestIdx = -1;
-                            float bestLogit = -Float.MAX_VALUE;
-                            for (int j = 0; j < candCount; j++) {
-                                if (mScratchNeuralLogits[j] > bestLogit) {
-                                    bestLogit = mScratchNeuralLogits[j];
-                                    bestIdx = j;
-                                }
-                            }
-                            if (bestIdx < 0) break;
-                            mScratchNeuralLogits[bestIdx] = -Float.MAX_VALUE; // Mark as used
-                            final String word = trf.getTokenText(mScratchNeuralCandIds[bestIdx]);
-                            if (word == null) continue;
-                            final String cleanWord = (word.length() > 0 && (word.charAt(0) == ' ' || word.charAt(0) == '\u2581')) ? word.substring(1) : word;
-                            if (cleanWord.isEmpty() || isBlocked(cleanWord)) continue;
-                            if (!mScratchPredictionsAdded.contains(cleanWord)) {
-                                mScratchPredictions.add(cleanWord);
-                                mScratchPredictionsAdded.add(cleanWord);
-                                if (mScratchPredictions.size() >= limit) break;
+
+                    if (n > 0) {
+                        trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, n, mScratchNeuralLogits);
+                        float sum = 0.0f;
+                        int validCount = 0;
+                        for (int i = 0; i < n; i++) {
+                            final float logit = mScratchNeuralLogits[i];
+                            if (logit > -10000.0f) {
+                                sum += logit;
+                                validCount++;
                             }
                         }
-                        Log.d(TAG, "Neural next-word prediction for context: '" + trimmedContext + "' -> " + mScratchPredictions);
+                        if (validCount > 1) {
+                            final float mean = sum / (float) validCount;
+                            float sumSq = 0.0f;
+                            for (int i = 0; i < n; i++) {
+                                final float logit = mScratchNeuralLogits[i];
+                                if (logit > -10000.0f) {
+                                    final float diff = logit - mean;
+                                    sumSq += diff * diff;
+                                }
+                            }
+                            final float std = (float) Math.sqrt(sumSq / (float) validCount);
+                            if (std > 1e-4f) {
+                                final float invStd = 1.0f / std;
+                                for (int i = 0; i < n; i++) {
+                                    final float logit = mScratchNeuralLogits[i];
+                                    if (logit > -10000.0f) {
+                                        float z = (logit - mean) * invStd;
+                                        if (z > 2.5f) z = 2.5f;
+                                        else if (z < -2.5f) z = -2.5f;
+                                        mScratchScoredWords.get(i).score += z * 60.0f;
+                                    }
+                                }
+                            }
+                        }
+                        Collections.sort(mScratchScoredWords);
+                    }
+
+                    // If candidates pool was small, supplement with top neural word starts
+                    if (mScratchScoredWords.size() < limit) {
+                        final int[] wordStarts = trf.getWordStartTokenIds();
+                        final int candCount = Math.min(wordStarts.length, mScratchNeuralCandIds.length);
+                        if (candCount > 0) {
+                            System.arraycopy(wordStarts, 0, mScratchNeuralCandIds, 0, candCount);
+                            trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, candCount, mScratchNeuralLogits);
+                            for (int pick = 0; pick < limit - mScratchScoredWords.size() + 2 && pick < candCount; pick++) {
+                                int bestIdx = -1;
+                                float bestLogit = -Float.MAX_VALUE;
+                                for (int j = 0; j < candCount; j++) {
+                                    if (mScratchNeuralLogits[j] > bestLogit) {
+                                        bestLogit = mScratchNeuralLogits[j];
+                                        bestIdx = j;
+                                    }
+                                }
+                                if (bestIdx < 0) break;
+                                mScratchNeuralLogits[bestIdx] = -Float.MAX_VALUE;
+                                final String word = trf.getTokenText(mScratchNeuralCandIds[bestIdx]);
+                                if (word == null) continue;
+                                final String cleanWord = (word.length() > 0 && (word.charAt(0) == ' ' || word.charAt(0) == '\u2581')) ? word.substring(1) : word;
+                                if (cleanWord.isEmpty() || isBlocked(cleanWord)) continue;
+                                mScratchScoredWords.add(new ScoredWord(cleanWord, 1, bestLogit));
+                            }
+                        }
                     }
                 }
+            }
+        } else {
+            Collections.sort(mScratchScoredWords);
+        }
+
+        // 4. Format top predictions up to limit
+        for (int i = 0; i < mScratchScoredWords.size(); i++) {
+            final String word = mScratchScoredWords.get(i).word;
+            if (mScratchPredictionsAdded.add(word.toLowerCase())) {
+                mScratchPredictions.add(word);
+                if (mScratchPredictions.size() >= limit) break;
             }
         }
 

@@ -25,7 +25,7 @@ public final class MicroTransformerModel {
 
     public static final int MAGIC_TRF2 = 0x54524632; // "TRF2" (Ternary 1.58-bit BitNet format)
     public static final int MAGIC_TRF2_ALT = 0x32465254; // ASCII "TRF2" LE
-    public static final int MAX_SEQ_LEN = 16;
+    public static final int MAX_SEQ_LEN = 32;
     public static final int UNK_TOKEN_ID = 1;
     public static final char WORD_START_CHAR = '\u2581'; // Lower One Eighth Block
 
@@ -37,10 +37,11 @@ public final class MicroTransformerModel {
     private float mScaleEmb = 1.0f;
     private float mScalePos = 1.0f;
     private float mScaleDot = 1.0f;
+    private float mScaleEmbDot = 1.0f;
 
-    // Weights (Dequantized to float32)
+    // Weights (Embeddings stored compactly as byte {-128..127} INT8, 512 KB instead of 2 MB)
     // Weights (Ternary weights stored as byte {-1, 0, 1})
-    private float[] mEmbeddings;       // vocab_size * d_model
+    private byte[] mEmbeddings;        // vocab_size * d_model (compact INT8)
     private float[] mPosEmb;           // MAX_SEQ_LEN * d_model
     private byte[] mQkvW;              // flat: [n_layers * (3 * d_model) * d_model]
     private byte[] mProjW;             // flat: [n_layers * d_model * d_model]
@@ -51,13 +52,14 @@ public final class MicroTransformerModel {
     private float[] mScaleProj;        // [n_layers]
     private float[] mScaleDown;        // [n_layers]
 
-    // BPE Vocabulary & Trie
+    // BPE Vocabulary, Trie & Precomputed Word Starts
     private String[] mBpeVocab;
     private TrieNode mBpeTrieRoot;
+    private int[] mWordStartTokenIds;
 
     // Hyperparameter constants precomputed for fast forward pass
-    private float mInvD = 1.0f / 64.0f;
-    private float mScaleAttn = 0.25f;
+    private float mInvD;
+    private float mScaleAttn;
 
     // Pre-allocated intermediate buffers for 0-allocation forward pass
     private final int[] mScratchTokenIds = new int[MAX_SEQ_LEN];
@@ -69,6 +71,15 @@ public final class MicroTransformerModel {
     private float[] mMlpOut;           // MAX_SEQ_LEN * d_model
     private float[] mHT;               // d_model
     private float[] mAttnWeights;      // n_heads * MAX_SEQ_LEN * MAX_SEQ_LEN
+
+    // LRU Cache for h_T Hidden State (8 entries) to avoid redundant forward passes during typing
+    private static final int HT_CACHE_SIZE = 8;
+    private final long[] mCacheContextHashes = new long[HT_CACHE_SIZE];
+    private final int[] mCacheContextLengths = new int[HT_CACHE_SIZE];
+    private final int[][] mCacheTokens = new int[HT_CACHE_SIZE][MAX_SEQ_LEN];
+    private float[][] mCacheHiddenStates; // [HT_CACHE_SIZE][d_model]
+    private int mCacheNextSlot = 0;
+    private int mModelVersion = 1;
 
     private volatile boolean mIsLoaded = false;
 
@@ -239,16 +250,46 @@ public final class MicroTransformerModel {
 
             buildBpeTrie();
 
-            // 3. Read Embeddings at offEmb (vocab_size * d_model bytes INT8)
+            // 3. Read Embeddings at offEmb (vocab_size * d_model bytes INT8 compactly stored in memory)
             if (offEmb < 64 || offEmb >= fileSize) {
                 Log.e(TAG, "loadModel: Invalid off_emb: " + offEmb);
                 return false;
             }
             buffer.position(offEmb);
             int embTotal = mVocabSize * mDModel;
-            mEmbeddings = new float[embTotal];
-            for (int i = 0; i < embTotal; i++) {
-                mEmbeddings[i] = ((float) buffer.get()) * mScaleEmb;
+            mEmbeddings = new byte[embTotal];
+            buffer.get(mEmbeddings);
+            mScaleEmbDot = mScaleEmb * mScaleDot;
+
+            // Pre-calculate word-start candidate tokens once at load time to avoid hot-path allocations
+            int startCount = 0;
+            for (int i = 2; i < mVocabSize; i++) {
+                String piece = mBpeVocab[i];
+                if (piece != null && piece.length() > 1 && (piece.charAt(0) == ' ' || piece.charAt(0) == WORD_START_CHAR)) {
+                    boolean hasLetter = false;
+                    for (int k = 1; k < piece.length(); k++) {
+                        if (Character.isLetter(piece.charAt(k))) {
+                            hasLetter = true;
+                            break;
+                        }
+                    }
+                    if (hasLetter) startCount++;
+                }
+            }
+            mWordStartTokenIds = new int[startCount];
+            int startIdx = 0;
+            for (int i = 2; i < mVocabSize; i++) {
+                String piece = mBpeVocab[i];
+                if (piece != null && piece.length() > 1 && (piece.charAt(0) == ' ' || piece.charAt(0) == WORD_START_CHAR)) {
+                    boolean hasLetter = false;
+                    for (int k = 1; k < piece.length(); k++) {
+                        if (Character.isLetter(piece.charAt(k))) {
+                            hasLetter = true;
+                            break;
+                        }
+                    }
+                    if (hasLetter) mWordStartTokenIds[startIdx++] = i;
+                }
             }
 
             // 4. Read Positional Embeddings at offPos (16 * d_model bytes INT8)
@@ -325,6 +366,10 @@ public final class MicroTransformerModel {
                 mScaleDown[l] = buffer.getFloat();
             }
 
+            // Calculate dynamic hyperparameters based on mDModel and mNHeads
+            mInvD = 1.0f / (float) mDModel;
+            mScaleAttn = 1.0f / (float) Math.sqrt(mDModel / mNHeads);
+
             // 6. Pre-allocate intermediate buffers for 0-allocation forward execution
             mX = new float[MAX_SEQ_LEN * mDModel];
             mNormed = new float[MAX_SEQ_LEN * mDModel];
@@ -334,6 +379,16 @@ public final class MicroTransformerModel {
             mMlpOut = new float[MAX_SEQ_LEN * mDModel];
             mHT = new float[mDModel];
             mAttnWeights = new float[mNHeads * MAX_SEQ_LEN * MAX_SEQ_LEN];
+
+            // Initialize LRU h_T cache with token verification
+            mModelVersion++;
+            mCacheHiddenStates = new float[HT_CACHE_SIZE][mDModel];
+            Arrays.fill(mCacheContextHashes, 0L);
+            Arrays.fill(mCacheContextLengths, 0);
+            for (int i = 0; i < HT_CACHE_SIZE; i++) {
+                Arrays.fill(mCacheTokens[i], 0);
+            }
+            mCacheNextSlot = 0;
 
             mIsLoaded = true;
             return true;
@@ -408,6 +463,7 @@ public final class MicroTransformerModel {
         mScaleEmb = 1.0f;
         mScalePos = 1.0f;
         mScaleDot = 1.0f;
+        mScaleEmbDot = 1.0f;
 
         mEmbeddings = null;
         mPosEmb = null;
@@ -422,6 +478,7 @@ public final class MicroTransformerModel {
 
         mBpeVocab = null;
         mBpeTrieRoot = null;
+        mWordStartTokenIds = null;
 
         mX = null;
         mNormed = null;
@@ -431,6 +488,15 @@ public final class MicroTransformerModel {
         mMlpOut = null;
         mHT = null;
         mAttnWeights = null;
+
+        mCacheHiddenStates = null;
+        mModelVersion++;
+        Arrays.fill(mCacheContextHashes, 0L);
+        Arrays.fill(mCacheContextLengths, 0);
+        for (int i = 0; i < HT_CACHE_SIZE; i++) {
+            Arrays.fill(mCacheTokens[i], 0);
+        }
+        mCacheNextSlot = 0;
     }
 
 
@@ -669,7 +735,37 @@ public final class MicroTransformerModel {
         final int dk = D / H;
         final int dFf = 2 * D;
 
-        // 1. Token Embeddings + Positional Embeddings (taking tail of contextTokens)
+        // Compute 64-bit context hash for LRU caching
+        long contextHash = 1125899906842597L;
+        for (int t = 0; t < T; t++) {
+            int tok = contextTokens[start + t];
+            if (tok < 0 || tok >= mVocabSize) tok = UNK_TOKEN_ID;
+            contextHash = contextHash * 31L + tok;
+        }
+
+        if (mCacheHiddenStates != null) {
+            for (int i = 0; i < HT_CACHE_SIZE; i++) {
+                if (mCacheContextHashes[i] == contextHash && mCacheContextLengths[i] == T) {
+                    boolean exactMatch = true;
+                    final int[] cached = mCacheTokens[i];
+                    for (int t = 0; t < T; t++) {
+                        int tok = contextTokens[start + t];
+                        if (tok < 0 || tok >= mVocabSize) tok = UNK_TOKEN_ID;
+                        if (cached[t] != tok) {
+                            exactMatch = false;
+                            break;
+                        }
+                    }
+                    if (exactMatch) {
+                        System.arraycopy(mCacheHiddenStates[i], 0, outHidden, 0, D);
+                        return true; // Cache Hit (Verified Exact)
+                    }
+                }
+            }
+        }
+
+        // 1. Token Embeddings + Positional Embeddings (taking tail of contextTokens, scaling INT8 on-the-fly)
+        final float scaleEmb = mScaleEmb;
         for (int t = 0; t < T; t++) {
             int tok = contextTokens[start + t];
             if (tok < 0 || tok >= mVocabSize) {
@@ -679,7 +775,7 @@ public final class MicroTransformerModel {
             int posOffset = t * D;
             int xOffset = t * D;
             for (int d = 0; d < D; d++) {
-                mX[xOffset + d] = mEmbeddings[embOffset + d] + mPosEmb[posOffset + d];
+                mX[xOffset + d] = (mEmbeddings[embOffset + d] * scaleEmb) + mPosEmb[posOffset + d];
             }
         }
 
@@ -868,6 +964,20 @@ public final class MicroTransformerModel {
             outHidden[d] = mX[lastTokenOffset + d] * invRms;
         }
 
+        // Store in LRU Cache with exact token IDs
+        if (mCacheHiddenStates != null) {
+            int slot = mCacheNextSlot;
+            System.arraycopy(outHidden, 0, mCacheHiddenStates[slot], 0, D);
+            mCacheContextHashes[slot] = contextHash;
+            mCacheContextLengths[slot] = T;
+            for (int t = 0; t < T; t++) {
+                int tok = contextTokens[start + t];
+                if (tok < 0 || tok >= mVocabSize) tok = UNK_TOKEN_ID;
+                mCacheTokens[slot][t] = tok;
+            }
+            mCacheNextSlot = (slot + 1) % HT_CACHE_SIZE;
+        }
+
         return true;
     }
 
@@ -903,7 +1013,7 @@ public final class MicroTransformerModel {
 
         int D = mDModel;
         int n = Math.min(numCandidates, Math.min(candidateIds.length, outLogits.length));
-        float scale = mScaleDot;
+        float scale = mScaleEmbDot;
 
         for (int c = 0; c < n; c++) {
             int candId = candidateIds[c];
@@ -922,6 +1032,13 @@ public final class MicroTransformerModel {
             float dot = (dot0 + dot1) + (dot2 + dot3);
             outLogits[c] = dot * scale;
         }
+    }
+
+    /**
+     * Returns the pre-calculated array of candidate token IDs that represent valid word starts.
+     */
+    public int[] getWordStartTokenIds() {
+        return mWordStartTokenIds != null ? mWordStartTokenIds : new int[0];
     }
 
     /**

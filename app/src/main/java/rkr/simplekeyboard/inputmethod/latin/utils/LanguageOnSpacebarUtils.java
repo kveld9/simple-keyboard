@@ -37,6 +37,10 @@ public final class LanguageOnSpacebarUtils {
     }
 
     public static int getLanguageOnSpacebarFormatType(final Subtype subtype) {
+        return getLanguageOnSpacebarFormatType(subtype, null);
+    }
+
+    public static int getLanguageOnSpacebarFormatType(final Subtype subtype, final RichInputMethodManager richImm) {
         final Locale locale = subtype.getLocaleObject();
         if (locale == null) {
             return FORMAT_TYPE_NONE;
@@ -44,8 +48,8 @@ public final class LanguageOnSpacebarUtils {
         final String keyboardLanguage = locale.getLanguage();
         final String keyboardLayout = subtype.getKeyboardLayoutSet();
         int sameLanguageAndLayoutCount = 0;
-        final Set<Subtype> enabledSubtypes =
-                RichInputMethodManager.getInstance().getEnabledSubtypes(false);
+        final RichInputMethodManager imm = richImm != null ? richImm : RichInputMethodManager.getInstance();
+        final Set<Subtype> enabledSubtypes = imm.getEnabledSubtypes(false);
         for (final Subtype enabledSubtype : enabledSubtypes) {
             final String language = enabledSubtype.getLocaleObject().getLanguage();
             if (keyboardLanguage.equals(language)

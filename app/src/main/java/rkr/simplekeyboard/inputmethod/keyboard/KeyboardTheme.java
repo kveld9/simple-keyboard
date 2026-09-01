@@ -126,7 +126,9 @@ public final class KeyboardTheme {
             Log.w(TAG, "Illegal keyboard theme in preference: " + themeIdString, e);
         }
         // Remove preference that contains unknown or illegal theme id.
-        prefs.edit().remove(KEYBOARD_THEME_KEY).apply();
+        if (prefs.contains(KEYBOARD_THEME_KEY)) {
+            prefs.edit().remove(KEYBOARD_THEME_KEY).apply();
+        }
         return getDefaultKeyboardTheme();
     }
 }

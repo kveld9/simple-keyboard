@@ -99,6 +99,24 @@ public final class CustomDictionaryManager {
         return null;
     }
 
+    public File getTransformerModelFile(final Context context, final String languageCode) {
+        if (languageCode == null || languageCode.isEmpty()) {
+            return null;
+        }
+        final String lang = languageCode.toLowerCase();
+        final File dictDir = getDictionaryDir(context);
+        // Buscar transformer primero, luego neural
+        File modelFile = new File(dictDir, "transformer_" + lang + ".bin");
+        if (modelFile.exists() && modelFile.length() > 64) {
+            return modelFile;
+        }
+        modelFile = new File(dictDir, "neural_" + lang + ".bin");
+        if (modelFile.exists() && modelFile.length() > 64) {
+            return modelFile;
+        }
+        return null;
+    }
+
     public List<CustomDictInfo> getInstalledDictionaries(final Context context) {
         final File dir = getDictionaryDir(context);
         // Recovery pass for any orphaned .bak files where target .bin was lost in crash window
@@ -211,6 +229,10 @@ public final class CustomDictionaryManager {
                 "simple_keyboard_dict_",
                 "dict_",
                 "dict-",
+                "transformer_",
+                "transformer-",
+                "neural_",
+                "neural-",
                 "main_",
                 "main-",
                 "extra_",
@@ -367,6 +389,16 @@ public final class CustomDictionaryManager {
                         "Successfully imported and compiled AOSP .dict (" + decoded.words.size() + " words)");
             }
 
+            // Case 3: TRF1 Micro-Transformer model
+            if (magic == 0x54524631 || magic == 0x31465254) {
+                return importRawBinaryModel(tempFile, dictDir, detectedLang, fallbackLang, "transformer_", "Micro-Transformer model");
+            }
+
+            // Case 4: NLM1 Neural model
+            if (magic == 0x4E4C4D31 || magic == 0x314D4C4E) {
+                return importRawBinaryModel(tempFile, dictDir, detectedLang, fallbackLang, "neural_", "neural language model");
+            }
+
             return new ImportResult(false, null, 0, "Unrecognized dictionary format (expected .dict or .bin)");
 
         } catch (Throwable e) {
@@ -428,6 +460,29 @@ public final class CustomDictionaryManager {
         try (FileInputStream in = new FileInputStream(src);
              FileOutputStream out = new FileOutputStream(dst)) {
             copyStreamWithSyncAndLimit(in, out, -1);
+        }
+    }
+
+    private static ImportResult importRawBinaryModel(final File tempFile, final File dictDir,
+            final String detectedLang, final String fallbackLang,
+            final String filePrefix, final String modelType) throws IOException {
+        final String targetLang = (detectedLang != null)
+                ? detectedLang
+                : (isValidLanguageCode(fallbackLang) ? fallbackLang.toLowerCase(java.util.Locale.US) : null);
+        if (targetLang == null) {
+            return new ImportResult(false, null, 0,
+                    "Could not determine language for " + modelType + " (expected name like " + filePrefix + "<lang>.bin)");
+        }
+        final File targetFile = new File(dictDir, filePrefix + targetLang + ".bin");
+        final File stagingFile = File.createTempFile(filePrefix + "stage_", ".bin", dictDir);
+        try {
+            copyFileWithSync(tempFile, stagingFile);
+            publishStagedFile(stagingFile, targetFile);
+            return new ImportResult(true, targetLang, 0, "Successfully imported " + modelType);
+        } finally {
+            if (stagingFile.exists()) {
+                stagingFile.delete();
+            }
         }
     }
 

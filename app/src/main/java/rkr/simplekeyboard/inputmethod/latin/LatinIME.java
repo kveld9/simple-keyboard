@@ -85,6 +85,7 @@ import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPalettesView;
 import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder;
+import rkr.simplekeyboard.inputmethod.latin.dict.neural.MicroTransformerModel;
 import rkr.simplekeyboard.inputmethod.latin.dict.user.UserBigramEntry;
 import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryEntry;
 import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryManager;
@@ -139,6 +140,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public final rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel mSpatialTouchModel = new rkr.simplekeyboard.inputmethod.latin.dict.spatial.SpatialTouchModel();
     public BinaryTrieDictionary mBinaryTrieDictionary;
     public BeamSearchDecoder mBeamSearchDecoder;
+    private MicroTransformerModel mTransformerModel;
 
     private final java.util.concurrent.atomic.AtomicLong mSuggestionSeq = new java.util.concurrent.atomic.AtomicLong(0);
     private volatile CharSequence mPendingAutoCorrection = null;
@@ -158,6 +160,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     final KeyboardSwitcher mKeyboardSwitcher;
     private AudioAndHapticFeedbackManager mFeedbackManager;
     private UserDictionaryManager mUserDictionaryManager;
+    private rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager mCustomDictionaryManager;
 
     private AlertDialog mOptionsDialog;
 
@@ -343,6 +346,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         AudioAndHapticFeedbackManager.init(this);
         mFeedbackManager = AudioAndHapticFeedbackManager.getInstance();
         mUserDictionaryManager = UserDictionaryManager.getInstance(this);
+        mCustomDictionaryManager = rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager.getInstance();
         super.onCreate();
 
         mClipboardHistoryManager = new ClipboardHistoryManager(this);
@@ -1020,6 +1024,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mLoadedLanguages = null;
             mBinaryTrieDictionary = null;
             mBeamSearchDecoder = null;
+            if (mTransformerModel != null) {
+                mTransformerModel.unload();
+            }
+            mTransformerModel = null;
             mPrefixDictionary.clear();
         }
     }
@@ -1065,10 +1073,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return false;
         }
         final String currentLang = currentLocale.getLanguage();
-        final java.io.File customDictFile = rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager.getInstance().getCustomDictionaryFile(this, currentLang);
+        final rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager customDictMgr = mCustomDictionaryManager != null
+                ? mCustomDictionaryManager
+                : rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager.getInstance();
+        final java.io.File customDictFile = customDictMgr.getCustomDictionaryFile(this, currentLang);
         final boolean hasCustomDict = customDictFile != null;
         final boolean hasBinaryDict = mBinaryTrieDictionary != null;
-        return hasCustomDict == hasBinaryDict;
+        final java.io.File transformerFile = customDictMgr.getTransformerModelFile(this, currentLang);
+        final boolean hasTransformerFile = transformerFile != null;
+        final boolean hasTransformerModel = mTransformerModel != null;
+        return hasCustomDict == hasBinaryDict && hasTransformerFile == hasTransformerModel;
     }
 
     private boolean isExecutorAvailable() {
@@ -1076,13 +1090,22 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void applyLoadedDictionary(final BinaryTrieDictionary binaryDict,
-            final BeamSearchDecoder decoder, final int loadGeneration) {
+            final BeamSearchDecoder decoder, final MicroTransformerModel transformerModel,
+            final int loadGeneration) {
         if (loadGeneration != mDictLoadGeneration) {
+            if (transformerModel != null) {
+                transformerModel.unload();
+            }
             return;
+        }
+        if (mTransformerModel != null && mTransformerModel != transformerModel) {
+            mTransformerModel.unload();
         }
         mBinaryTrieDictionary = binaryDict;
         mBeamSearchDecoder = decoder;
+        mTransformerModel = transformerModel;
         mPrefixDictionary.setBinaryDictionary(binaryDict);
+        mPrefixDictionary.setTransformerModel(transformerModel);
         final SettingsValues currentSettings = mSettings.getCurrent();
         if (currentSettings != null) {
             mPrefixDictionary.setAutoCorrectionThreshold(currentSettings.mAutoCorrectionThreshold);
@@ -1091,14 +1114,19 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void postDictionaryLoadResult(final BinaryTrieDictionary binaryDict,
-            final BeamSearchDecoder decoder, final int loadGeneration) {
-        mHandler.post(() -> applyLoadedDictionary(binaryDict, decoder, loadGeneration));
+            final BeamSearchDecoder decoder, final MicroTransformerModel transformerModel,
+            final int loadGeneration) {
+        mHandler.post(() -> applyLoadedDictionary(binaryDict, decoder, transformerModel, loadGeneration));
     }
 
     private void loadDictionaryTask(final String currentLang, final int loadGeneration) {
         BinaryTrieDictionary newBinaryDict = null;
         BeamSearchDecoder newDecoder = null;
-        final java.io.File customDictFile = rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager.getInstance().getCustomDictionaryFile(this, currentLang);
+        MicroTransformerModel newTransformerModel = null;
+        final rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager customDictMgr = mCustomDictionaryManager != null
+                ? mCustomDictionaryManager
+                : rkr.simplekeyboard.inputmethod.latin.dict.CustomDictionaryManager.getInstance();
+        final java.io.File customDictFile = customDictMgr.getCustomDictionaryFile(this, currentLang);
         if (customDictFile != null) {
             try (java.io.FileInputStream fis = new java.io.FileInputStream(customDictFile);
                  java.nio.channels.FileChannel channel = fis.getChannel()) {
@@ -1108,6 +1136,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 Log.i(TAG, "Loaded custom dictionary for " + currentLang + ": " + customDictFile.getAbsolutePath());
             } catch (Exception e) {
                 Log.w(TAG, "Could not load custom dictionary for " + currentLang, e);
+            }
+        }
+        // Cargar modelo transformer si existe
+        final File transformerFile = customDictMgr.getTransformerModelFile(this, currentLang);
+        if (transformerFile != null) {
+            final MicroTransformerModel trf = new MicroTransformerModel();
+            if (trf.loadModel(transformerFile)) {
+                newTransformerModel = trf;
+                Log.i(TAG, "Loaded Micro-Transformer model: " + transformerFile.getName()
+                        + " (vocab=" + trf.getVocabSize() + ", dim=" + trf.getModelDim() + ")");
+            } else {
+                Log.w(TAG, "Failed to load transformer model: " + transformerFile.getName());
             }
         }
         try {
@@ -1130,7 +1170,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         } catch (Exception e) {
             Log.w(TAG, "Could not hydrate user dictionary in loadDictionaryTask", e);
         }
-        postDictionaryLoadResult(newBinaryDict, newDecoder, loadGeneration);
+        postDictionaryLoadResult(newBinaryDict, newDecoder, newTransformerModel, loadGeneration);
     }
 
     private void executeDictionaryLoad(final String currentLang, final int loadGeneration) {

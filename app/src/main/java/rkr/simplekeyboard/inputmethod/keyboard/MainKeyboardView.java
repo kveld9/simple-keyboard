@@ -107,6 +107,8 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
 
     private final TimerHandler mTimerHandler;
     private final int mLanguageOnSpacebarHorizontalMargin;
+    private final Settings mSettings;
+    private final RichInputMethodManager mRichImm;
 
     public MainKeyboardView(final Context context, final AttributeSet attrs) {
         this(context, attrs, R.attr.mainKeyboardViewStyle);
@@ -137,6 +139,8 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
                 .hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT);
         mNonDistinctMultitouchHelper = hasDistinctMultitouch ? null
                 : new NonDistinctMultitouchHelper();
+        mSettings = Settings.getInstance();
+        mRichImm = RichInputMethodManager.getInstance();
 
         final int backgroundDimAlpha = mainKeyboardViewAttr.getInt(
                 R.styleable.MainKeyboardView_backgroundDimAlpha, 0);
@@ -253,9 +257,10 @@ public final class MainKeyboardView extends KeyboardView implements MoreKeysPane
         mSpaceKey = keyboard.getKey(Constants.CODE_SPACE);
         final int keyHeight = keyboard.mMostCommonKeyHeight;
         mLanguageOnSpacebarTextSize = keyHeight * mLanguageOnSpacebarTextRatio;
-        final SettingsValues settingsValues = Settings.getInstance().getCurrent();
+        final SettingsValues settingsValues = mSettings != null ? mSettings.getCurrent() : Settings.getInstance().getCurrent();
         final boolean showLanguageOnSpacebar = settingsValues == null || settingsValues.mShowLanguageOnSpacebar;
-        mShouldDrawLanguageOnSpacebar = showLanguageOnSpacebar && RichInputMethodManager.getInstance().hasMultipleEnabledSubtypes();
+        final RichInputMethodManager richImm = mRichImm != null ? mRichImm : RichInputMethodManager.getInstance();
+        mShouldDrawLanguageOnSpacebar = showLanguageOnSpacebar && richImm.hasMultipleEnabledSubtypes();
     }
 
     /**

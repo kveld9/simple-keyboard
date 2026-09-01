@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
+import rkr.simplekeyboard.inputmethod.latin.dict.neural.MicroTransformerModel;
 
 /**
  * Lightweight in-memory Trie dictionary with Accent-Folding, Physical Proximity scoring,
@@ -151,7 +152,7 @@ public final class PrefixDictionary {
     public static final class ScoredWord implements Comparable<ScoredWord> {
         public final String word;
         public final int frequency;
-        public final float score;
+        public float score;
 
         public ScoredWord(String word, int frequency) {
             this(word, frequency, frequency);
@@ -186,7 +187,13 @@ public final class PrefixDictionary {
     private final String[] mScratchTopKLower = new String[32];
     private final int[] mScratchTopKFreqs = new int[32];
     private final StringBuilder mScratchFuzzyPath = new StringBuilder(32);
+    // Scratch buffers para rescoring neural
+    private final int[] mScratchNeuralCandIds = new int[512];
+    private final float[] mScratchNeuralLogits = new float[512];
+    private final float[] mScratchNeuralHidden = new float[64];
+    private final int[] mScratchNeuralTokens = new int[16];
     private volatile rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary mBinaryDict = null;
+    private MicroTransformerModel mTransformerModel;
 
     public PrefixDictionary() {
     }
@@ -197,6 +204,14 @@ public final class PrefixDictionary {
 
     public rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary getBinaryDictionary() {
         return mBinaryDict;
+    }
+
+    public synchronized void setTransformerModel(final MicroTransformerModel model) {
+        mTransformerModel = model;
+    }
+
+    public MicroTransformerModel getTransformerModel() {
+        return mTransformerModel;
     }
 
     public synchronized void setAutoCorrectionThreshold(final float threshold) {
@@ -641,6 +656,31 @@ public final class PrefixDictionary {
         }
 
         scorePrefixWords(mScratchRawWords, normPrefix, w1, w2);
+
+        final MicroTransformerModel trf = mTransformerModel;
+        if (trf != null && trf.isLoaded() && !mScratchScoredWords.isEmpty()) {
+            final String context = (w1 != null ? w1 + " " : "") + (w2 != null ? w2 + " " : "") + trimmed;
+            final int numTokens = trf.tokenize(context, mScratchNeuralTokens, 0, mScratchNeuralTokens.length);
+            if (numTokens > 0) {
+                if (trf.forward(mScratchNeuralTokens, numTokens, mScratchNeuralHidden)) {
+                    final int n = Math.min(mScratchScoredWords.size(), mScratchNeuralCandIds.length);
+                    for (int i = 0; i < n; i++) {
+                        final String word = mScratchScoredWords.get(i).word;
+                        final int wordCount = trf.tokenize(word, mScratchNeuralCandIds, i, 1);
+                        if (wordCount == 0) {
+                            mScratchNeuralCandIds[i] = MicroTransformerModel.UNK_TOKEN_ID;
+                        }
+                    }
+                    trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, n, mScratchNeuralLogits);
+                    // Boost scored words by transformer logit
+                    for (int i = 0; i < n; i++) {
+                        mScratchScoredWords.get(i).score += mScratchNeuralLogits[i] * 50.0f;
+                    }
+                    Collections.sort(mScratchScoredWords);
+                }
+            }
+        }
+
         return formatSuggestions(mScratchScoredWords, trimmed, maxCount);
     }
 
@@ -1272,6 +1312,51 @@ public final class PrefixDictionary {
             predictBigrams(w2, mScratchPredictions, mScratchPredictionsAdded, limit);
         }
 
+        final MicroTransformerModel trf = mTransformerModel;
+        if (trf != null && trf.isLoaded() && mScratchPredictions.size() < limit) {
+            final String context = (w1 != null ? w1 + " " : "") + w2;
+            final int numTokens = trf.tokenize(context, mScratchNeuralTokens, 0, mScratchNeuralTokens.length);
+            if (numTokens > 0) {
+                if (trf.forward(mScratchNeuralTokens, numTokens, mScratchNeuralHidden)) {
+                    // Score top 512 word-start tokens (those starting with space or \u2581)
+                    final int vocabSize = trf.getVocabSize();
+                    int candCount = 0;
+                    final int maxCand = Math.min(vocabSize, mScratchNeuralCandIds.length);
+                    for (int i = 2; i < vocabSize && candCount < maxCand; i++) {
+                        final String piece = trf.getTokenText(i);
+                        if (piece != null && piece.length() > 1 && (piece.charAt(0) == ' ' || piece.charAt(0) == '\u2581')) {
+                            mScratchNeuralCandIds[candCount++] = i;
+                        }
+                    }
+                    if (candCount > 0) {
+                        trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, candCount, mScratchNeuralLogits);
+                        // Find top predictions not already in the list
+                        for (int pick = 0; pick < limit - mScratchPredictions.size() + 1 && pick < candCount; pick++) {
+                            int bestIdx = -1;
+                            float bestLogit = -Float.MAX_VALUE;
+                            for (int j = 0; j < candCount; j++) {
+                                if (mScratchNeuralLogits[j] > bestLogit) {
+                                    bestLogit = mScratchNeuralLogits[j];
+                                    bestIdx = j;
+                                }
+                            }
+                            if (bestIdx < 0) break;
+                            mScratchNeuralLogits[bestIdx] = -Float.MAX_VALUE; // Mark as used
+                            final String word = trf.getTokenText(mScratchNeuralCandIds[bestIdx]);
+                            if (word == null) continue;
+                            final String cleanWord = (word.length() > 0 && (word.charAt(0) == ' ' || word.charAt(0) == '\u2581')) ? word.substring(1) : word;
+                            if (cleanWord.isEmpty()) continue;
+                            if (!mScratchPredictionsAdded.contains(cleanWord)) {
+                                mScratchPredictions.add(cleanWord);
+                                mScratchPredictionsAdded.add(cleanWord);
+                                if (mScratchPredictions.size() >= limit) break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return mScratchPredictions;
     }
 
@@ -1291,6 +1376,7 @@ public final class PrefixDictionary {
         mScratchSuggestions.clear();
         mScratchPredictions.clear();
         mScratchPredictionsAdded.clear();
+        mTransformerModel = null;
     }
 }
 

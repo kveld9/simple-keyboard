@@ -18,7 +18,12 @@ public final class UserDictionaryManager {
         default void onWordBlocked(String word) {}
         default void onWordUnblocked(String word, long id) {}
         default void onAllBlockedWordsCleared() {}
+        default void onBigramAdded(UserBigramEntry entry) {}
+        default void onAllBigramsCleared() {}
     }
+
+    public static final long DEFAULT_DECAY_INTERVAL_MILLIS = 7L * 24 * 60 * 60 * 1000L;
+    public static final int DEFAULT_DECAY_STEP = 25;
 
     private static volatile UserDictionaryManager sInstance;
 
@@ -109,6 +114,22 @@ public final class UserDictionaryManager {
         });
     }
 
+    private void notifyBigramAdded(final UserBigramEntry entry) {
+        mMainHandler.post(() -> {
+            for (final UserDictionaryListener listener : mListeners) {
+                listener.onBigramAdded(entry);
+            }
+        });
+    }
+
+    private void notifyAllBigramsCleared() {
+        mMainHandler.post(() -> {
+            for (final UserDictionaryListener listener : mListeners) {
+                listener.onAllBigramsCleared();
+            }
+        });
+    }
+
     // --- Learned Words ---
 
     public boolean addWord(final String word) {
@@ -180,11 +201,79 @@ public final class UserDictionaryManager {
     }
 
     public boolean clearLearnedWords() {
-        final boolean success = mDatabase.clearAllWords();
+        final boolean success = mDatabase.clearAllWords() && mDatabase.clearAllBigrams();
         if (success) {
             notifyAllLearnedWordsCleared();
         }
         return success;
+    }
+
+    // --- Bigram Operations ---
+
+    public boolean addBigram(final String prevWord, final String word) {
+        return addBigram(prevWord, word, PrefixDictionary.BASE_LEARNED_FREQUENCY, System.currentTimeMillis());
+    }
+
+    public boolean addBigram(final String prevWord, final String word, final int frequency) {
+        return addBigram(prevWord, word, frequency, System.currentTimeMillis());
+    }
+
+    public boolean addBigram(final String prevWord, final String word, final int frequency, final long timestamp) {
+        final boolean success = mDatabase.addOrUpdateBigram(prevWord, word, frequency, timestamp);
+        if (success) {
+            notifyBigramAdded(new UserBigramEntry(-1, prevWord, word, frequency, timestamp));
+        }
+        return success;
+    }
+
+    public List<UserBigramEntry> getBigrams() {
+        return mDatabase.getAllBigrams();
+    }
+
+    public List<UserBigramEntry> getAllBigrams() {
+        return mDatabase.getAllBigrams();
+    }
+
+    public int getBigramFrequency(final String prevWord, final String word) {
+        return mDatabase.getBigramFrequency(prevWord, word);
+    }
+
+    public int getBigramsCount() {
+        return mDatabase.getBigramsCount();
+    }
+
+    public boolean deleteBigram(final String prevWord, final String word) {
+        return mDatabase.deleteBigram(prevWord, word);
+    }
+
+    public boolean clearBigrams() {
+        final boolean success = mDatabase.clearAllBigrams();
+        if (success) {
+            notifyAllBigramsCleared();
+        }
+        return success;
+    }
+
+    // --- Temporal Decay Operations ---
+
+    public boolean applyDecay(final long currentTimestamp, final long decayIntervalMillis, final int decayStep) {
+        return mDatabase.applyDecay(currentTimestamp, decayIntervalMillis, decayStep);
+    }
+
+    public void runDecayAsync(final java.util.concurrent.Executor executor, final long decayIntervalMillis, final int decayStep) {
+        if (executor != null) {
+            executor.execute(() -> applyDecay(System.currentTimeMillis(), decayIntervalMillis, decayStep));
+        } else {
+            new Thread(() -> applyDecay(System.currentTimeMillis(), decayIntervalMillis, decayStep), "UserDictDecayThread").start();
+        }
+    }
+
+    public void runDecayAsync(final java.util.concurrent.Executor executor) {
+        runDecayAsync(executor, DEFAULT_DECAY_INTERVAL_MILLIS, DEFAULT_DECAY_STEP);
+    }
+
+    public void runDecayAsync() {
+        runDecayAsync(null, DEFAULT_DECAY_INTERVAL_MILLIS, DEFAULT_DECAY_STEP);
     }
 
     // --- Blocked Words ---

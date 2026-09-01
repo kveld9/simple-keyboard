@@ -85,6 +85,7 @@ import rkr.simplekeyboard.inputmethod.latin.emoji.EmojiPalettesView;
 import rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary;
 import rkr.simplekeyboard.inputmethod.latin.dict.decoder.BeamSearchDecoder;
+import rkr.simplekeyboard.inputmethod.latin.dict.user.UserBigramEntry;
 import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryEntry;
 import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryManager;
 import java.io.InputStream;
@@ -1113,6 +1114,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             final UserDictionaryManager manager = mUserDictionaryManager != null
                     ? mUserDictionaryManager
                     : UserDictionaryManager.getInstance(this);
+            manager.applyDecay(System.currentTimeMillis(), UserDictionaryManager.DEFAULT_DECAY_INTERVAL_MILLIS, UserDictionaryManager.DEFAULT_DECAY_STEP);
             final java.util.List<UserDictionaryEntry> blocked = manager.getBlockedWords();
             for (final UserDictionaryEntry b : blocked) {
                 mPrefixDictionary.blockWord(b.word);
@@ -1120,6 +1122,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             final java.util.List<UserDictionaryEntry> learned = manager.getLearnedWords();
             for (final UserDictionaryEntry l : learned) {
                 mPrefixDictionary.insert(l.word, l.frequency);
+            }
+            final java.util.List<UserBigramEntry> bigrams = manager.getBigrams();
+            for (final UserBigramEntry bg : bigrams) {
+                mPrefixDictionary.loadBigram(bg.prevWord, bg.word, bg.frequency);
             }
         } catch (Exception e) {
             Log.w(TAG, "Could not hydrate user dictionary in loadDictionaryTask", e);
@@ -2012,15 +2018,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 : cleanWord;
         mDictExecutor.execute(() -> {
             mPrefixDictionary.insert(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
-            if (mUserDictionaryManager != null) {
-                mUserDictionaryManager.addWord(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
-            } else {
-                UserDictionaryManager.getInstance(this).addWord(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
-            }
+            final UserDictionaryManager manager = mUserDictionaryManager != null
+                    ? mUserDictionaryManager
+                    : UserDictionaryManager.getInstance(this);
+            manager.addWord(canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
             if (!isWordEmpty(w2)) {
-                mPrefixDictionary.setBigram(w2.trim(), canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                final String cleanW2 = w2.trim();
+                mPrefixDictionary.setBigram(cleanW2, canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                final int bigramFreq = mPrefixDictionary.getBigramFrequency(cleanW2, canonicalWord);
+                manager.addBigram(cleanW2, canonicalWord, bigramFreq);
                 if (!isWordEmpty(w1)) {
-                    mPrefixDictionary.setTrigram(w1.trim(), w2.trim(), canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
+                    mPrefixDictionary.setTrigram(w1.trim(), cleanW2, canonicalWord, PrefixDictionary.BASE_LEARNED_FREQUENCY);
                 }
             }
         });

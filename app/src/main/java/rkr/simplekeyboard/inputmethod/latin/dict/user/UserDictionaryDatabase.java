@@ -33,7 +33,7 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
 
     private static final String TAG = "UserDictDb";
     private static final String DATABASE_NAME = "user_dictionary.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
 
     public static final int MAX_WORD_LENGTH = 48;
     public static final int MAX_QUERY_LENGTH = 48;
@@ -53,6 +53,14 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
     private static final String COL_BLOCKED_WORD = "word";
     private static final String COL_BLOCKED_NORM = "normalized_word";
     private static final String COL_BLOCKED_TIMESTAMP = "timestamp";
+
+    // Table: user_bigrams
+    public static final String TABLE_BIGRAMS = "user_bigrams";
+    public static final String COL_BIGRAMS_ID = "id";
+    public static final String COL_BIGRAMS_PREV_WORD = "prev_word";
+    public static final String COL_BIGRAMS_WORD = "word";
+    public static final String COL_BIGRAMS_FREQ = "frequency";
+    public static final String COL_BIGRAMS_TIMESTAMP = "timestamp";
 
     public UserDictionaryDatabase(final Context context) {
         super(PreferenceManagerCompat.getDeviceContext(context), DATABASE_NAME, null, DATABASE_VERSION);
@@ -77,11 +85,31 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
                 COL_BLOCKED_TIMESTAMP + " INTEGER NOT NULL)";
         db.execSQL(createBlockedTable);
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_blocked_norm ON " + TABLE_BLOCKED + " (" + COL_BLOCKED_NORM + ")");
+
+        final String createBigramsTable = "CREATE TABLE IF NOT EXISTS " + TABLE_BIGRAMS + " (" +
+                COL_BIGRAMS_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COL_BIGRAMS_PREV_WORD + " TEXT NOT NULL, " +
+                COL_BIGRAMS_WORD + " TEXT NOT NULL, " +
+                COL_BIGRAMS_FREQ + " INTEGER NOT NULL, " +
+                COL_BIGRAMS_TIMESTAMP + " INTEGER NOT NULL, " +
+                "UNIQUE(" + COL_BIGRAMS_PREV_WORD + ", " + COL_BIGRAMS_WORD + "))";
+        db.execSQL(createBigramsTable);
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_bigrams_prev ON " + TABLE_BIGRAMS + " (" + COL_BIGRAMS_PREV_WORD + ")");
     }
 
     @Override
     public void onUpgrade(final SQLiteDatabase db, final int oldVersion, final int newVersion) {
-        // Initial version; migrations will be handled here if schema changes in future versions.
+        if (oldVersion < 2) {
+            final String createBigramsTable = "CREATE TABLE IF NOT EXISTS " + TABLE_BIGRAMS + " (" +
+                    COL_BIGRAMS_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    COL_BIGRAMS_PREV_WORD + " TEXT NOT NULL, " +
+                    COL_BIGRAMS_WORD + " TEXT NOT NULL, " +
+                    COL_BIGRAMS_FREQ + " INTEGER NOT NULL, " +
+                    COL_BIGRAMS_TIMESTAMP + " INTEGER NOT NULL, " +
+                    "UNIQUE(" + COL_BIGRAMS_PREV_WORD + ", " + COL_BIGRAMS_WORD + "))";
+            db.execSQL(createBigramsTable);
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_bigrams_prev ON " + TABLE_BIGRAMS + " (" + COL_BIGRAMS_PREV_WORD + ")");
+        }
     }
 
     @Override
@@ -552,6 +580,175 @@ public class UserDictionaryDatabase extends SQLiteOpenHelper {
         } catch (Throwable e) {
             Log.e(TAG, "Error clearing blocked words table", e);
             return false;
+        }
+    }
+
+    // --- Bigrams & Temporal Decay Operations ---
+
+    public synchronized boolean addOrUpdateBigram(final String prevWord, final String word, final int frequency, final long timestamp) {
+        final String cleanPrev = sanitizeWord(prevWord);
+        final String cleanWord = sanitizeWord(word);
+        if (cleanPrev == null || cleanWord == null) {
+            return false;
+        }
+        final int targetFreq = Math.max(1, frequency);
+        final long targetTimestamp = timestamp > 0 ? timestamp : System.currentTimeMillis();
+
+        try {
+            final SQLiteDatabase db = getWritableDatabase();
+            final ContentValues values = new ContentValues();
+            values.put(COL_BIGRAMS_PREV_WORD, cleanPrev);
+            values.put(COL_BIGRAMS_WORD, cleanWord);
+            values.put(COL_BIGRAMS_FREQ, targetFreq);
+            values.put(COL_BIGRAMS_TIMESTAMP, targetTimestamp);
+
+            final long result = db.insertWithOnConflict(TABLE_BIGRAMS, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+            return result != -1;
+        } catch (Throwable e) {
+            Log.e(TAG, "Error inserting/updating bigram", e);
+            return false;
+        }
+    }
+
+    public synchronized boolean addOrUpdateBigram(final String prevWord, final String word, final int frequency) {
+        return addOrUpdateBigram(prevWord, word, frequency, System.currentTimeMillis());
+    }
+
+    public synchronized List<UserBigramEntry> getAllBigrams() {
+        final List<UserBigramEntry> list = new ArrayList<>();
+        Cursor cursor = null;
+        try {
+            final SQLiteDatabase db = getReadableDatabase();
+            cursor = db.query(TABLE_BIGRAMS, null, null, null, null, null,
+                    COL_BIGRAMS_PREV_WORD + " ASC, " + COL_BIGRAMS_FREQ + " DESC");
+            if (cursor != null && cursor.moveToFirst()) {
+                final int idIdx = cursor.getColumnIndexOrThrow(COL_BIGRAMS_ID);
+                final int prevIdx = cursor.getColumnIndexOrThrow(COL_BIGRAMS_PREV_WORD);
+                final int wordIdx = cursor.getColumnIndexOrThrow(COL_BIGRAMS_WORD);
+                final int freqIdx = cursor.getColumnIndexOrThrow(COL_BIGRAMS_FREQ);
+                final int timeIdx = cursor.getColumnIndexOrThrow(COL_BIGRAMS_TIMESTAMP);
+                do {
+                    final long id = cursor.getLong(idIdx);
+                    final String prevWord = cursor.getString(prevIdx);
+                    final String word = cursor.getString(wordIdx);
+                    final int freq = cursor.getInt(freqIdx);
+                    final long time = cursor.getLong(timeIdx);
+                    list.add(new UserBigramEntry(id, prevWord, word, freq, time));
+                } while (cursor.moveToNext());
+            }
+        } catch (Throwable e) {
+            Log.e(TAG, "Error querying all bigrams", e);
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
+            }
+        }
+        return list;
+    }
+
+    public synchronized int getBigramFrequency(final String prevWord, final String word) {
+        final String cleanPrev = sanitizeWord(prevWord);
+        final String cleanWord = sanitizeWord(word);
+        if (cleanPrev == null || cleanWord == null) {
+            return 0;
+        }
+        Cursor cursor = null;
+        try {
+            final SQLiteDatabase db = getReadableDatabase();
+            cursor = db.query(TABLE_BIGRAMS, new String[]{COL_BIGRAMS_FREQ},
+                    COL_BIGRAMS_PREV_WORD + "=? AND " + COL_BIGRAMS_WORD + "=?",
+                    new String[]{cleanPrev, cleanWord}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getInt(0);
+            }
+        } catch (Throwable e) {
+            Log.e(TAG, "Error getting bigram frequency", e);
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
+            }
+        }
+        return 0;
+    }
+
+    public synchronized int getBigramsCount() {
+        Cursor cursor = null;
+        try {
+            final SQLiteDatabase db = getReadableDatabase();
+            cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_BIGRAMS, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getInt(0);
+            }
+        } catch (Throwable e) {
+            Log.e(TAG, "Error counting bigrams", e);
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
+            }
+        }
+        return 0;
+    }
+
+    public synchronized boolean deleteBigram(final String prevWord, final String word) {
+        final String cleanPrev = sanitizeWord(prevWord);
+        final String cleanWord = sanitizeWord(word);
+        if (cleanPrev == null || cleanWord == null) {
+            return false;
+        }
+        try {
+            final SQLiteDatabase db = getWritableDatabase();
+            final int rows = db.delete(TABLE_BIGRAMS,
+                    COL_BIGRAMS_PREV_WORD + "=? AND " + COL_BIGRAMS_WORD + "=?",
+                    new String[]{cleanPrev, cleanWord});
+            return rows > 0;
+        } catch (Throwable e) {
+            Log.e(TAG, "Error deleting bigram", e);
+            return false;
+        }
+    }
+
+    public synchronized boolean clearAllBigrams() {
+        try {
+            final SQLiteDatabase db = getWritableDatabase();
+            db.delete(TABLE_BIGRAMS, null, null);
+            return true;
+        } catch (Throwable e) {
+            Log.e(TAG, "Error clearing bigrams table", e);
+            return false;
+        }
+    }
+
+    public synchronized boolean applyDecay(final long currentTimestamp, final long decayIntervalMillis, final int decayStep) {
+        if (decayStep <= 0) {
+            return false;
+        }
+        final long cutoffTimestamp = currentTimestamp - Math.max(0, decayIntervalMillis);
+        SQLiteDatabase db = null;
+        try {
+            db = getWritableDatabase();
+            db.beginTransaction();
+
+            db.execSQL("UPDATE " + TABLE_BIGRAMS + " SET " + COL_BIGRAMS_FREQ + " = " + COL_BIGRAMS_FREQ + " - " + decayStep +
+                    " WHERE " + COL_BIGRAMS_TIMESTAMP + " <= " + cutoffTimestamp);
+            db.execSQL("DELETE FROM " + TABLE_BIGRAMS + " WHERE " + COL_BIGRAMS_FREQ + " <= 1");
+
+            db.setTransactionSuccessful();
+            return true;
+        } catch (Throwable e) {
+            Log.e(TAG, "Error applying decay", e);
+            return false;
+        } finally {
+            if (db != null && db.inTransaction()) {
+                try {
+                    db.endTransaction();
+                } catch (Throwable e) { Log.w(TAG, "Cleanup failed", e); }
+            }
         }
     }
 }

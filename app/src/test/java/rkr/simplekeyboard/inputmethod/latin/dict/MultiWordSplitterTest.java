@@ -6,6 +6,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class MultiWordSplitterTest {
 
@@ -24,10 +25,18 @@ public class MultiWordSplitterTest {
         mDict.insert("va", 200);
         mDict.insert("por", 245);
         mDict.insert("favor", 220);
+        mDict.insert("que", 250);
+        mDict.insert("qué", 220);
+        mDict.insert("porque", 240);
 
         mDict.setBigram("no", "tengo", 200);
         mDict.setBigram("de", "los", 220);
         mDict.setBigram("por", "favor", 230);
+        mDict.setBigram("cómo", "te", 230);
+        mDict.setBigram("te", "va", 220);
+        mDict.setBigram("por", "que", 220);
+        mDict.setBigram("que", "no", 210);
+        mDict.setBigram("porque", "no", 230);
     }
 
     @Test
@@ -61,5 +70,53 @@ public class MultiWordSplitterTest {
     public void testShortWordNoSplit() {
         MultiWordSplitter.SplitResult result = MultiWordSplitter.findBestSplit(mDict, "no", null);
         assertNull(result);
+    }
+
+    @Test
+    public void test3WordSplitClean() {
+        MultiWordSplitter.SplitResult result = MultiWordSplitter.findBestSplit(mDict, "comoteva", null);
+        assertNotNull(result);
+        assertEquals("cómo", result.word1);
+        assertEquals("te", result.word2);
+        assertEquals("va", result.word3);
+        assertEquals("cómo te va", result.combined);
+        assertTrue(result.score >= 75.0f);
+    }
+
+    @Test
+    public void test3WordSplitPorQueNo() {
+        MultiWordSplitter.SplitResult result = MultiWordSplitter.findBestSplit(mDict, "porqueno", null);
+        assertNotNull(result);
+        assertTrue("porque no".equals(result.combined) || "por que no".equals(result.combined));
+        assertTrue(result.score >= 75.0f);
+    }
+
+    @Test
+    public void testSplitWithTypoPorqyeno() {
+        MultiWordSplitter.SplitResult result = MultiWordSplitter.findBestSplit(mDict, "porqyeno", null);
+        assertNotNull("Should split typo 'porqyeno'", result);
+        assertTrue("Expected 'porque no' or 'por que no', but got: " + result.combined,
+                "porque no".equals(result.combined) || "por que no".equals(result.combined));
+        assertTrue(result.score >= 75.0f);
+    }
+
+    @Test
+    public void testSplitWithComponentTypoNotengp() {
+        MultiWordSplitter.SplitResult result = MultiWordSplitter.findBestSplit(mDict, "notengp", null);
+        assertNotNull("Should split 'notengp' to 'no tengo'", result);
+        assertEquals("no", result.word1);
+        assertEquals("tengo", result.word2);
+        assertEquals("no tengo", result.combined);
+    }
+
+    @Test
+    public void testSplitConvenienceMethods() {
+        MultiWordSplitter.SplitResult result = MultiWordSplitter.split(mDict, "delos");
+        assertNotNull(result);
+        assertEquals("de los", result.combined);
+
+        MultiWordSplitter.SplitResult resultWithPrev = MultiWordSplitter.split(mDict, "tengo", "no");
+        // "tengo" is single word, should not split
+        assertNull(resultWithPrev);
     }
 }

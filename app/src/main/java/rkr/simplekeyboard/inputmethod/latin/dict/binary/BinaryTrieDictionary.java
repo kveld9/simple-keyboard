@@ -530,14 +530,17 @@ public class BinaryTrieDictionary {
             return;
         }
 
-        // 3. Substitutions and Insertions (Cost 1)
+        final char targetNextChar = (targetIdx + 1 < target.length()) ? StringUtils.foldChar(target.charAt(targetIdx + 1)) : '\0';
+
+        // 3. Substitutions, Insertions, and Transpositions (Cost 1)
         for (int i = 0; i < childCount; i++) {
             if (candidates.size() >= 40) {
                 break;
             }
             final int childNode = childrenOffset + i * 16;
             final char c = (char) (buffer.getShort(childNode) & 0xFFFF);
-            final boolean isExactMatch = (targetIdx < target.length() && StringUtils.foldChar(c) == targetChar);
+            final char foldedC = StringUtils.foldChar(c);
+            final boolean isExactMatch = (targetIdx < target.length() && foldedC == targetChar);
 
             currentPath.append(c);
 
@@ -549,6 +552,26 @@ public class BinaryTrieDictionary {
             // 3b. Insertion (keep targetIdx)
             if (candidates.size() < 40) {
                 searchFuzzy(childNode, currentPath, target, targetIdx, remainingDistance - 1, candidates);
+            }
+
+            // 3c. Transposition (adjacent swap: child matches target[targetIdx + 1], grandChild matches target[targetIdx])
+            if (candidates.size() < 40 && targetIdx + 1 < target.length() && foldedC == targetNextChar) {
+                final int grandChildCount = buffer.get(childNode + 4) & 0xFF;
+                if (grandChildCount > 0) {
+                    final int grandChildrenOffset = buffer.getInt(childNode + 8);
+                    for (int j = 0; j < grandChildCount; j++) {
+                        if (candidates.size() >= 40) {
+                            break;
+                        }
+                        final int grandChildNode = grandChildrenOffset + j * 16;
+                        final char grandC = (char) (buffer.getShort(grandChildNode) & 0xFFFF);
+                        if (StringUtils.foldChar(grandC) == targetChar) {
+                            currentPath.append(grandC);
+                            searchFuzzy(grandChildNode, currentPath, target, targetIdx + 2, remainingDistance - 1, candidates);
+                            currentPath.setLength(currentPath.length() - 1);
+                        }
+                    }
+                }
             }
 
             currentPath.setLength(currentPath.length() - 1);

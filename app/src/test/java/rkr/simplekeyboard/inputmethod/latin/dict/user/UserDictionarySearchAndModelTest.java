@@ -59,4 +59,42 @@ public class UserDictionarySearchAndModelTest {
         assertEquals("my\\_var", UserDictionaryDatabase.escapeLikePattern("my_var"));
         assertEquals("path\\\\to\\\\file", UserDictionaryDatabase.escapeLikePattern("path\\to\\file"));
     }
+
+    @Test
+    public void testUserBigramEntryCreation() {
+        long now = System.currentTimeMillis();
+        UserBigramEntry entry = new UserBigramEntry(42L, "how", "are", 250, now);
+
+        assertEquals(42L, entry.id);
+        assertEquals("how", entry.prevWord);
+        assertEquals("word must match", "are", entry.word);
+        assertEquals(250, entry.frequency);
+        assertEquals(now, entry.timestamp);
+    }
+
+    @Test
+    public void testUserBigramEntryConvenienceConstructor() {
+        UserBigramEntry entry = new UserBigramEntry("good", "morning", 200);
+
+        assertEquals(-1L, entry.id);
+        assertEquals("good", entry.prevWord);
+        assertEquals("morning", entry.word);
+        assertEquals(200, entry.frequency);
+        assertTrue(entry.timestamp > 0);
+    }
+
+    @Test
+    public void testUserBigramEntryEqualityAndHashCode() {
+        long now = System.currentTimeMillis();
+        UserBigramEntry entry1 = new UserBigramEntry(1L, "how", "are", 250, now);
+        UserBigramEntry entry2 = new UserBigramEntry(2L, "how", "are", 250, now + 1000);
+        UserBigramEntry entry3 = new UserBigramEntry(3L, "how", "is", 250, now);
+
+        assertEquals(entry1, entry2);
+        assertEquals(entry1.hashCode(), entry2.hashCode());
+        assertNotNull(entry1.toString());
+        assertTrue(entry1.toString().contains("how"));
+        assertTrue(entry1.toString().contains("are"));
+        org.junit.Assert.assertNotEquals(entry1, entry3);
+    }
 }

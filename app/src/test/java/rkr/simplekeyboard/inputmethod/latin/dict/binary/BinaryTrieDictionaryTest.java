@@ -35,6 +35,7 @@ public class BinaryTrieDictionaryTest {
         esWords.add(new BinaryTrieCompiler.WordEntry("hecho", 170));
         esWords.add(new BinaryTrieCompiler.WordEntry("hemos", 160));
         esWords.add(new BinaryTrieCompiler.WordEntry("manzana", 150));
+        esWords.add(new BinaryTrieCompiler.WordEntry("buenos", 220));
         esWords.add(new BinaryTrieCompiler.WordEntry("casa", 220));
         esWords.add(new BinaryTrieCompiler.WordEntry("casas", 180));
         for (int i = 0; i < 50; i++) {
@@ -223,6 +224,21 @@ public class BinaryTrieDictionaryTest {
         candidates.clear();
         esDict.searchFuzzy(esDict.getRootNode(), new StringBuilder(), "zzqqxx123", 0, 1, candidates);
         assertEquals("Fuzzy search for impossible word must return 0 candidates", 0, candidates.size());
+    }
+
+    @Test
+    public void testFuzzySearchTranspositionCorrections() {
+        // Transposition test 1: "teh" -> "the"
+        List<rkr.simplekeyboard.inputmethod.latin.dict.PrefixDictionary.ScoredWord> candidates = new java.util.ArrayList<>();
+        enDict.searchFuzzy(enDict.getRootNode(), new StringBuilder(), "teh", 0, 1, candidates);
+        assertTrue("Fuzzy search for transposed 'teh' must find 'the'",
+                candidates.stream().anyMatch(sw -> "the".equalsIgnoreCase(sw.word)));
+
+        // Transposition test 2: "buneos" -> "buenos"
+        candidates.clear();
+        esDict.searchFuzzy(esDict.getRootNode(), new StringBuilder(), "buneos", 0, 1, candidates);
+        assertTrue("Fuzzy search for transposed 'buneos' must find 'buenos'",
+                candidates.stream().anyMatch(sw -> "buenos".equalsIgnoreCase(sw.word)));
     }
 
     @Test

@@ -537,6 +537,28 @@ public final class PrefixDictionary {
         putNGram(mBigrams, contextKey, word, freq);
     }
 
+    public synchronized void loadBigram(final String prevWord, final String word, final int freq) {
+        if (prevWord == null || word == null || prevWord.isEmpty() || word.isEmpty()) {
+            return;
+        }
+        final String contextKey = StringUtils.toNormalizedLower(prevWord);
+        final String normWord = StringUtils.toNormalizedLower(word);
+        Map<String, Short> nextMap = mBigrams.get(contextKey);
+        if (nextMap == null) {
+            nextMap = new HashMap<>();
+            mBigrams.put(contextKey, nextMap);
+        }
+        nextMap.put(normWord, (short) Math.min(Short.MAX_VALUE, Math.max(1, freq)));
+    }
+
+    public synchronized int getBigramCount() {
+        int count = 0;
+        for (final Map<String, Short> map : mBigrams.values()) {
+            count += map.size();
+        }
+        return count;
+    }
+
     public synchronized int getBigramFrequency(final String prevWord, final String word) {
         if (prevWord == null || word == null || prevWord.isEmpty() || word.isEmpty()) {
             return 0;
@@ -1088,10 +1110,18 @@ public final class PrefixDictionary {
         if (word == null || word.isEmpty() || isBlocked(word)) return word;
         final String norm = StringUtils.toNormalizedLower(word);
         final TrieNode current = findPrefixNode(norm);
-        if (current == null) return word;
-        for (int i = 0; i < current.words.length; i++) {
-            if (current.freqs[i] > 0 && !isBlocked(current.words[i])) {
-                return current.words[i];
+        if (current != null) {
+            for (int i = 0; i < current.words.length; i++) {
+                if (current.freqs[i] > 0 && !isBlocked(current.words[i])) {
+                    return current.words[i];
+                }
+            }
+        }
+        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+        if (bin != null) {
+            final String binCanon = bin.getCanonicalWord(norm);
+            if (binCanon != null && !isBlocked(binCanon)) {
+                return binCanon;
             }
         }
         return word;

@@ -145,6 +145,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private String mOriginalTypedWordBeforeAutocorrect = null;
     private String mAutocorrectedWord = null;
+    private String mRevertedWord = null;
     private boolean mCanRevertAutocorrect = false;
     private int mLastInlineFieldId = 0;
 
@@ -755,6 +756,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         hideEmojiView();
         hideClipboardHistory();
         mCanRevertAutocorrect = false;
+        mRevertedWord = null;
         mInputLogic.clearCaches();
         mRichImm.resetSubtypeCycleOrder();
         mHandler.onFinishInputView(finishingInput);
@@ -780,6 +782,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mCanRevertAutocorrect = false;
         mOriginalTypedWordBeforeAutocorrect = null;
         mAutocorrectedWord = null;
+        mRevertedWord = null;
         if (mTopBarView != null) {
             mTopBarView.closeToolTray();
             if (mTopBarView.isExternalViewActive()) {
@@ -922,6 +925,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mCanRevertAutocorrect = false;
         mOriginalTypedWordBeforeAutocorrect = null;
         mAutocorrectedWord = null;
+        mRevertedWord = null;
         hideClipboardHistory();
         hideEmojiView();
         if (mTopBarView != null && mTopBarView.isExternalViewActive()) {
@@ -1831,6 +1835,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (!isBackspaceEvent(event)) {
             if (isLetterOrDigitKey(event)) {
                 mCanRevertAutocorrect = false;
+                mRevertedWord = null;
             }
             return false;
         }
@@ -1873,15 +1878,17 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     }
 
     private void executeBackspaceRevert(final Event event, final boolean hasTrailingSpace) {
+        final String revertedWord = mOriginalTypedWordBeforeAutocorrect;
         mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + (hasTrailingSpace ? 1 : 0));
-        mInputLogic.mConnection.commitText(mOriginalTypedWordBeforeAutocorrect, 1);
+        mInputLogic.mConnection.commitText(revertedWord, 1);
 
         final String[] context = getEffectivePreviousWords();
-        recordCommittedWord(mOriginalTypedWordBeforeAutocorrect, context[0], context[1]);
+        recordCommittedWord(revertedWord, context[0], context[1]);
 
         mCanRevertAutocorrect = false;
         mOriginalTypedWordBeforeAutocorrect = null;
         mAutocorrectedWord = null;
+        mRevertedWord = revertedWord;
         mKeyboardSwitcher.onEvent(event);
         updateSuggestions();
     }
@@ -1909,6 +1916,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             mCanRevertAutocorrect = false;
             return word;
         }
+        if (mRevertedWord != null && mRevertedWord.equals(word)) {
+            mCanRevertAutocorrect = false;
+            return word;
+        }
+        mRevertedWord = null;
+
         final CharSequence correction;
         if (mPendingAutoCorrection != null && word.equals(mPendingAutoCorrectionWord)) {
             correction = mPendingAutoCorrection;

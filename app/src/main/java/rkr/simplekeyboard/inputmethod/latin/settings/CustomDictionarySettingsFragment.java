@@ -159,7 +159,12 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
                 getActivity().runOnUiThread(() -> {
                     if (result.success) {
                         final String displayLang = getDisplayNameForLocale(result.languageCode);
-                        final String msg = getString(R.string.import_dictionary_success, displayLang, result.wordCount);
+                        final String msg;
+                        if (result.message != null && result.message.contains("Transformer")) {
+                            msg = getString(R.string.import_transformer_success, displayLang, result.wordCount);
+                        } else {
+                            msg = getString(R.string.import_dictionary_success, displayLang, result.wordCount);
+                        }
                         Toast.makeText(context, msg, Toast.LENGTH_LONG).show();
                         refreshInstalledDictionaries();
                     } else if (promptOnUnknownLang && result.message != null && result.message.contains("Could not determine language")) {
@@ -205,9 +210,14 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
         for (final CustomDictionaryManager.CustomDictInfo info : list) {
             final Preference pref = new Preference(context);
             final String displayLang = getDisplayNameForLocale(info.languageCode);
-            pref.setTitle(displayLang + " (" + info.languageCode + ")");
             final String sizeMb = String.format(Locale.US, "%.1f MB", info.fileSizeBytes / (1024.0 * 1024.0));
-            pref.setSummary(getString(R.string.custom_dict_item_summary, info.wordCount, sizeMb));
+            if (info.isTransformer) {
+                pref.setTitle(getString(R.string.custom_transformer_item_title, displayLang, info.languageCode));
+                pref.setSummary(getString(R.string.custom_transformer_item_summary, info.wordCount, sizeMb));
+            } else {
+                pref.setTitle(displayLang + " (" + info.languageCode + ")");
+                pref.setSummary(getString(R.string.custom_dict_item_summary, info.wordCount, sizeMb));
+            }
             pref.setWidgetLayoutResource(R.layout.preference_chevron);
             pref.setOnPreferenceClickListener(p -> {
                 showDeleteDialog(info);
@@ -223,11 +233,14 @@ public final class CustomDictionarySettingsFragment extends SubScreenFragment {
             return;
         }
         final String displayLang = getDisplayNameForLocale(info.languageCode);
+        final String message = info.isTransformer
+                ? getString(R.string.remove_custom_transformer_message, displayLang)
+                : getString(R.string.remove_custom_dict_message, displayLang);
         new MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.remove_custom_dict_title)
-                .setMessage(getString(R.string.remove_custom_dict_message, displayLang))
+                .setMessage(message)
                 .setPositiveButton(R.string.remove_custom_dict_confirm, (dialog, which) -> {
-                    CustomDictionaryManager.getInstance().deleteCustomDictionary(context, info.languageCode);
+                    CustomDictionaryManager.getInstance().deleteCustomFile(context, info.fileName);
                     Toast.makeText(context, getString(R.string.custom_dict_removed_toast, displayLang), Toast.LENGTH_SHORT).show();
                     refreshInstalledDictionaries();
                 })

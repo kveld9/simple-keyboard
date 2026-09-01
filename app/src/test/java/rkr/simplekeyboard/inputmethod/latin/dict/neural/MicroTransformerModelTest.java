@@ -79,12 +79,12 @@ public class MicroTransformerModelTest {
         int posSize = MicroTransformerModel.MAX_SEQ_LEN * dModel;
         int offLayer0 = align64(offPos + posSize);
 
-        // Per layer sizes
-        int qkvCount = (3 * dModel) * dModel;
-        int projCount = dModel * dModel;
-        int mlpUpCount = dFf * dModel;
-        int mlpDownCount = dModel * dFf;
-        int layerSize = qkvCount + projCount + mlpUpCount + mlpDownCount + (dModel * 4) + (dModel * 4);
+        // Per layer sizes (In TRF2, weights are packed 4 per byte)
+        int qkvPacked = (3 * dModel * dModel + 3) / 4;
+        int projPacked = (dModel * dModel + 3) / 4;
+        int mlpUpPacked = (dFf * dModel + 3) / 4;
+        int mlpDownPacked = (dModel * dFf + 3) / 4;
+        int layerSize = qkvPacked + projPacked + mlpUpPacked + mlpDownPacked + (dModel * 4) + (dModel * 4);
 
         int totalFileSize = offLayer0 + nLayers * layerSize;
 
@@ -93,8 +93,8 @@ public class MicroTransformerModelTest {
 
         // --- Write Header (64 bytes) ---
         buffer.position(0);
-        buffer.putInt(MicroTransformerModel.MAGIC_TRF1); // 0x00: magic
-        buffer.putInt(1);                                // 0x04: version
+        buffer.putInt(MicroTransformerModel.MAGIC_TRF2); // 0x00: magic (TRF2)
+        buffer.putInt(2);                                // 0x04: version (2 for TRF2)
         buffer.putInt(vocabSize);                        // 0x08: vocab_size
         buffer.putInt(dModel);                           // 0x0C: d_model
         buffer.putInt(nHeads);                           // 0x10: n_heads
@@ -145,47 +145,48 @@ public class MicroTransformerModelTest {
             }
         } else {
             for (int i = 0; i < posSize; i++) {
-                buffer.put((byte) 1);
+                buffer.put((byte) 0);
             }
         }
 
-        // --- Write Layers (at offLayer0) ---
+        // --- Write Layers (at offLayer0) with packed 2-bit weights ---
         buffer.position(offLayer0);
+        byte defaultPacked = (byte) (0x01 | (0x01 << 2) | (0x01 << 4) | (0x01 << 6)); // all +1.0f
         for (int l = 0; l < nLayers; l++) {
             // 1. QKV weights
             if (qkvWeights != null) {
-                int toWrite = Math.min(qkvWeights.length, qkvCount);
+                int toWrite = Math.min(qkvWeights.length, qkvPacked);
                 buffer.put(qkvWeights, 0, toWrite);
-                for (int i = toWrite; i < qkvCount; i++) buffer.put((byte) 0);
+                for (int i = toWrite; i < qkvPacked; i++) buffer.put((byte) 0);
             } else {
-                for (int i = 0; i < qkvCount; i++) buffer.put((byte) 1);
+                for (int i = 0; i < qkvPacked; i++) buffer.put(defaultPacked);
             }
 
             // 2. Proj weights
             if (projWeights != null) {
-                int toWrite = Math.min(projWeights.length, projCount);
+                int toWrite = Math.min(projWeights.length, projPacked);
                 buffer.put(projWeights, 0, toWrite);
-                for (int i = toWrite; i < projCount; i++) buffer.put((byte) 0);
+                for (int i = toWrite; i < projPacked; i++) buffer.put((byte) 0);
             } else {
-                for (int i = 0; i < projCount; i++) buffer.put((byte) 1);
+                for (int i = 0; i < projPacked; i++) buffer.put(defaultPacked);
             }
 
             // 3. MLP Up weights
             if (mlpUpWeights != null) {
-                int toWrite = Math.min(mlpUpWeights.length, mlpUpCount);
+                int toWrite = Math.min(mlpUpWeights.length, mlpUpPacked);
                 buffer.put(mlpUpWeights, 0, toWrite);
-                for (int i = toWrite; i < mlpUpCount; i++) buffer.put((byte) 0);
+                for (int i = toWrite; i < mlpUpPacked; i++) buffer.put((byte) 0);
             } else {
-                for (int i = 0; i < mlpUpCount; i++) buffer.put((byte) 1);
+                for (int i = 0; i < mlpUpPacked; i++) buffer.put(defaultPacked);
             }
 
             // 4. MLP Down weights
             if (mlpDownWeights != null) {
-                int toWrite = Math.min(mlpDownWeights.length, mlpDownCount);
+                int toWrite = Math.min(mlpDownWeights.length, mlpDownPacked);
                 buffer.put(mlpDownWeights, 0, toWrite);
-                for (int i = toWrite; i < mlpDownCount; i++) buffer.put((byte) 0);
+                for (int i = toWrite; i < mlpDownPacked; i++) buffer.put((byte) 0);
             } else {
-                for (int i = 0; i < mlpDownCount; i++) buffer.put((byte) 1);
+                for (int i = 0; i < mlpDownPacked; i++) buffer.put(defaultPacked);
             }
 
             // 5. Gamma1 fused

@@ -1,5 +1,7 @@
 package rkr.simplekeyboard.inputmethod.latin.dict;
 
+import android.util.Log;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -16,6 +18,7 @@ import rkr.simplekeyboard.inputmethod.latin.dict.neural.MicroTransformerModel;
  * Long Word correction bonuses, and Bigram context support.
  */
 public final class PrefixDictionary {
+    private static final String TAG = PrefixDictionary.class.getSimpleName();
     public static final int BASE_LEARNED_FREQUENCY = 250;
 
     private static final char[] EMPTY_CHARS = new char[0];
@@ -188,8 +191,8 @@ public final class PrefixDictionary {
     private final int[] mScratchTopKFreqs = new int[32];
     private final StringBuilder mScratchFuzzyPath = new StringBuilder(32);
     // Scratch buffers para rescoring neural
-    private final int[] mScratchNeuralCandIds = new int[512];
-    private final float[] mScratchNeuralLogits = new float[512];
+    private final int[] mScratchNeuralCandIds = new int[8192];
+    private final float[] mScratchNeuralLogits = new float[8192];
     private final float[] mScratchNeuralHidden = new float[64];
     private final int[] mScratchNeuralTokens = new int[16];
     private volatile rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary mBinaryDict = null;
@@ -208,6 +211,9 @@ public final class PrefixDictionary {
 
     public synchronized void setTransformerModel(final MicroTransformerModel model) {
         mTransformerModel = model;
+        if (model != null && model.isLoaded()) {
+            Log.i(TAG, "Attached Micro-Transformer model to PrefixDictionary (vocab=" + model.getVocabSize() + ", dim=" + model.getModelDim() + ")");
+        }
     }
 
     public MicroTransformerModel getTransformerModel() {
@@ -659,24 +665,28 @@ public final class PrefixDictionary {
 
         final MicroTransformerModel trf = mTransformerModel;
         if (trf != null && trf.isLoaded() && !mScratchScoredWords.isEmpty()) {
-            final String context = (w1 != null ? w1 + " " : "") + (w2 != null ? w2 + " " : "") + trimmed;
-            final int numTokens = trf.tokenize(context, mScratchNeuralTokens, 0, mScratchNeuralTokens.length);
-            if (numTokens > 0) {
-                if (trf.forward(mScratchNeuralTokens, numTokens, mScratchNeuralHidden)) {
-                    final int n = Math.min(mScratchScoredWords.size(), mScratchNeuralCandIds.length);
-                    for (int i = 0; i < n; i++) {
-                        final String word = mScratchScoredWords.get(i).word;
-                        final int wordCount = trf.tokenize(word, mScratchNeuralCandIds, i, 1);
-                        if (wordCount == 0) {
-                            mScratchNeuralCandIds[i] = MicroTransformerModel.UNK_TOKEN_ID;
+            final String context = (w1 != null ? w1 + " " : "") + (w2 != null ? w2 : "");
+            final String trimmedContext = context.trim();
+            if (!trimmedContext.isEmpty()) {
+                final int numTokens = trf.tokenize(trimmedContext, mScratchNeuralTokens, 0, mScratchNeuralTokens.length);
+                if (numTokens > 0) {
+                    if (trf.forward(mScratchNeuralTokens, numTokens, mScratchNeuralHidden)) {
+                        final int n = Math.min(mScratchScoredWords.size(), mScratchNeuralCandIds.length);
+                        for (int i = 0; i < n; i++) {
+                            final String word = mScratchScoredWords.get(i).word;
+                            final int wordCount = trf.tokenize(word, mScratchNeuralCandIds, i, 1);
+                            if (wordCount == 0) {
+                                mScratchNeuralCandIds[i] = MicroTransformerModel.UNK_TOKEN_ID;
+                            }
                         }
+                        trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, n, mScratchNeuralLogits);
+                        // Boost scored words by transformer logit
+                        for (int i = 0; i < n; i++) {
+                            mScratchScoredWords.get(i).score += mScratchNeuralLogits[i] * 40.0f;
+                        }
+                        Collections.sort(mScratchScoredWords);
+                        Log.d(TAG, "Neural rescoring applied on " + n + " candidates for context: '" + trimmedContext + "'");
                     }
-                    trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, n, mScratchNeuralLogits);
-                    // Boost scored words by transformer logit
-                    for (int i = 0; i < n; i++) {
-                        mScratchScoredWords.get(i).score += mScratchNeuralLogits[i] * 50.0f;
-                    }
-                    Collections.sort(mScratchScoredWords);
                 }
             }
         }
@@ -1314,18 +1324,27 @@ public final class PrefixDictionary {
 
         final MicroTransformerModel trf = mTransformerModel;
         if (trf != null && trf.isLoaded() && mScratchPredictions.size() < limit) {
-            final String context = (w1 != null ? w1 + " " : "") + w2;
-            final int numTokens = trf.tokenize(context, mScratchNeuralTokens, 0, mScratchNeuralTokens.length);
-            if (numTokens > 0) {
-                if (trf.forward(mScratchNeuralTokens, numTokens, mScratchNeuralHidden)) {
-                    // Score top 512 word-start tokens (those starting with space or \u2581)
+            final String context = (w1 != null ? w1 + " " : "") + (w2 != null ? w2 : "");
+            final String trimmedContext = context.trim();
+            if (!trimmedContext.isEmpty()) {
+                final int numTokens = trf.tokenize(trimmedContext, mScratchNeuralTokens, 0, mScratchNeuralTokens.length);
+                if (numTokens > 0 && trf.forward(mScratchNeuralTokens, numTokens, mScratchNeuralHidden)) {
                     final int vocabSize = trf.getVocabSize();
                     int candCount = 0;
                     final int maxCand = Math.min(vocabSize, mScratchNeuralCandIds.length);
                     for (int i = 2; i < vocabSize && candCount < maxCand; i++) {
                         final String piece = trf.getTokenText(i);
                         if (piece != null && piece.length() > 1 && (piece.charAt(0) == ' ' || piece.charAt(0) == '\u2581')) {
-                            mScratchNeuralCandIds[candCount++] = i;
+                            boolean hasLetter = false;
+                            for (int k = 1; k < piece.length(); k++) {
+                                if (Character.isLetter(piece.charAt(k))) {
+                                    hasLetter = true;
+                                    break;
+                                }
+                            }
+                            if (hasLetter) {
+                                mScratchNeuralCandIds[candCount++] = i;
+                            }
                         }
                     }
                     if (candCount > 0) {
@@ -1345,13 +1364,14 @@ public final class PrefixDictionary {
                             final String word = trf.getTokenText(mScratchNeuralCandIds[bestIdx]);
                             if (word == null) continue;
                             final String cleanWord = (word.length() > 0 && (word.charAt(0) == ' ' || word.charAt(0) == '\u2581')) ? word.substring(1) : word;
-                            if (cleanWord.isEmpty()) continue;
+                            if (cleanWord.isEmpty() || isBlocked(cleanWord)) continue;
                             if (!mScratchPredictionsAdded.contains(cleanWord)) {
                                 mScratchPredictions.add(cleanWord);
                                 mScratchPredictionsAdded.add(cleanWord);
                                 if (mScratchPredictions.size() >= limit) break;
                             }
                         }
+                        Log.d(TAG, "Neural next-word prediction for context: '" + trimmedContext + "' -> " + mScratchPredictions);
                     }
                 }
             }

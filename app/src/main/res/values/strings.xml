@@ -263,6 +263,10 @@
     <string name="remove_custom_dict_message">Delete the imported dictionary for %s?</string>
     <string name="remove_custom_dict_confirm">Delete</string>
     <string name="custom_dict_removed_toast">%s dictionary removed</string>
+    <string name="custom_transformer_item_title">%1$s (%2$s) • Neural Model</string>
+    <string name="custom_transformer_item_summary">%1$d tokens vocabulary · %2$s</string>
+    <string name="import_transformer_success">Successfully imported %1$s Neural Transformer model (%2$d tokens)</string>
+    <string name="remove_custom_transformer_message">Delete the imported Neural Transformer model for %s?</string>
 
     <!-- Backup & Restore -->
     <string name="settings_screen_backup">Backup &amp; restore</string>

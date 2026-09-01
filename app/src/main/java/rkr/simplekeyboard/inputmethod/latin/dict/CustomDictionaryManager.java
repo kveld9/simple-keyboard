@@ -30,14 +30,22 @@ public final class CustomDictionaryManager {
         public final long fileSizeBytes;
         public final int wordCount;
         public final long lastModified;
+        public final boolean isTransformer;
 
         public CustomDictInfo(final String languageCode, final String fileName,
-                              final long fileSizeBytes, final int wordCount, final long lastModified) {
+                              final long fileSizeBytes, final int wordCount, final long lastModified,
+                              final boolean isTransformer) {
             this.languageCode = languageCode;
             this.fileName = fileName;
             this.fileSizeBytes = fileSizeBytes;
             this.wordCount = wordCount;
             this.lastModified = lastModified;
+            this.isTransformer = isTransformer;
+        }
+
+        public CustomDictInfo(final String languageCode, final String fileName,
+                              final long fileSizeBytes, final int wordCount, final long lastModified) {
+            this(languageCode, fileName, fileSizeBytes, wordCount, lastModified, false);
         }
     }
 
@@ -120,7 +128,7 @@ public final class CustomDictionaryManager {
     public List<CustomDictInfo> getInstalledDictionaries(final Context context) {
         final File dir = getDictionaryDir(context);
         // Recovery pass for any orphaned .bak files where target .bin was lost in crash window
-        final File[] bakFiles = dir.listFiles((d, name) -> name.startsWith("dict_") && name.endsWith(".bin.bak"));
+        final File[] bakFiles = dir.listFiles((d, name) -> (name.startsWith("dict_") || name.startsWith("transformer_") || name.startsWith("neural_")) && name.endsWith(".bin.bak"));
         if (bakFiles != null) {
             for (final File bak : bakFiles) {
                 final String targetName = bak.getName().substring(0, bak.getName().length() - ".bak".length());
@@ -133,7 +141,7 @@ public final class CustomDictionaryManager {
             }
         }
 
-        final File[] files = dir.listFiles((d, name) -> name.startsWith("dict_") && name.endsWith(".bin"));
+        final File[] files = dir.listFiles((d, name) -> (name.startsWith("dict_") || name.startsWith("transformer_") || name.startsWith("neural_")) && name.endsWith(".bin"));
         if (files == null || files.length == 0) {
             return Collections.emptyList();
         }
@@ -141,18 +149,25 @@ public final class CustomDictionaryManager {
         final List<CustomDictInfo> list = new ArrayList<>();
         for (final File f : files) {
             final String name = f.getName();
-            final String lang = name.substring("dict_".length(), name.length() - ".bin".length());
+            final boolean isTrf = name.startsWith("transformer_") || name.startsWith("neural_");
+            final String prefix = name.startsWith("transformer_") ? "transformer_" : (name.startsWith("neural_") ? "neural_" : "dict_");
+            final String lang = name.substring(prefix.length(), name.length() - ".bin".length());
             int wordCount = 0;
             try (FileInputStream fis = new FileInputStream(f);
                  FileChannel channel = fis.getChannel()) {
                 final ByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, Math.min(f.length(), 32));
                 buffer.order(ByteOrder.LITTLE_ENDIAN);
-                if (buffer.getInt(0) == 0x42444B53) {
+                if (isTrf) {
+                    final int magic = buffer.getInt(0);
+                    if (magic == 0x54524631 || magic == 0x31465254 || (buffer.get(0) == 'T' && buffer.get(1) == 'R' && buffer.get(2) == 'F' && buffer.get(3) == '1')) {
+                        wordCount = buffer.getInt(8);
+                    }
+                } else if (buffer.getInt(0) == 0x42444B53) {
                     wordCount = buffer.getInt(8);
                 }
             } catch (Exception ignored) {
             }
-            list.add(new CustomDictInfo(lang, name, f.length(), wordCount, f.lastModified()));
+            list.add(new CustomDictInfo(lang, name, f.length(), wordCount, f.lastModified(), isTrf));
         }
         return list;
     }
@@ -162,6 +177,17 @@ public final class CustomDictionaryManager {
             return false;
         }
         final File file = new File(getDictionaryDir(context), "dict_" + languageCode.toLowerCase() + ".bin");
+        if (file.exists()) {
+            return file.delete();
+        }
+        return false;
+    }
+
+    public synchronized boolean deleteCustomFile(final Context context, final String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return false;
+        }
+        final File file = new File(getDictionaryDir(context), fileName);
         if (file.exists()) {
             return file.delete();
         }
@@ -389,8 +415,8 @@ public final class CustomDictionaryManager {
                         "Successfully imported and compiled AOSP .dict (" + decoded.words.size() + " words)");
             }
 
-            // Case 3: TRF1 Micro-Transformer model
-            if (magic == 0x54524631 || magic == 0x31465254) {
+            // Case 3: TRF2 (Ternary BitNet) Micro-Transformer model
+            if (magic == 0x54524632 || magic == 0x32465254) {
                 return importRawBinaryModel(tempFile, dictDir, detectedLang, fallbackLang, "transformer_", "Micro-Transformer model");
             }
 
@@ -477,8 +503,19 @@ public final class CustomDictionaryManager {
         final File stagingFile = File.createTempFile(filePrefix + "stage_", ".bin", dictDir);
         try {
             copyFileWithSync(tempFile, stagingFile);
+            int vocabSize = 0;
+            try (FileInputStream fis = new FileInputStream(stagingFile);
+                 FileChannel channel = fis.getChannel()) {
+                final ByteBuffer buf = channel.map(FileChannel.MapMode.READ_ONLY, 0, Math.min(stagingFile.length(), 32));
+                buf.order(ByteOrder.LITTLE_ENDIAN);
+                final int magic = buf.getInt(0);
+                if (magic == 0x54524631 || magic == 0x31465254 || (buf.get(0) == 'T' && buf.get(1) == 'R' && buf.get(2) == 'F' && buf.get(3) == '1')) {
+                    vocabSize = buf.getInt(8);
+                }
+            } catch (Exception ignored) {
+            }
             publishStagedFile(stagingFile, targetFile);
-            return new ImportResult(true, targetLang, 0, "Successfully imported " + modelType);
+            return new ImportResult(true, targetLang, vocabSize, "Successfully imported " + modelType);
         } finally {
             if (stagingFile.exists()) {
                 stagingFile.delete();

@@ -19,7 +19,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Unit tests for {@link MicroTransformerModel} pure Java TRF1 inference engine.
+ * Unit tests for {@link MicroTransformerModel} pure Java TRF2 (1.58-bit Ternary) inference engine.
  */
 public class MicroTransformerModelTest {
 
@@ -36,10 +36,10 @@ public class MicroTransformerModelTest {
     }
 
     /**
-     * Helper to create a complete valid TRF1 binary file with custom hyperparameters,
+     * Helper to create a complete valid TRF2 binary file with custom hyperparameters,
      * vocabulary, embeddings, and layer weights.
      */
-    private File createTestTRF1File(
+    private File createTestTRF2File(
             File file,
             int vocabSize,
             int dModel,
@@ -217,14 +217,14 @@ public class MicroTransformerModelTest {
     /**
      * Overload with common defaults.
      */
-    private File createTestTRF1File(
+    private File createTestTRF2File(
             File file,
             int vocabSize,
             int dModel,
             int nHeads,
             String[] bpeTokens,
             byte[] embeddingData) throws IOException {
-        return createTestTRF1File(
+        return createTestTRF2File(
                 file,
                 vocabSize,
                 dModel,
@@ -248,7 +248,7 @@ public class MicroTransformerModelTest {
     @Test
     public void testLoadValidTRF1() throws IOException {
         final File modelFile = mTempFolder.newFile("valid_model.trf1");
-        createTestTRF1File(modelFile, 16, 4, 2, null, null);
+        createTestTRF2File(modelFile, 16, 4, 2, null, null);
 
         final MicroTransformerModel model = new MicroTransformerModel();
         final boolean loaded = model.loadModel(modelFile);
@@ -262,7 +262,7 @@ public class MicroTransformerModelTest {
     @Test
     public void testLoadInvalidMagic() throws IOException {
         final File invalidFile = mTempFolder.newFile("invalid_magic.trf1");
-        createTestTRF1File(invalidFile, 16, 4, 2, null, null);
+        createTestTRF2File(invalidFile, 16, 4, 2, null, null);
 
         // Corrupt the magic number at offset 0
         try (FileOutputStream fos = new FileOutputStream(invalidFile, false)) {
@@ -296,7 +296,7 @@ public class MicroTransformerModelTest {
     @Test
     public void testUnload() throws IOException {
         final File modelFile = mTempFolder.newFile("model_unload.trf1");
-        createTestTRF1File(modelFile, 16, 4, 2, null, null);
+        createTestTRF2File(modelFile, 16, 4, 2, null, null);
 
         final MicroTransformerModel model = new MicroTransformerModel();
         assertTrue(model.loadModel(modelFile));
@@ -321,7 +321,7 @@ public class MicroTransformerModelTest {
         }
 
         final File modelFile = mTempFolder.newFile("tokenize_model.trf1");
-        createTestTRF1File(modelFile, 16, 4, 2, vocab, null);
+        createTestTRF2File(modelFile, 16, 4, 2, vocab, null);
 
         final MicroTransformerModel model = new MicroTransformerModel();
         assertTrue(model.loadModel(modelFile));
@@ -353,7 +353,7 @@ public class MicroTransformerModelTest {
 
         byte[] emb = new byte[vocabSize * dModel];
         Arrays.fill(emb, (byte) 2);
-        createTestTRF1File(modelFile, vocabSize, dModel, nHeads, null, emb);
+        createTestTRF2File(modelFile, vocabSize, dModel, nHeads, null, emb);
 
         final MicroTransformerModel model = new MicroTransformerModel();
         assertTrue(model.loadModel(modelFile));
@@ -381,7 +381,7 @@ public class MicroTransformerModelTest {
         final int nHeads = 2;
         final File modelFile = mTempFolder.newFile("forward_deterministic.trf1");
 
-        createTestTRF1File(modelFile, vocabSize, dModel, nHeads, null, null);
+        createTestTRF2File(modelFile, vocabSize, dModel, nHeads, null, null);
 
         final MicroTransformerModel model = new MicroTransformerModel();
         assertTrue(model.loadModel(modelFile));
@@ -417,7 +417,7 @@ public class MicroTransformerModelTest {
         emb[3 * dModel + 2] = 0;
         emb[3 * dModel + 3] = 0;
 
-        createTestTRF1File(modelFile, vocabSize, dModel, nHeads, null, emb);
+        createTestTRF2File(modelFile, vocabSize, dModel, nHeads, null, emb);
 
         final MicroTransformerModel model = new MicroTransformerModel();
         assertTrue(model.loadModel(modelFile));
@@ -449,7 +449,7 @@ public class MicroTransformerModelTest {
         emb[2 * dModel + 2] = 30;
         emb[2 * dModel + 3] = 40;
 
-        createTestTRF1File(
+        createTestTRF2File(
                 modelFile,
                 vocabSize,
                 dModel,
@@ -497,7 +497,7 @@ public class MicroTransformerModelTest {
         }
 
         final File modelFile = mTempFolder.newFile("get_token_text.trf1");
-        createTestTRF1File(modelFile, 16, 4, 2, vocab, null);
+        createTestTRF2File(modelFile, 16, 4, 2, vocab, null);
 
         final MicroTransformerModel model = new MicroTransformerModel();
         assertTrue(model.loadModel(modelFile));
@@ -521,7 +521,7 @@ public class MicroTransformerModelTest {
         }
 
         final File modelFile = mTempFolder.newFile("tokenize_tail.trf2");
-        createTestTRF1File(modelFile, 16, 4, 2, vocab, null);
+        createTestTRF2File(modelFile, 16, 4, 2, vocab, null);
 
         final MicroTransformerModel model = new MicroTransformerModel();
         assertTrue(model.loadModel(modelFile));
@@ -544,7 +544,7 @@ public class MicroTransformerModelTest {
         }
 
         final File modelFile = mTempFolder.newFile("forward_long_context.trf2");
-        createTestTRF1File(modelFile, 16, 4, 2, vocab, null);
+        createTestTRF2File(modelFile, 16, 4, 2, vocab, null);
 
         final MicroTransformerModel model = new MicroTransformerModel();
         assertTrue(model.loadModel(modelFile));

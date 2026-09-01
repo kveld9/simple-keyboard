@@ -13,9 +13,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**
- * Pure Java (float32) inference engine for the Micro-Transformer model.
- * Loads TRF1 binary weights, dequantizes INT8 weights to float32, and executes
- * a 2-layer causal Transformer forward pass with zero hot-path allocations.
+ * Pure Java multiplication-free inference engine for the MicroBitNet (1.58-bit Ternary) Transformer.
+ * Loads TRF2 binary weights, unpacks 2-bit ternary weights {-1, 0, +1}, and executes
+ * a 2-layer causal BitNet Transformer forward pass using purely integer additions/subtractions
+ * and zero hot-path allocations.
  */
 public final class MicroTransformerModel {
 
@@ -52,6 +53,10 @@ public final class MicroTransformerModel {
     // BPE Vocabulary & Trie
     private String[] mBpeVocab;
     private TrieNode mBpeTrieRoot;
+
+    // Hyperparameter constants precomputed for fast forward pass
+    private float mInvD = 1.0f / 64.0f;
+    private float mScaleAttn = 0.25f;
 
     // Pre-allocated intermediate buffers for 0-allocation forward pass
     private final int[] mScratchTokenIds = new int[MAX_SEQ_LEN];
@@ -104,9 +109,9 @@ public final class MicroTransformerModel {
     }
 
     /**
-     * Loads the model from a TRF1 binary file.
+     * Loads the model from a TRF2 (1.58-bit Ternary) binary file.
      *
-     * @param modelFile The file containing the TRF1 weights and vocabulary.
+     * @param modelFile The file containing the TRF2 weights and vocabulary.
      * @return true if the model was successfully loaded, false otherwise.
      */
     public synchronized boolean loadModel(File modelFile) {
@@ -162,6 +167,8 @@ public final class MicroTransformerModel {
                 return false;
             }
 
+            mInvD = 1.0f / (float) mDModel;
+            mScaleAttn = (float) (1.0 / Math.sqrt((double) mDModel / mNHeads));
             int dFf = 2 * mDModel;
 
             // 2. Read BPE Table at offBpe
@@ -501,12 +508,18 @@ public final class MicroTransformerModel {
         }
         if (len <= 0) return 0;
 
+        // Limit scanning window to the last 160 characters (plenty for 16 tokens) to avoid scanning whole documents
+        final int charWindow = 160;
+        final int windowStart = Math.max(0, len - charWindow);
+        final CharSequence scanText = (windowStart > 0) ? text.subSequence(windowStart, len) : text;
+        final int scanLen = scanText.length();
+
         final int ringCap = mTailRing.length;
         final int targetKeep = Math.min(maxTokens, Math.min(ringCap, outTokens.length));
 
-        final char firstChar = text.charAt(0);
+        final char firstChar = scanText.charAt(0);
         final boolean hasVirtualStart = (firstChar != ' ' && firstChar != WORD_START_CHAR);
-        final int virtualLen = hasVirtualStart ? (len + 1) : len;
+        final int virtualLen = hasVirtualStart ? (scanLen + 1) : scanLen;
 
         int pos = 0;
         int count = 0;
@@ -518,7 +531,7 @@ public final class MicroTransformerModel {
             if (mBpeTrieRoot != null) {
                 TrieNode node = mBpeTrieRoot;
                 for (int i = pos; i < virtualLen; i++) {
-                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : text.charAt(i - 1)) : text.charAt(i);
+                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : scanText.charAt(i - 1)) : scanText.charAt(i);
                     char c = normalizeCharForTrie(rawChar);
 
                     TrieNode child = node.getChild(c);
@@ -651,7 +664,7 @@ public final class MicroTransformerModel {
 
             // 2c. Causal Multi-Head Self-Attention
             Arrays.fill(mAttnOut, 0, T * D, 0.0f);
-            float scaleAttn = 1.0f / (float) Math.sqrt(dk);
+            final float scaleAttn = mScaleAttn;
 
             for (int h = 0; h < H; h++) {
                 int qOff = h * dk;

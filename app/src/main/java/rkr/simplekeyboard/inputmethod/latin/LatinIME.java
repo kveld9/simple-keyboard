@@ -1900,9 +1900,6 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + trailingCharsToDelete);
         mInputLogic.mConnection.commitText(revertedWord, 1);
 
-        final String[] context = getEffectivePreviousWords();
-        recordCommittedWord(revertedWord, context[0], context[1]);
-
         mCanRevertAutocorrect = false;
         mOriginalTypedWordBeforeAutocorrect = null;
         mAutocorrectedWord = null;

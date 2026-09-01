@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -41,10 +42,10 @@ public final class MicroTransformerModel {
     // Weights (Ternary weights stored as byte {-1, 0, 1})
     private float[] mEmbeddings;       // vocab_size * d_model
     private float[] mPosEmb;           // MAX_SEQ_LEN * d_model
-    private byte[][] mQkvW;            // [n_layers][(3 * d_model) * d_model]
-    private byte[][] mProjW;           // [n_layers][d_model * d_model]
-    private byte[][] mMlpUpW;          // [n_layers][d_ff * d_model]
-    private byte[][] mMlpDownW;        // [n_layers][d_model * d_ff]
+    private byte[] mQkvW;              // flat: [n_layers * (3 * d_model) * d_model]
+    private byte[] mProjW;             // flat: [n_layers * d_model * d_model]
+    private byte[] mMlpUpW;            // flat: [n_layers * d_ff * d_model]
+    private byte[] mMlpDownW;          // flat: [n_layers * d_model * d_ff]
     private float[][] mGamma1Fused;    // [n_layers][d_model]
     private float[][] mGamma2Fused;    // [n_layers][d_model]
     private float[] mScaleProj;        // [n_layers]
@@ -69,7 +70,7 @@ public final class MicroTransformerModel {
     private float[] mHT;               // d_model
     private float[] mAttnWeights;      // n_heads * MAX_SEQ_LEN * MAX_SEQ_LEN
 
-    private boolean mIsLoaded = false;
+    private volatile boolean mIsLoaded = false;
 
     private static final class TrieNode {
         int tokenId = -1;
@@ -122,16 +123,28 @@ public final class MicroTransformerModel {
 
         unload();
 
-        try (FileInputStream fis = new FileInputStream(modelFile);
-             FileChannel channel = fis.getChannel()) {
+        try (FileInputStream fis = new FileInputStream(modelFile)) {
 
-            long fileSize = channel.size();
-            if (fileSize < 64) {
-                Log.e(TAG, "loadModel: File size too small (" + fileSize + " bytes)");
+            long fileSizeLong = modelFile.length();
+            if (fileSizeLong < 64 || fileSizeLong > 10 * 1024 * 1024) { // Max 10MB sanity check
+                Log.e(TAG, "loadModel: Invalid file size (" + fileSizeLong + " bytes)");
+                return false;
+            }
+            int fileSize = (int) fileSizeLong;
+            
+            byte[] fileBytes = new byte[fileSize];
+            int read = 0;
+            while (read < fileSize) {
+                int count = fis.read(fileBytes, read, fileSize - read);
+                if (count == -1) break;
+                read += count;
+            }
+            if (read != fileSize) {
+                Log.e(TAG, "loadModel: Failed to read entire file");
                 return false;
             }
 
-            MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, fileSize);
+            ByteBuffer buffer = ByteBuffer.wrap(fileBytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
 
             // 1. Read Header (64 bytes)
@@ -153,6 +166,19 @@ public final class MicroTransformerModel {
             mDModel = buffer.getInt(0x0C);
             mNHeads = buffer.getInt(0x10);
             mNLayers = buffer.getInt(0x14);
+            
+            // Safety bounds checks (P2 / P9 from 2.8T Audit)
+            if (mVocabSize <= 0 || mVocabSize > 128000 || 
+                mDModel <= 0 || mDModel > 4096 || 
+                mNHeads <= 0 || mNHeads > 64 || 
+                mNLayers <= 0 || mNLayers > 64) {
+                Log.e(TAG, "loadModel: Hyperparameters out of safe bounds.");
+                return false;
+            }
+            if (mDModel % 4 != 0) {
+                Log.e(TAG, "loadModel: d_model must be a multiple of 4 for unrolled SIMD loop.");
+                return false;
+            }
             int offBpe = buffer.getInt(0x18);
             int offEmb = buffer.getInt(0x1C);
             int offPos = buffer.getInt(0x20);
@@ -243,10 +269,10 @@ public final class MicroTransformerModel {
                 return false;
             }
 
-            mQkvW = new byte[mNLayers][(3 * mDModel) * mDModel];
-            mProjW = new byte[mNLayers][mDModel * mDModel];
-            mMlpUpW = new byte[mNLayers][dFf * mDModel];
-            mMlpDownW = new byte[mNLayers][mDModel * dFf];
+            mQkvW = new byte[mNLayers * (3 * mDModel) * mDModel];
+            mProjW = new byte[mNLayers * mDModel * mDModel];
+            mMlpUpW = new byte[mNLayers * dFf * mDModel];
+            mMlpDownW = new byte[mNLayers * mDModel * dFf];
             mGamma1Fused = new float[mNLayers][mDModel];
             mGamma2Fused = new float[mNLayers][mDModel];
             mScaleProj = new float[mNLayers];
@@ -270,19 +296,19 @@ public final class MicroTransformerModel {
 
                 // 1. QKV weights (Ternary 2-bit packed)
                 int qkvCount = (3 * mDModel) * mDModel;
-                readTernaryWeights(buffer, mQkvW[l], qkvCount);
+                readTernaryWeights(buffer, mQkvW, l * qkvCount, qkvCount);
 
                 // 2. Proj weights (Ternary 2-bit packed)
                 int projCount = mDModel * mDModel;
-                readTernaryWeights(buffer, mProjW[l], projCount);
+                readTernaryWeights(buffer, mProjW, l * projCount, projCount);
 
                 // 3. MLP up weights (Ternary 2-bit packed)
                 int mlpUpCount = dFf * mDModel;
-                readTernaryWeights(buffer, mMlpUpW[l], mlpUpCount);
+                readTernaryWeights(buffer, mMlpUpW, l * mlpUpCount, mlpUpCount);
 
                 // 4. MLP down weights (Ternary 2-bit packed)
                 int mlpDownCount = mDModel * dFf;
-                readTernaryWeights(buffer, mMlpDownW[l], mlpDownCount);
+                readTernaryWeights(buffer, mMlpDownW, l * mlpDownCount, mlpDownCount);
 
                 // 5. Gamma1 fused: D floats
                 for (int i = 0; i < mDModel; i++) {
@@ -318,13 +344,14 @@ public final class MicroTransformerModel {
         }
     }
 
-    private static void readTernaryWeights(MappedByteBuffer buffer, byte[] dest, int count) {
+    private static void readTernaryWeights(ByteBuffer buffer, byte[] dest, int startOffset, int count) {
         // Unpack 4 ternary {-1, 0, +1} weights per byte
         int packedBytes = (count + 3) / 4;
-        int destIdx = 0;
+        int destIdx = startOffset;
+        int endIdx = startOffset + count;
         for (int b = 0; b < packedBytes; b++) {
             int val = buffer.get() & 0xFF;
-            for (int k = 0; k < 4 && destIdx < count; k++) {
+            for (int k = 0; k < 4 && destIdx < endIdx; k++) {
                 int code = (val >> (k * 2)) & 0x03;
                 if (code == 0x01) {
                     dest[destIdx++] = (byte) 1;
@@ -406,12 +433,7 @@ public final class MicroTransformerModel {
         mAttnWeights = null;
     }
 
-    private static char normalizeCharForTrie(char c) {
-        if (c == WORD_START_CHAR || Character.isWhitespace(c)) {
-            return ' ';
-        }
-        return Character.toLowerCase(c);
-    }
+
 
     /**
      * Tokenizes a text into BPE token IDs writing directly to outTokens without String allocations.
@@ -430,15 +452,35 @@ public final class MicroTransformerModel {
         if (text == null || text.length() == 0 || outTokens == null || maxTokens <= 0 || outOffset < 0 || outOffset >= outTokens.length) {
             return 0;
         }
-
         final int textLen = text.length();
-        final char firstChar = text.charAt(0);
-        final boolean hasVirtualStart = (firstChar != ' ' && firstChar != WORD_START_CHAR);
-        final int virtualLen = hasVirtualStart ? textLen + 1 : textLen;
+
+        int bufLen = 0;
+        boolean lastWasSpace = true;
+        for (int i = 0; i < textLen && bufLen < mScratchTextBuffer.length - 2; i++) {
+            char c = text.charAt(i);
+            if (c == WORD_START_CHAR || Character.isWhitespace(c) || !Character.isLetterOrDigit(c)) {
+                if (!lastWasSpace) {
+                    mScratchTextBuffer[bufLen++] = ' ';
+                    lastWasSpace = true;
+                }
+            } else {
+                mScratchTextBuffer[bufLen++] = Character.toLowerCase(c);
+                lastWasSpace = false;
+            }
+        }
+        
+        while (bufLen > 0 && mScratchTextBuffer[bufLen - 1] == ' ') {
+            bufLen--;
+        }
+        if (bufLen <= 0) return 0;
 
         final int limit = Math.min(maxTokens, outTokens.length - outOffset);
         int count = 0;
         int pos = 0;
+
+        final char firstChar = mScratchTextBuffer[0];
+        final boolean hasVirtualStart = (firstChar != ' ');
+        final int virtualLen = hasVirtualStart ? bufLen + 1 : bufLen;
 
         while (pos < virtualLen && count < limit) {
             int bestLen = 0;
@@ -447,8 +489,8 @@ public final class MicroTransformerModel {
             if (mBpeTrieRoot != null) {
                 TrieNode node = mBpeTrieRoot;
                 for (int i = pos; i < virtualLen; i++) {
-                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : text.charAt(i - 1)) : text.charAt(i);
-                    char c = normalizeCharForTrie(rawChar);
+                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : mScratchTextBuffer[i - 1]) : mScratchTextBuffer[i];
+                    char c = (rawChar == ' ') ? ' ' : rawChar;
 
                     TrieNode child = node.getChild(c);
                     if (child == null) {
@@ -478,6 +520,7 @@ public final class MicroTransformerModel {
     }
 
     private final int[] mTailRing = new int[256];
+    private final char[] mScratchTextBuffer = new char[512];
 
     /**
      * Tokenizes text and stores only the trailing tokens (the most recent context),
@@ -496,18 +539,35 @@ public final class MicroTransformerModel {
         }
         if (len <= 0) return 0;
 
-        // Limit scanning window to the last 160 characters (plenty for 16 tokens) to avoid scanning whole documents
-        final int charWindow = 160;
-        final int windowStart = Math.max(0, len - charWindow);
-        final CharSequence scanText = (windowStart > 0) ? text.subSequence(windowStart, len) : text;
-        final int scanLen = scanText.length();
+        final int charWindow = Math.min(len, mScratchTextBuffer.length - 2);
+        final int windowStart = len - charWindow;
+
+        int bufLen = 0;
+        boolean lastWasSpace = true;
+        for (int i = windowStart; i < len; i++) {
+            char c = text.charAt(i);
+            if (c == WORD_START_CHAR || Character.isWhitespace(c) || !Character.isLetterOrDigit(c)) {
+                if (!lastWasSpace) {
+                    mScratchTextBuffer[bufLen++] = ' ';
+                    lastWasSpace = true;
+                }
+            } else {
+                mScratchTextBuffer[bufLen++] = Character.toLowerCase(c);
+                lastWasSpace = false;
+            }
+        }
+        
+        while (bufLen > 0 && mScratchTextBuffer[bufLen - 1] == ' ') {
+            bufLen--;
+        }
+        if (bufLen <= 0) return 0;
 
         final int ringCap = mTailRing.length;
         final int targetKeep = Math.min(maxTokens, Math.min(ringCap, outTokens.length));
 
-        final char firstChar = scanText.charAt(0);
-        final boolean hasVirtualStart = (firstChar != ' ' && firstChar != WORD_START_CHAR);
-        final int virtualLen = hasVirtualStart ? (scanLen + 1) : scanLen;
+        final char firstChar = mScratchTextBuffer[0];
+        final boolean hasVirtualStart = (firstChar != ' ');
+        final int virtualLen = hasVirtualStart ? (bufLen + 1) : bufLen;
 
         int pos = 0;
         int count = 0;
@@ -519,8 +579,8 @@ public final class MicroTransformerModel {
             if (mBpeTrieRoot != null) {
                 TrieNode node = mBpeTrieRoot;
                 for (int i = pos; i < virtualLen; i++) {
-                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : scanText.charAt(i - 1)) : scanText.charAt(i);
-                    char c = normalizeCharForTrie(rawChar);
+                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : mScratchTextBuffer[i - 1]) : mScratchTextBuffer[i];
+                    char c = (rawChar == ' ') ? ' ' : rawChar;
 
                     TrieNode child = node.getChild(c);
                     if (child == null) {
@@ -589,7 +649,19 @@ public final class MicroTransformerModel {
             return false;
         }
 
-        final int start = Math.max(0, numTokens - MAX_SEQ_LEN);
+        int actualStart = Math.max(0, numTokens - MAX_SEQ_LEN);
+        int consecutiveUnk = 0;
+        for (int t = actualStart; t < numTokens; t++) {
+            if (contextTokens[t] == UNK_TOKEN_ID) {
+                consecutiveUnk++;
+                if (consecutiveUnk >= 2) {
+                    actualStart = t; // Reset context to just the last UNK
+                }
+            } else {
+                consecutiveUnk = 0;
+            }
+        }
+        final int start = actualStart;
         final int T = numTokens - start;
         final int D = mDModel;
         final float invD = 1.0f / (float) D;
@@ -630,22 +702,22 @@ public final class MicroTransformerModel {
 
             // 2b. QKV projection: mQKV[t, :] = mNormed[t, :] * qkv_weight^T (Ternary additions/subtractions)
             // qkv_weight has shape (3*D, D), row-major, elements in {-1, 0, +1}
-            byte[] qkvW = mQkvW[layer];
             int outDimQKV = 3 * D;
+            int qkvLayerOffset = layer * outDimQKV * D;
             for (int t = 0; t < T; t++) {
                 int normedOffset = t * D;
                 int qkvRowOffset = t * outDimQKV;
                 for (int j = 0; j < outDimQKV; j++) {
-                    int wOffset = j * D;
+                    int wOffset = qkvLayerOffset + j * D;
                     float sum = 0.0f;
-                    for (int k = 0; k < D; k++) {
-                        byte w = qkvW[wOffset + k];
-                        if (w == 1) {
-                            sum += mNormed[normedOffset + k];
-                        } else if (w == -1) {
-                            sum -= mNormed[normedOffset + k];
-                        }
+                    float s0 = 0f, s1 = 0f, s2 = 0f, s3 = 0f;
+                    for (int k = 0; k < D; k += 4) {
+                        s0 += mQkvW[wOffset + k] * mNormed[normedOffset + k];
+                        s1 += mQkvW[wOffset + k + 1] * mNormed[normedOffset + k + 1];
+                        s2 += mQkvW[wOffset + k + 2] * mNormed[normedOffset + k + 2];
+                        s3 += mQkvW[wOffset + k + 3] * mNormed[normedOffset + k + 3];
                     }
+                    sum = (s0 + s1) + (s2 + s3);
                     mQKV[qkvRowOffset + j] = sum;
                 }
             }
@@ -703,22 +775,22 @@ public final class MicroTransformerModel {
 
             // 2d. Output projection + Residual: mX += (mAttnOut * proj_weight^T) * s_proj
             // proj_weight has shape (D, D), row-major, elements in {-1, 0, +1}
-            byte[] projW = mProjW[layer];
             final float sProj = (mScaleProj != null && layer < mScaleProj.length) ? mScaleProj[layer] : 1.0f;
+            int projLayerOffset = layer * D * D;
             for (int t = 0; t < T; t++) {
                 int attnOffset = t * D;
                 int xOffset = t * D;
                 for (int j = 0; j < D; j++) {
-                    int wOffset = j * D;
+                    int wOffset = projLayerOffset + j * D;
                     float sum = 0.0f;
-                    for (int k = 0; k < D; k++) {
-                        byte w = projW[wOffset + k];
-                        if (w == 1) {
-                            sum += mAttnOut[attnOffset + k];
-                        } else if (w == -1) {
-                            sum -= mAttnOut[attnOffset + k];
-                        }
+                    float s0 = 0f, s1 = 0f, s2 = 0f, s3 = 0f;
+                    for (int k = 0; k < D; k += 4) {
+                        s0 += mProjW[wOffset + k] * mAttnOut[attnOffset + k];
+                        s1 += mProjW[wOffset + k + 1] * mAttnOut[attnOffset + k + 1];
+                        s2 += mProjW[wOffset + k + 2] * mAttnOut[attnOffset + k + 2];
+                        s3 += mProjW[wOffset + k + 3] * mAttnOut[attnOffset + k + 3];
                     }
+                    sum = (s0 + s1) + (s2 + s3);
                     mX[xOffset + j] += sum * sProj;
                 }
             }
@@ -741,21 +813,21 @@ public final class MicroTransformerModel {
             // 2f. MLP Forward:
             // up = ReLU(mNormed * mlp_up^T) (shape: T x d_ff, Ternary additions/subtractions)
             // mlp_up has shape (d_ff, D), elements in {-1, 0, +1}
-            byte[] mlpUpW = mMlpUpW[layer];
+            int mlpUpLayerOffset = layer * dFf * D;
             for (int t = 0; t < T; t++) {
                 int normedOffset = t * D;
                 int hidOffset = t * dFf;
                 for (int j = 0; j < dFf; j++) {
-                    int wOffset = j * D;
+                    int wOffset = mlpUpLayerOffset + j * D;
                     float sum = 0.0f;
-                    for (int k = 0; k < D; k++) {
-                        byte w = mlpUpW[wOffset + k];
-                        if (w == 1) {
-                            sum += mNormed[normedOffset + k];
-                        } else if (w == -1) {
-                            sum -= mNormed[normedOffset + k];
-                        }
+                    float s0 = 0f, s1 = 0f, s2 = 0f, s3 = 0f;
+                    for (int k = 0; k < D; k += 4) {
+                        s0 += mMlpUpW[wOffset + k] * mNormed[normedOffset + k];
+                        s1 += mMlpUpW[wOffset + k + 1] * mNormed[normedOffset + k + 1];
+                        s2 += mMlpUpW[wOffset + k + 2] * mNormed[normedOffset + k + 2];
+                        s3 += mMlpUpW[wOffset + k + 3] * mNormed[normedOffset + k + 3];
                     }
+                    sum = (s0 + s1) + (s2 + s3);
                     mMlpHid[hidOffset + j] = (sum > 0.0f) ? sum : 0.0f; // ReLU
                 }
             }
@@ -763,22 +835,22 @@ public final class MicroTransformerModel {
             // down = mMlpHid * mlp_down^T (shape: T x D, Ternary additions/subtractions)
             // mlp_down has shape (D, d_ff), elements in {-1, 0, +1}
             // Residual: mX += down * s_down
-            byte[] mlpDownW = mMlpDownW[layer];
             final float sDown = (mScaleDown != null && layer < mScaleDown.length) ? mScaleDown[layer] : 1.0f;
+            int mlpDownLayerOffset = layer * D * dFf;
             for (int t = 0; t < T; t++) {
                 int hidOffset = t * dFf;
                 int xOffset = t * D;
                 for (int j = 0; j < D; j++) {
-                    int wOffset = j * dFf;
+                    int wOffset = mlpDownLayerOffset + j * dFf;
                     float sum = 0.0f;
-                    for (int k = 0; k < dFf; k++) {
-                        byte w = mlpDownW[wOffset + k];
-                        if (w == 1) {
-                            sum += mMlpHid[hidOffset + k];
-                        } else if (w == -1) {
-                            sum -= mMlpHid[hidOffset + k];
-                        }
+                    float s0 = 0f, s1 = 0f, s2 = 0f, s3 = 0f;
+                    for (int k = 0; k < dFf; k += 4) {
+                        s0 += mMlpDownW[wOffset + k] * mMlpHid[hidOffset + k];
+                        s1 += mMlpDownW[wOffset + k + 1] * mMlpHid[hidOffset + k + 1];
+                        s2 += mMlpDownW[wOffset + k + 2] * mMlpHid[hidOffset + k + 2];
+                        s3 += mMlpDownW[wOffset + k + 3] * mMlpHid[hidOffset + k + 3];
                     }
+                    sum = (s0 + s1) + (s2 + s3);
                     mX[xOffset + j] += sum * sDown;
                 }
             }
@@ -840,10 +912,14 @@ public final class MicroTransformerModel {
                 continue;
             }
             int embOffset = candId * D;
-            float dot = 0.0f;
-            for (int d = 0; d < D; d++) {
-                dot += hT[d] * mEmbeddings[embOffset + d];
+            float dot0 = 0.0f, dot1 = 0.0f, dot2 = 0.0f, dot3 = 0.0f;
+            for (int d = 0; d < D; d += 4) {
+                dot0 += hT[d] * mEmbeddings[embOffset + d];
+                dot1 += hT[d + 1] * mEmbeddings[embOffset + d + 1];
+                dot2 += hT[d + 2] * mEmbeddings[embOffset + d + 2];
+                dot3 += hT[d + 3] * mEmbeddings[embOffset + d + 3];
             }
+            float dot = (dot0 + dot1) + (dot2 + dot3);
             outLogits[c] = dot * scale;
         }
     }

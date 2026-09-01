@@ -674,15 +674,19 @@ public final class PrefixDictionary {
                         final int n = Math.min(mScratchScoredWords.size(), mScratchNeuralCandIds.length);
                         for (int i = 0; i < n; i++) {
                             final String word = mScratchScoredWords.get(i).word;
-                            final int wordCount = trf.tokenize(word, mScratchNeuralCandIds, i, 1);
-                            if (wordCount == 0) {
+                            final int wordCount = trf.tokenize(word, mScratchNeuralCandIds, mScratchNeuralCandIds.length - 2, 2);
+                            if (wordCount != 1) {
                                 mScratchNeuralCandIds[i] = MicroTransformerModel.UNK_TOKEN_ID;
+                            } else {
+                                mScratchNeuralCandIds[i] = mScratchNeuralCandIds[mScratchNeuralCandIds.length - 2];
                             }
                         }
                         trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, n, mScratchNeuralLogits);
-                        // Boost scored words by transformer logit
+                        // Boost scored words by transformer logit, keeping OOV neutral
                         for (int i = 0; i < n; i++) {
-                            mScratchScoredWords.get(i).score += mScratchNeuralLogits[i] * 40.0f;
+                            if (mScratchNeuralLogits[i] > -10000.0f) {
+                                mScratchScoredWords.get(i).score += mScratchNeuralLogits[i] * 40.0f;
+                            }
                         }
                         Collections.sort(mScratchScoredWords);
                         Log.d(TAG, "Neural rescoring applied on " + n + " candidates for context: '" + trimmedContext + "'");

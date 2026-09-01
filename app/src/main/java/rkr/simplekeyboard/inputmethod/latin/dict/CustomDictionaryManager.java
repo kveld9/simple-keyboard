@@ -350,7 +350,7 @@ public final class CustomDictionaryManager {
 
                 final File targetFile = new File(dictDir, "dict_" + targetLang + ".bin");
                 stagingFile = File.createTempFile("dict_stage_", ".bin", dictDir);
-                BinaryTrieCompiler.compile(decoded.words, stagingFile);
+                BinaryTrieCompiler.compile(decoded.words, decoded.bigrams, stagingFile);
 
                 try (FileInputStream fis = new FileInputStream(stagingFile);
                      FileChannel channel = fis.getChannel()) {
@@ -384,6 +384,21 @@ public final class CustomDictionaryManager {
 
     private static final long MAX_DECOMPRESSED_BYTES = 50L * 1024L * 1024L; // 50 MB hard limit
 
+        private static void copyStreamWithSyncAndLimit(java.io.InputStream in, java.io.FileOutputStream out, long maxBytes) throws IOException {
+        final byte[] buffer = new byte[16384];
+        long totalRead = 0;
+        int len;
+        while ((len = in.read(buffer)) != -1) {
+            totalRead += len;
+            if (maxBytes > 0 && totalRead > maxBytes) {
+                throw new IOException("Dictionary exceeds maximum allowed size (" + (maxBytes / (1024 * 1024)) + " MB)");
+            }
+            out.write(buffer, 0, len);
+        }
+        out.flush();
+        out.getFD().sync();
+    }
+
     private static void copyStreamWithGzipDetection(final InputStream rawIn, final File dst) throws IOException {
         final File parent = dst.getParentFile();
         if (parent != null && !parent.exists()) {
@@ -401,18 +416,7 @@ public final class CustomDictionaryManager {
         }
 
         try (FileOutputStream fos = new FileOutputStream(dst)) {
-            final byte[] buffer = new byte[16384];
-            long totalRead = 0;
-            int len;
-            while ((len = effectiveIn.read(buffer)) != -1) {
-                totalRead += len;
-                if (totalRead > MAX_DECOMPRESSED_BYTES) {
-                    throw new IOException("Dictionary exceeds maximum allowed size (" + (MAX_DECOMPRESSED_BYTES / (1024 * 1024)) + " MB)");
-                }
-                fos.write(buffer, 0, len);
-            }
-            fos.flush();
-            fos.getFD().sync();
+            copyStreamWithSyncAndLimit(effectiveIn, fos, MAX_DECOMPRESSED_BYTES);
         }
     }
 
@@ -423,13 +427,7 @@ public final class CustomDictionaryManager {
         }
         try (FileInputStream in = new FileInputStream(src);
              FileOutputStream out = new FileOutputStream(dst)) {
-            final byte[] buf = new byte[16384];
-            int len;
-            while ((len = in.read(buf)) > 0) {
-                out.write(buf, 0, len);
-            }
-            out.flush();
-            out.getFD().sync();
+            copyStreamWithSyncAndLimit(in, out, -1);
         }
     }
 

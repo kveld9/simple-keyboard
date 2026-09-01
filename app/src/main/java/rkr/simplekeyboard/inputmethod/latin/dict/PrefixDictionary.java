@@ -542,7 +542,15 @@ public final class PrefixDictionary {
             return 0;
         }
         final String contextKey = StringUtils.toNormalizedLower(prevWord);
-        return getNGram(mBigrams, contextKey, word);
+        final int memFreq = getNGram(mBigrams, contextKey, word);
+        if (memFreq > 0) {
+            return memFreq;
+        }
+        final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+        if (bin != null) {
+            return bin.getBigramFrequency(prevWord, word);
+        }
+        return 0;
     }
 
     public synchronized int getWordFrequency(final String word) {
@@ -1119,7 +1127,26 @@ public final class PrefixDictionary {
     private boolean predictBigrams(final String w2, final List<CharSequence> results, final Set<String> added, final int limit) {
         if (StringUtils.isNotBlank(w2)) {
             final String key = StringUtils.toNormalizedLower(w2.trim());
-            return collectTopNGramWords(mBigrams.get(key), results, added, limit);
+            final boolean full = collectTopNGramWords(mBigrams.get(key), results, added, limit);
+            if (full) {
+                return true;
+            }
+            final rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary bin = mBinaryDict;
+            if (bin != null && results.size() < limit) {
+                final List<CharSequence> binPreds = bin.getNextWordPredictions(w2.trim(), limit - results.size());
+                if (binPreds != null) {
+                    for (CharSequence s : binPreds) {
+                        final String candidate = s.toString();
+                        if (!isBlocked(candidate) && added.add(candidate.toLowerCase())) {
+                            results.add(candidate);
+                            if (results.size() >= limit) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return results.size() >= limit;
         }
         return false;
     }
@@ -1140,7 +1167,7 @@ public final class PrefixDictionary {
             predictBigrams(w2, mScratchPredictions, mScratchPredictionsAdded, limit);
         }
 
-        return mScratchPredictions.isEmpty() ? Collections.emptyList() : new ArrayList<>(mScratchPredictions);
+        return mScratchPredictions;
     }
 
     public synchronized int getWordCount() {

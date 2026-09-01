@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,14 +26,34 @@ public final class AospDictDecoder {
         public final int version;
         public final Map<String, String> attributes;
         public final List<BinaryTrieCompiler.WordEntry> words;
+        public final List<BinaryTrieCompiler.BigramEntry> bigrams;
 
         public DecodedDictionary(final String locale, final String languageCode, final int version,
-                                 final Map<String, String> attributes, final List<BinaryTrieCompiler.WordEntry> words) {
+                                 final Map<String, String> attributes, final List<BinaryTrieCompiler.WordEntry> words,
+                                 final List<BinaryTrieCompiler.BigramEntry> bigrams) {
             this.locale = locale;
             this.languageCode = languageCode;
             this.version = version;
             this.attributes = attributes;
             this.words = words;
+            this.bigrams = bigrams != null ? bigrams : Collections.emptyList();
+        }
+
+        public DecodedDictionary(final String locale, final String languageCode, final int version,
+                                 final Map<String, String> attributes, final List<BinaryTrieCompiler.WordEntry> words) {
+            this(locale, languageCode, version, attributes, words, Collections.emptyList());
+        }
+    }
+
+    private static final class RawBigram {
+        final String word1;
+        final int targetPos;
+        final int freq;
+
+        RawBigram(final String word1, final int targetPos, final int freq) {
+            this.word1 = word1;
+            this.targetPos = targetPos;
+            this.freq = freq;
         }
     }
 
@@ -105,11 +126,21 @@ public final class AospDictDecoder {
         }
 
         final List<BinaryTrieCompiler.WordEntry> words = new ArrayList<>();
+        final List<RawBigram> rawBigrams = new ArrayList<>();
+        final Map<Integer, String> nodeOffsetToWord = new HashMap<>();
         final StringBuilder prefixBuilder = new StringBuilder(64);
         final java.util.BitSet visitedOffsets = new java.util.BitSet(buffer.capacity());
-        parsePtNodeArray(buffer, headerSize, prefixBuilder, words, visitedOffsets, 0);
+        parsePtNodeArray(buffer, headerSize, prefixBuilder, words, rawBigrams, nodeOffsetToWord, visitedOffsets, 0);
 
-        return new DecodedDictionary(locale, languageCode, version, attributes, words);
+        final List<BinaryTrieCompiler.BigramEntry> bigrams = new ArrayList<>();
+        for (final RawBigram rb : rawBigrams) {
+            final String word2 = nodeOffsetToWord.get(rb.targetPos);
+            if (word2 != null && !word2.isEmpty()) {
+                bigrams.add(new BinaryTrieCompiler.BigramEntry(rb.word1, word2, rb.freq));
+            }
+        }
+
+        return new DecodedDictionary(locale, languageCode, version, attributes, words, bigrams);
     }
 
     private static Map<String, String> decodeHeaderAttributes(final ByteBuffer buffer, final int headerSize) {
@@ -194,9 +225,31 @@ public final class AospDictDecoder {
         return msb & 0x7F;
     }
 
+    
+    private static int readOffsetByByteCount(final ByteBuffer buffer, final int[] posRef, final int byteCount) {
+        if (byteCount == 1 && posRef[0] < buffer.capacity()) {
+            final int offset = buffer.get(posRef[0]) & 0xFF;
+            posRef[0]++;
+            return offset;
+        } else if (byteCount == 2 && posRef[0] + 1 < buffer.capacity()) {
+            final int offset = ((buffer.get(posRef[0]) & 0xFF) << 8) | (buffer.get(posRef[0] + 1) & 0xFF);
+            posRef[0] += 2;
+            return offset;
+        } else if (byteCount == 3 && posRef[0] + 2 < buffer.capacity()) {
+            final int offset = ((buffer.get(posRef[0]) & 0xFF) << 16)
+                    | ((buffer.get(posRef[0] + 1) & 0xFF) << 8)
+                    | (buffer.get(posRef[0] + 2) & 0xFF);
+            posRef[0] += 3;
+            return offset;
+        }
+        return 0;
+    }
+
     private static void parsePtNodeArray(final ByteBuffer buffer, final int groupOffset,
                                          final StringBuilder prefix,
                                          final List<BinaryTrieCompiler.WordEntry> words,
+                                         final List<RawBigram> rawBigrams,
+                                         final Map<Integer, String> nodeOffsetToWord,
                                          final java.util.BitSet visitedOffsets,
                                          final int depth) {
         if (depth > MAX_PARSE_DEPTH || words.size() >= MAX_DECODED_WORDS) {
@@ -219,6 +272,7 @@ public final class AospDictDecoder {
             if (posRef[0] >= buffer.capacity() || words.size() >= MAX_DECODED_WORDS) {
                 break;
             }
+            final int nodeStartPos = posRef[0];
             final int flags = buffer.get(posRef[0]) & 0xFF;
             posRef[0]++;
 
@@ -243,27 +297,21 @@ public final class AospDictDecoder {
                     final int freq = buffer.get(posRef[0]) & 0xFF;
                     posRef[0]++;
                     if ((flags & 0x02) == 0 && prefix.length() > 0) { // not NOT_A_WORD
-                        words.add(new BinaryTrieCompiler.WordEntry(prefix.toString(), freq));
+                        final String currentWord = prefix.toString();
+                        words.add(new BinaryTrieCompiler.WordEntry(currentWord, freq));
+                        nodeOffsetToWord.put(nodeStartPos, currentWord);
                     }
                 }
             }
 
-            final int addrType = (flags & 0xC0);
+            final int addrByteCount = (flags & 0xC0) >> 6;
             int childrenPos = -1;
-            if (addrType == 0x40 && posRef[0] < buffer.capacity()) {
-                final int offset = buffer.get(posRef[0]) & 0xFF;
-                childrenPos = posRef[0] + offset;
-                posRef[0]++;
-            } else if (addrType == 0x80 && posRef[0] + 1 < buffer.capacity()) {
-                final int offset = ((buffer.get(posRef[0]) & 0xFF) << 8) | (buffer.get(posRef[0] + 1) & 0xFF);
-                childrenPos = posRef[0] + offset;
-                posRef[0] += 2;
-            } else if (addrType == 0xC0 && posRef[0] + 2 < buffer.capacity()) {
-                final int offset = ((buffer.get(posRef[0]) & 0xFF) << 16)
-                        | ((buffer.get(posRef[0] + 1) & 0xFF) << 8)
-                        | (buffer.get(posRef[0] + 2) & 0xFF);
-                childrenPos = posRef[0] + offset;
-                posRef[0] += 3;
+            if (addrByteCount > 0) {
+                final int startPos = posRef[0];
+                final int offset = readOffsetByByteCount(buffer, posRef, addrByteCount);
+                if (offset > 0) {
+                    childrenPos = startPos + offset;
+                }
             }
 
             if ((flags & 0x10) != 0) {
@@ -272,13 +320,21 @@ public final class AospDictDecoder {
                     posRef[0] += 2 + scLen;
                 }
                 if ((flags & 0x04) != 0) { // BIGRAMS
+                    final String currentWord = prefix.toString();
                     while (posRef[0] < buffer.capacity()) {
                         final int bgFlags = buffer.get(posRef[0]) & 0xFF;
-                        final int bgAddrType = (bgFlags & 0x30);
-                        if (bgAddrType == 0x10) posRef[0] += 2;
-                        else if (bgAddrType == 0x20) posRef[0] += 3;
-                        else if (bgAddrType == 0x30) posRef[0] += 4;
-                        else posRef[0] += 1;
+                        posRef[0]++;
+                        final int bgAddrByteCount = (bgFlags & 0x30) >> 4;
+                        int targetOffset = 0;
+                        if (bgAddrByteCount > 0) {
+                            targetOffset = readOffsetByByteCount(buffer, posRef, bgAddrByteCount);
+                        }
+                        final int targetPos = posRef[0] + targetOffset;
+                        final int rawFreq = bgFlags & 0x0F;
+                        final int freq = (rawFreq == 0) ? 1 : rawFreq * 17;
+                        if (currentWord.length() > 0) {
+                            rawBigrams.add(new RawBigram(currentWord, targetPos, freq));
+                        }
 
                         if ((bgFlags & 0x80) == 0) {
                             break;
@@ -300,7 +356,7 @@ public final class AospDictDecoder {
             final int chPos = childrenToVisit.get(i)[0];
             final String chPrefix = childPrefixes.get(i);
             final StringBuilder nextPrefix = new StringBuilder(chPrefix);
-            parsePtNodeArray(buffer, chPos, nextPrefix, words, visitedOffsets, depth + 1);
+            parsePtNodeArray(buffer, chPos, nextPrefix, words, rawBigrams, nodeOffsetToWord, visitedOffsets, depth + 1);
         }
     }
 }

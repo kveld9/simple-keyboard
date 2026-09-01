@@ -10,8 +10,12 @@ import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
 
 public class BinaryTrieDictionary {
     private final ByteBuffer buffer;
+    private final int version;
     private final int wordCount;
     private final int rootOffset;
+    private final int bigramCount;
+    private final int bigramTableOffset;
+    private final int stringPoolOffset;
 
     public BinaryTrieDictionary(ByteBuffer buffer) {
         if (buffer == null || buffer.capacity() < 16) {
@@ -25,20 +29,48 @@ public class BinaryTrieDictionary {
             throw new IllegalArgumentException("Invalid magic header: " + Integer.toHexString(magic));
         }
         
-        int version = this.buffer.getInt(4);
-        if (version != 1) {
-            throw new IllegalArgumentException("Unsupported version: " + version);
+        this.version = this.buffer.getInt(4);
+        if (this.version != 1 && this.version != 2) {
+            throw new IllegalArgumentException("Unsupported version: " + this.version);
         }
         
         this.wordCount = this.buffer.getInt(8);
         this.rootOffset = this.buffer.getInt(12);
-        if (this.wordCount > 0 && (this.rootOffset < 16 || this.rootOffset >= this.buffer.capacity())) {
+        final int minHeader = (this.version >= 2) ? 32 : 16;
+        if (this.wordCount > 0 && (this.rootOffset < minHeader || this.rootOffset >= this.buffer.capacity())) {
             throw new IllegalArgumentException("Invalid root offset: " + this.rootOffset);
         }
+
+        if (this.version >= 2) {
+            if (this.buffer.capacity() < 32) {
+                throw new IllegalArgumentException("Buffer too small for v2 header: " + this.buffer.capacity());
+            }
+            this.bigramCount = this.buffer.getInt(16);
+            this.bigramTableOffset = this.buffer.getInt(20);
+            this.stringPoolOffset = this.buffer.getInt(24);
+            if (this.bigramCount < 0) {
+                throw new IllegalArgumentException("Invalid bigram count: " + this.bigramCount);
+            }
+            if (this.bigramCount > 0 && (this.bigramTableOffset < 32 || this.bigramTableOffset >= this.buffer.capacity())) {
+                throw new IllegalArgumentException("Invalid bigram table offset: " + this.bigramTableOffset);
+            }
+        } else {
+            this.bigramCount = 0;
+            this.bigramTableOffset = 0;
+            this.stringPoolOffset = 0;
+        }
+    }
+
+    public int getVersion() {
+        return version;
     }
 
     public int getWordCount() {
         return wordCount;
+    }
+
+    public int getBigramCount() {
+        return bigramCount;
     }
 
     public boolean validateStructure() {
@@ -46,8 +78,35 @@ public class BinaryTrieDictionary {
             return true;
         }
         final int capacity = buffer.capacity();
-        if (capacity < 16 || rootOffset < 16 || rootOffset + 16 > capacity) {
+        final int minHeader = (version >= 2) ? 32 : 16;
+        if (capacity < minHeader || rootOffset < minHeader || rootOffset + 16 > capacity) {
             return false;
+        }
+
+        if (version >= 2 && bigramCount > 0) {
+            if (bigramTableOffset < minHeader || (long) bigramTableOffset + ((long) bigramCount * 12) > capacity) {
+                return false;
+            }
+            if (stringPoolOffset < minHeader || stringPoolOffset >= capacity) {
+                return false;
+            }
+            int prevW1 = -1;
+            for (int i = 0; i < bigramCount; i++) {
+                int entryOffset = bigramTableOffset + i * 12;
+                int w1 = buffer.getInt(entryOffset);
+                int w2 = buffer.getInt(entryOffset + 4);
+                int freq = buffer.getShort(entryOffset + 8) & 0xFFFF;
+                if (w1 < minHeader || w1 >= capacity || w2 < minHeader || w2 >= capacity) {
+                    return false;
+                }
+                if (freq <= 0 || freq > 255) {
+                    return false;
+                }
+                if (w1 < prevW1) {
+                    return false; // Not sorted by word1Offset
+                }
+                prevW1 = w1;
+            }
         }
 
         // BitSet indexed by 16-byte slot (node / 16) -> 80KB for 10MB dict, zero boxing
@@ -58,7 +117,7 @@ public class BinaryTrieDictionary {
 
         while (!queue.isEmpty()) {
             final int node = queue.poll();
-            if (node < 16 || (long) node + 16 > capacity) {
+            if (node < minHeader || (long) node + 16 > capacity) {
                 return false;
             }
             final int slot = node / 16;
@@ -73,7 +132,7 @@ public class BinaryTrieDictionary {
             final int wordOffset = buffer.getInt(node + 12);
 
             if ((flags & 1) != 0) { // Terminal
-                if (wordOffset < 16 || wordOffset >= capacity) {
+                if (wordOffset < minHeader || wordOffset >= capacity) {
                     return false;
                 }
                 // Verify null-terminated UTF-8 string within bounds
@@ -89,12 +148,12 @@ public class BinaryTrieDictionary {
 
             if ((flags & 2) != 0) { // Has children
                 final long childrenEnd = (long) childrenOffset + ((long) childCount * 16);
-                if (childCount <= 0 || childrenOffset < 16 || childrenEnd > capacity) {
+                if (childCount <= 0 || childrenOffset < minHeader || childrenEnd > capacity) {
                     return false;
                 }
                 for (int i = 0; i < childCount; i++) {
                     final long childNodeLong = (long) childrenOffset + ((long) i * 16);
-                    if (childNodeLong < 16 || childNodeLong + 16 > capacity) {
+                    if (childNodeLong < minHeader || childNodeLong + 16 > capacity) {
                         return false;
                     }
                     queue.add((int) childNodeLong);
@@ -237,6 +296,16 @@ public class BinaryTrieDictionary {
         if (childCount == 0) return -1;
         int childrenOffset = buffer.getInt(nodeOffset + 8);
         
+        if (childCount <= 16) {
+            for (int i = 0; i < childCount; i++) {
+                int childNode = childrenOffset + i * 16;
+                char childChar = (char) (buffer.getShort(childNode) & 0xFFFF);
+                if (childChar == c) return childNode;
+                if (childChar > c) return -1;
+            }
+            return -1;
+        }
+
         int left = 0;
         int right = childCount - 1;
         while (left <= right) {
@@ -267,17 +336,38 @@ public class BinaryTrieDictionary {
         if (!isTerminal(nodeOffset)) return null;
         int wordOffset = buffer.getInt(nodeOffset + 12);
         if (wordOffset == 0) return null;
+        return getWordAtOffset(wordOffset);
+    }
+
+    private static final ThreadLocal<byte[]> sScratchBytes = new ThreadLocal<byte[]>() {
+        @Override
+        protected byte[] initialValue() {
+            return new byte[64];
+        }
+    };
+
+    public String getWordAtOffset(int wordOffset) {
+        final int minOffset = (version >= 2) ? 32 : 16;
+        if (wordOffset < minOffset || wordOffset >= buffer.capacity()) return null;
         
         int endOffset = wordOffset;
-        while (buffer.get(endOffset) != 0) {
+        while (endOffset < buffer.capacity() && buffer.get(endOffset) != 0) {
             endOffset++;
         }
-        byte[] bytes = new byte[endOffset - wordOffset];
+        if (endOffset >= buffer.capacity()) return null;
+
+        int len = endOffset - wordOffset;
+        if (len == 0) return "";
+        byte[] bytes = sScratchBytes.get();
+        if (bytes.length < len) {
+            bytes = new byte[Math.max(bytes.length * 2, len)];
+            sScratchBytes.set(bytes);
+        }
         int oldPos = buffer.position();
         buffer.position(wordOffset);
-        buffer.get(bytes);
+        buffer.get(bytes, 0, len);
         buffer.position(oldPos);
-        return new String(bytes, StandardCharsets.UTF_8);
+        return new String(bytes, 0, len, StandardCharsets.UTF_8);
     }
 
     public int getChildren(int nodeOffset, char[] outChars, int[] outOffsets) {
@@ -290,6 +380,108 @@ public class BinaryTrieDictionary {
             outOffsets[i] = childNode;
         }
         return Math.min(childCount, outChars.length);
+    }
+
+    private int findFirstBigramIndex(int targetW1Offset) {
+        if (bigramCount == 0 || bigramTableOffset <= 0) {
+            return -1;
+        }
+        int low = 0;
+        int high = bigramCount - 1;
+        int result = -1;
+        while (low <= high) {
+            int mid = (low + high) >>> 1;
+            int midW1Offset = buffer.getInt(bigramTableOffset + mid * 12);
+            if (midW1Offset == targetW1Offset) {
+                result = mid;
+                high = mid - 1; // Keep searching left for the first match
+            } else if (midW1Offset < targetW1Offset) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return result;
+    }
+
+    public int getBigramFrequency(final String word1, final String word2) {
+        if (word1 == null || word2 == null || word1.isEmpty() || word2.isEmpty() || bigramCount == 0) {
+            return 0;
+        }
+        int node1 = getNodeForWord(word1);
+        if (node1 <= 0 || !isTerminal(node1)) {
+            return 0;
+        }
+        int node2 = getNodeForWord(word2);
+        if (node2 <= 0 || !isTerminal(node2)) {
+            return 0;
+        }
+        int w1Offset = buffer.getInt(node1 + 12);
+        int w2Offset = buffer.getInt(node2 + 12);
+        if (w1Offset == 0 || w2Offset == 0) {
+            return 0;
+        }
+
+        int firstIdx = findFirstBigramIndex(w1Offset);
+        if (firstIdx < 0) {
+            return 0;
+        }
+
+        for (int i = firstIdx; i < bigramCount; i++) {
+            int entryOffset = bigramTableOffset + i * 12;
+            int currentW1Offset = buffer.getInt(entryOffset);
+            if (currentW1Offset != w1Offset) {
+                break;
+            }
+            int currentW2Offset = buffer.getInt(entryOffset + 4);
+            if (currentW2Offset == w2Offset) {
+                return buffer.getShort(entryOffset + 8) & 0xFFFF;
+            }
+        }
+        return 0;
+    }
+
+    public int getNextWordPredictions(final String prevWord, final int limit, final List<CharSequence> out) {
+        if (prevWord == null || prevWord.isEmpty() || limit <= 0 || out == null || bigramCount == 0) {
+            return 0;
+        }
+        int node = getNodeForWord(prevWord);
+        if (node <= 0 || !isTerminal(node)) {
+            return 0;
+        }
+        int w1Offset = buffer.getInt(node + 12);
+        if (w1Offset == 0) {
+            return 0;
+        }
+
+        int firstIdx = findFirstBigramIndex(w1Offset);
+        if (firstIdx < 0) {
+            return 0;
+        }
+
+        int count = 0;
+        for (int i = firstIdx; i < bigramCount && count < limit; i++) {
+            int entryOffset = bigramTableOffset + i * 12;
+            int currentW1Offset = buffer.getInt(entryOffset);
+            if (currentW1Offset != w1Offset) {
+                break;
+            }
+            int w2Offset = buffer.getInt(entryOffset + 4);
+            String word2 = getWordAtOffset(w2Offset);
+            if (word2 != null && !word2.isEmpty()) {
+                out.add(word2);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public List<CharSequence> getNextWordPredictions(final String prevWord, final int limit) {
+        final List<CharSequence> result = new ArrayList<>(Math.min(Math.max(limit, 0), 16));
+        if (limit > 0) {
+            getNextWordPredictions(prevWord, limit, result);
+        }
+        return result;
     }
 
     @FunctionalInterface

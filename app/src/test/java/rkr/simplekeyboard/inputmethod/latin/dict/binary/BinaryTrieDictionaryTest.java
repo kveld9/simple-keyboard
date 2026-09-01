@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.List;
 
@@ -236,5 +237,135 @@ public class BinaryTrieDictionaryTest {
         });
         assertTrue("Should traverse words", count[0] >= 50);
         assertTrue("Should find 'que'", foundQue[0]);
+    }
+
+    @Test
+    public void testVersion1BackwardCompatibility() {
+        // Build a manual Version 1 buffer:
+        // Header (16 bytes), Root Node (16 bytes), Child Node 'h' (16 bytes), String "h\0" (2 bytes)
+        final byte[] stringBytes = "h\0".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        final int headerSize = 16;
+        final int nodeSize = 16;
+        final int rootOffset = headerSize; // 16
+        final int childOffset = rootOffset + nodeSize; // 32
+        final int stringOffset = childOffset + nodeSize; // 48
+        final ByteBuffer buf = ByteBuffer.allocate(stringOffset + stringBytes.length);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+
+        // Header v1 (16 bytes)
+        buf.putInt(0x42444B53); // Magic
+        buf.putInt(1);          // Version 1
+        buf.putInt(1);          // wordCount
+        buf.putInt(rootOffset); // rootOffset
+
+        // Root Node at offset 16 (char '\0', flags 2 = has children, childCount 1, childrenOffset 32)
+        buf.putShort((short) '\0');
+        buf.put((byte) 2);      // has children
+        buf.put((byte) 0);      // freq
+        buf.put((byte) 1);      // childCount
+        buf.put((byte) 0);      // pad
+        buf.put((byte) 0);
+        buf.put((byte) 0);
+        buf.putInt(childOffset); // childrenOffset = 32
+        buf.putInt(0);          // wordOffset
+
+        // Child Node 'h' at offset 32 (terminal with freq 200, wordOffset pointing to 48)
+        buf.putShort((short) 'h');
+        buf.put((byte) 1);      // terminal flag
+        buf.put((byte) 200);    // freq
+        buf.put((byte) 0);      // childCount
+        buf.put((byte) 0);      // pad
+        buf.put((byte) 0);
+        buf.put((byte) 0);
+        buf.putInt(0);          // childrenOffset
+        buf.putInt(stringOffset); // wordOffset = 48
+
+        // String pool
+        buf.put(stringBytes);
+
+        final BinaryTrieDictionary v1Dict = new BinaryTrieDictionary(buf);
+        assertEquals(1, v1Dict.getVersion());
+        assertEquals(1, v1Dict.getWordCount());
+        assertEquals(0, v1Dict.getBigramCount());
+        assertTrue(v1Dict.validateStructure());
+        assertEquals(200, v1Dict.getWordFrequency("h"));
+        assertTrue(v1Dict.containsWord("h"));
+        assertEquals(0, v1Dict.getBigramFrequency("h", "anything"));
+        assertTrue(v1Dict.getNextWordPredictions("h", 5).isEmpty());
+    }
+
+    @Test
+    public void testV2BigramPredictionsAndFrequencies() throws Exception {
+        final List<BinaryTrieCompiler.WordEntry> words = new java.util.ArrayList<>();
+        words.add(new BinaryTrieCompiler.WordEntry("buenos", 220));
+        words.add(new BinaryTrieCompiler.WordEntry("días", 210));
+        words.add(new BinaryTrieCompiler.WordEntry("tardes", 190));
+        words.add(new BinaryTrieCompiler.WordEntry("noches", 180));
+
+        final List<BinaryTrieCompiler.BigramEntry> bigrams = new java.util.ArrayList<>();
+        bigrams.add(new BinaryTrieCompiler.BigramEntry("buenos", "días", 250));
+        bigrams.add(new BinaryTrieCompiler.BigramEntry("buenos", "tardes", 200));
+        bigrams.add(new BinaryTrieCompiler.BigramEntry("buenos", "noches", 150));
+
+        final File tempFile = File.createTempFile("test_v2_preds_", ".bin");
+        tempFile.deleteOnExit();
+        BinaryTrieCompiler.compile(words, bigrams, tempFile);
+
+        try (FileInputStream fis = new FileInputStream(tempFile);
+             FileChannel channel = fis.getChannel()) {
+            final ByteBuffer buf = channel.map(FileChannel.MapMode.READ_ONLY, 0, tempFile.length());
+            final BinaryTrieDictionary dict = new BinaryTrieDictionary(buf);
+
+            assertEquals(2, dict.getVersion());
+            assertEquals(4, dict.getWordCount());
+            assertEquals(3, dict.getBigramCount());
+            assertTrue(dict.validateStructure());
+
+            assertEquals(250, dict.getBigramFrequency("buenos", "días"));
+            assertEquals(200, dict.getBigramFrequency("buenos", "tardes"));
+            assertEquals(150, dict.getBigramFrequency("buenos", "noches"));
+            assertEquals(0, dict.getBigramFrequency("días", "noches"));
+
+            final java.util.List<CharSequence> out = new java.util.ArrayList<>();
+            int count = dict.getNextWordPredictions("buenos", 2, out);
+            assertEquals(2, count);
+            assertEquals(2, out.size());
+            assertEquals("días", out.get(0).toString());
+            assertEquals("tardes", out.get(1).toString());
+
+            final java.util.List<CharSequence> all = dict.getNextWordPredictions("buenos", 10);
+            assertEquals(3, all.size());
+            assertEquals("días", all.get(0).toString());
+            assertEquals("tardes", all.get(1).toString());
+            assertEquals("noches", all.get(2).toString());
+        }
+    }
+
+    @Test
+    public void testValidateStructureV2CorruptBigramOffsets() throws Exception {
+        final List<BinaryTrieCompiler.WordEntry> words = new java.util.ArrayList<>();
+        words.add(new BinaryTrieCompiler.WordEntry("hola", 200));
+        words.add(new BinaryTrieCompiler.WordEntry("mundo", 180));
+
+        final List<BinaryTrieCompiler.BigramEntry> bigrams = new java.util.ArrayList<>();
+        bigrams.add(new BinaryTrieCompiler.BigramEntry("hola", "mundo", 150));
+
+        final File tempFile = File.createTempFile("test_corrupt_", ".bin");
+        tempFile.deleteOnExit();
+        BinaryTrieCompiler.compile(words, bigrams, tempFile);
+
+        final byte[] bytes = java.nio.file.Files.readAllBytes(tempFile.toPath());
+        final ByteBuffer validBuf = ByteBuffer.wrap(bytes);
+        validBuf.order(ByteOrder.LITTLE_ENDIAN);
+        final BinaryTrieDictionary validDict = new BinaryTrieDictionary(validBuf);
+        assertTrue(validDict.validateStructure());
+
+        // Corrupt word2Offset inside the bigram entry (offset = bigramTableOffset + 4)
+        final ByteBuffer corruptBuf = ByteBuffer.wrap(bytes.clone());
+        corruptBuf.order(ByteOrder.LITTLE_ENDIAN);
+        int bigramTableOffset = corruptBuf.getInt(20);
+        corruptBuf.putInt(bigramTableOffset + 4, 999999); // Out of bounds word2 offset
+        final BinaryTrieDictionary corruptDict = new BinaryTrieDictionary(corruptBuf);
+        assertFalse(corruptDict.validateStructure());
     }
 }

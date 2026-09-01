@@ -399,6 +399,25 @@ public final class MicroTransformerModel {
         mAttnWeights = null;
     }
 
+    private static char normalizeCharForTrie(char c) {
+        if (c == WORD_START_CHAR || Character.isWhitespace(c)) {
+            return ' ';
+        }
+        if (c >= 'A' && c <= 'Z') {
+            return (char) (c + 32);
+        }
+        switch (c) {
+            case 'Á': return 'á';
+            case 'É': return 'é';
+            case 'Í': return 'í';
+            case 'Ó': return 'ó';
+            case 'Ú': return 'ú';
+            case 'Ü': return 'ü';
+            case 'Ñ': return 'ñ';
+            default: return c;
+        }
+    }
+
     /**
      * Tokenizes a text into BPE token IDs writing directly to outTokens without String allocations.
      *
@@ -433,19 +452,10 @@ public final class MicroTransformerModel {
             if (mBpeTrieRoot != null) {
                 TrieNode node = mBpeTrieRoot;
                 for (int i = pos; i < virtualLen; i++) {
-                    char c;
-                    if (hasVirtualStart) {
-                        c = (i == 0) ? ' ' : text.charAt(i - 1);
-                    } else {
-                        c = text.charAt(i);
-                    }
-                    if (c == WORD_START_CHAR) {
-                        c = ' ';
-                    }
+                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : text.charAt(i - 1)) : text.charAt(i);
+                    char c = normalizeCharForTrie(rawChar);
+
                     TrieNode child = node.getChild(c);
-                    if (child == null && Character.isUpperCase(c)) {
-                        child = node.getChild(Character.toLowerCase(c));
-                    }
                     if (child == null) {
                         break;
                     }
@@ -467,15 +477,16 @@ public final class MicroTransformerModel {
 
         return count;
     }
+
     public synchronized int tokenize(CharSequence text, int[] outTokens, int maxTokens) {
         return tokenize(text, outTokens, 0, maxTokens);
     }
 
-    private final int[] mTailScratch = new int[256];
+    private final int[] mTailRing = new int[256];
 
     /**
      * Tokenizes text and stores only the trailing tokens (the most recent context),
-     * avoiding allocations in the hot path.
+     * scanning through the full sequence with a ring buffer to avoid allocations.
      *
      * @param text The input sequence.
      * @param outTokens Array where the tail tokens will be written.
@@ -489,13 +500,55 @@ public final class MicroTransformerModel {
             len--;
         }
         if (len <= 0) return 0;
-        CharSequence trimmed = text.subSequence(0, len);
-        int n = tokenize(trimmed, mTailScratch, 0, mTailScratch.length);
-        if (n <= 0) return 0;
-        int keep = Math.min(n, Math.min(maxTokens, outTokens.length));
-        int srcStart = n - keep;
+
+        final int ringCap = mTailRing.length;
+        final int targetKeep = Math.min(maxTokens, Math.min(ringCap, outTokens.length));
+
+        final char firstChar = text.charAt(0);
+        final boolean hasVirtualStart = (firstChar != ' ' && firstChar != WORD_START_CHAR);
+        final int virtualLen = hasVirtualStart ? (len + 1) : len;
+
+        int pos = 0;
+        int count = 0;
+
+        while (pos < virtualLen) {
+            int bestLen = 0;
+            int bestId = UNK_TOKEN_ID;
+
+            if (mBpeTrieRoot != null) {
+                TrieNode node = mBpeTrieRoot;
+                for (int i = pos; i < virtualLen; i++) {
+                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : text.charAt(i - 1)) : text.charAt(i);
+                    char c = normalizeCharForTrie(rawChar);
+
+                    TrieNode child = node.getChild(c);
+                    if (child == null) {
+                        break;
+                    }
+                    node = child;
+                    if (node.tokenId != -1) {
+                        bestLen = (i - pos) + 1;
+                        bestId = node.tokenId;
+                    }
+                }
+            }
+
+            if (bestLen == 0) {
+                bestLen = 1;
+                bestId = UNK_TOKEN_ID;
+            }
+
+            mTailRing[count % ringCap] = bestId;
+            count++;
+            pos += bestLen;
+        }
+
+        int keep = Math.min(count, targetKeep);
+        if (keep <= 0) return 0;
+
+        int start = (count - keep) % ringCap;
         for (int i = 0; i < keep; i++) {
-            outTokens[i] = mTailScratch[srcStart + i];
+            outTokens[i] = mTailRing[(start + i) % ringCap];
         }
         return keep;
     }
@@ -745,6 +798,20 @@ public final class MicroTransformerModel {
         return true;
     }
 
+    private boolean isBadCandidate(int tokenId) {
+        if (tokenId < 0 || tokenId >= mVocabSize || tokenId == UNK_TOKEN_ID || tokenId == 0) {
+            return true;
+        }
+        if (mBpeVocab != null && tokenId < mBpeVocab.length) {
+            String s = mBpeVocab[tokenId];
+            if (s == null || s.isEmpty()) return true;
+            if (s.length() >= 2 && s.charAt(0) == '<' && s.charAt(s.length() - 1) == '>') {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Scores candidate tokens by computing dot(h_T, embedding[candidateId]) * scale_dot.
      *
@@ -753,13 +820,11 @@ public final class MicroTransformerModel {
      * @param numCandidates Number of valid candidates in candidateIds.
      * @param outLogits Output array for scores (size at least numCandidates).
      */
-    public void scoreCandidates(float[] hT, int[] candidateIds, int numCandidates, float[] outLogits) {
-        if (!mIsLoaded) {
-            Log.w(TAG, "scoreCandidates: Model not loaded");
+    public synchronized void scoreCandidates(float[] hT, int[] candidateIds, int numCandidates, float[] outLogits) {
+        if (!mIsLoaded || mEmbeddings == null) {
             return;
         }
         if (hT == null || candidateIds == null || outLogits == null || numCandidates <= 0) {
-            Log.w(TAG, "scoreCandidates: Invalid arguments");
             return;
         }
 
@@ -769,7 +834,7 @@ public final class MicroTransformerModel {
 
         for (int c = 0; c < n; c++) {
             int candId = candidateIds[c];
-            if (candId < 0 || candId >= mVocabSize) {
+            if (isBadCandidate(candId)) {
                 outLogits[c] = -Float.MAX_VALUE;
                 continue;
             }
@@ -788,13 +853,11 @@ public final class MicroTransformerModel {
      * @param tokenId The BPE token ID.
      * @return Decoded token text with word-start marker replaced by space, or empty string on error.
      */
-    public String getTokenText(int tokenId) {
+    public synchronized String getTokenText(int tokenId) {
         if (!mIsLoaded || mBpeVocab == null) {
-            Log.w(TAG, "getTokenText: Model not loaded");
             return "";
         }
-        if (tokenId < 0 || tokenId >= mVocabSize) {
-            Log.w(TAG, "getTokenText: Invalid tokenId " + tokenId);
+        if (tokenId < 0 || tokenId >= mBpeVocab.length) {
             return "";
         }
         final String piece = mBpeVocab[tokenId];

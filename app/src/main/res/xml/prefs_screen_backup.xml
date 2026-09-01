@@ -11,6 +11,12 @@
     <PreferenceCategory
         android:title="@string/settings_category_backup">
 
+        <SwitchPreferenceCompat
+            android:key="pref_backup_include_user_dictionary"
+            android:title="@string/pref_backup_include_user_dictionary_title"
+            android:summary="@string/pref_backup_include_user_dictionary_summary"
+            android:defaultValue="false" />
+
         <Preference
             android:key="pref_backup_export"
             android:title="@string/pref_backup_export_title"

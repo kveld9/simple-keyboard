@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import rkr.simplekeyboard.inputmethod.R;
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardLayoutSet;
 import rkr.simplekeyboard.inputmethod.latin.RichInputMethodManager;
+import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryManager;
 
 public final class BackupSettingsFragment extends SubScreenFragment {
     private static final String TAG = BackupSettingsFragment.class.getSimpleName();
@@ -137,6 +138,8 @@ public final class BackupSettingsFragment extends SubScreenFragment {
 
         Toast.makeText(context, R.string.backup_in_progress, Toast.LENGTH_SHORT).show();
 
+        final boolean includeUserWords = getSharedPreferences().getBoolean(
+                BackupHelper.PREF_BACKUP_INCLUDE_USER_DICTIONARY, false);
         final Context appContext = context.getApplicationContext();
         new Thread(() -> {
             boolean success = false;
@@ -144,7 +147,10 @@ public final class BackupSettingsFragment extends SubScreenFragment {
 
             try (final OutputStream os = appContext.getContentResolver().openOutputStream(uri)) {
                 if (os != null) {
-                    BackupHelper.exportToStream(getSharedPreferences(), os);
+                    final UserDictionaryManager userDictManager = includeUserWords
+                            ? UserDictionaryManager.getInstance(appContext)
+                            : null;
+                    BackupHelper.exportToStream(getSharedPreferences(), os, userDictManager, includeUserWords);
                     success = true;
                 } else {
                     errorMsg = "Unable to open output destination stream.";
@@ -209,14 +215,20 @@ public final class BackupSettingsFragment extends SubScreenFragment {
             }
 
             final BackupHelper.ValidationResult finalResult = result;
+            int restoredWordsCount = 0;
 
             if (finalResult.success) {
                 BackupHelper.applyValidatedBackup(getSharedPreferences(), finalResult);
+                if (finalResult.hasUserWords()) {
+                    restoredWordsCount = BackupHelper.applyValidatedUserWords(
+                            UserDictionaryManager.getInstance(appContext), finalResult);
+                }
                 RichInputMethodManager.getInstance().reloadSubtypes(appContext);
                 KeyboardLayoutSet.clearKeyboardCache();
                 Settings.getInstance().onSharedPreferenceChanged(getSharedPreferences(), null);
             }
 
+            final int finalRestoredWords = restoredWordsCount;
             final androidx.fragment.app.FragmentActivity activity = getActivity();
             if (activity != null) {
                 activity.runOnUiThread(() -> {
@@ -226,7 +238,9 @@ public final class BackupSettingsFragment extends SubScreenFragment {
                         return;
                     }
                     if (finalResult.success) {
-                        final String msg = getString(R.string.backup_restore_success, finalResult.validEntriesCount);
+                        final String msg = (finalRestoredWords > 0)
+                                ? getString(R.string.backup_restore_success_words, finalResult.validEntriesCount, finalRestoredWords)
+                                : getString(R.string.backup_restore_success, finalResult.validEntriesCount);
                         Toast.makeText(activeContext, msg, Toast.LENGTH_LONG).show();
                     } else {
                         final String errorMsg = finalResult.errorMessage != null ? finalResult.errorMessage : "Validation failed.";

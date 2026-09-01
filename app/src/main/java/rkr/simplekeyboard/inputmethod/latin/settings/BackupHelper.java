@@ -30,14 +30,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import rkr.simplekeyboard.inputmethod.keyboard.KeyboardTheme;
+import rkr.simplekeyboard.inputmethod.latin.common.StringUtils;
+import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryEntry;
+import rkr.simplekeyboard.inputmethod.latin.dict.user.UserDictionaryManager;
 
 public final class BackupHelper {
     private static final String TAG = BackupHelper.class.getSimpleName();
@@ -52,15 +57,23 @@ public final class BackupHelper {
     public static final String KEY_TYPE = "type";
     public static final String KEY_VALUE = "value";
 
+    public static final String KEY_LEARNED_WORDS = "learned_words";
+    public static final String KEY_BLOCKED_WORDS = "blocked_words";
+    public static final String KEY_WORD = "word";
+    public static final String KEY_FREQUENCY = "frequency";
+    public static final String KEY_SHORTCUT = "shortcut";
+
     public static final String TYPE_BOOLEAN = "boolean";
     public static final String TYPE_INT = "int";
     public static final String TYPE_FLOAT = "float";
     public static final String TYPE_STRING = "string";
 
-    public static final int MAX_BACKUP_SIZE_BYTES = 512 * 1024; // 512 KB
+    public static final int MAX_BACKUP_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
     public static final int MAX_STRING_LENGTH = 4096;
+    public static final int MAX_USER_WORDS_LIMIT = 20000;
 
     public static final String PREF_RECENT_EMOJIS = "pref_recent_emojis";
+    public static final String PREF_BACKUP_INCLUDE_USER_DICTIONARY = "pref_backup_include_user_dictionary";
 
     public enum PrefType {
         BOOLEAN(TYPE_BOOLEAN),
@@ -118,6 +131,7 @@ public final class BackupHelper {
         map.put(Settings.PREF_SHOW_SUGGESTIONS, PrefType.BOOLEAN);
         map.put(Settings.PREF_SUGGESTIONS_IN_URLS, PrefType.BOOLEAN);
         map.put(Settings.PREF_AUTO_LEARN, PrefType.BOOLEAN);
+        map.put(PREF_BACKUP_INCLUDE_USER_DICTIONARY, PrefType.BOOLEAN);
 
         // Integers
         map.put(Settings.PREF_KEY_LONGPRESS_TIMEOUT, PrefType.INT);
@@ -155,6 +169,13 @@ public final class BackupHelper {
 
     @NonNull
     public static String exportToJson(@NonNull final SharedPreferences prefs) throws JSONException {
+        return exportToJson(prefs, null, false);
+    }
+
+    @NonNull
+    public static String exportToJson(@NonNull final SharedPreferences prefs,
+                                      @Nullable final UserDictionaryManager userDictManager,
+                                      final boolean includeUserWords) throws JSONException {
         final JSONObject root = new JSONObject();
         root.put(KEY_VERSION, CURRENT_VERSION);
         root.put(KEY_APP, APP_IDENTIFIER);
@@ -211,11 +232,50 @@ public final class BackupHelper {
         }
 
         root.put(KEY_PREFERENCES, prefsJson);
+
+        if (includeUserWords && userDictManager != null) {
+            final List<UserDictionaryEntry> learned = userDictManager.getLearnedWords();
+            if (learned != null && !learned.isEmpty()) {
+                final org.json.JSONArray learnedArray = new org.json.JSONArray();
+                for (final UserDictionaryEntry entry : learned) {
+                    if (entry == null || entry.word == null || entry.word.isEmpty()) {
+                        continue;
+                    }
+                    final JSONObject wordObj = new JSONObject();
+                    wordObj.put(KEY_WORD, entry.word);
+                    wordObj.put(KEY_FREQUENCY, entry.frequency);
+                    if (entry.shortcut != null && !entry.shortcut.isEmpty()) {
+                        wordObj.put(KEY_SHORTCUT, entry.shortcut);
+                    }
+                    learnedArray.put(wordObj);
+                }
+                root.put(KEY_LEARNED_WORDS, learnedArray);
+            }
+
+            final List<UserDictionaryEntry> blocked = userDictManager.getBlockedWords();
+            if (blocked != null && !blocked.isEmpty()) {
+                final org.json.JSONArray blockedArray = new org.json.JSONArray();
+                for (final UserDictionaryEntry entry : blocked) {
+                    if (entry != null && entry.word != null && !entry.word.isEmpty()) {
+                        blockedArray.put(entry.word);
+                    }
+                }
+                root.put(KEY_BLOCKED_WORDS, blockedArray);
+            }
+        }
+
         return root.toString(2);
     }
 
     public static void exportToStream(@NonNull final SharedPreferences prefs, @NonNull final OutputStream os) throws IOException, JSONException {
-        final String json = exportToJson(prefs);
+        exportToStream(prefs, os, null, false);
+    }
+
+    public static void exportToStream(@NonNull final SharedPreferences prefs,
+                                      @NonNull final OutputStream os,
+                                      @Nullable final UserDictionaryManager userDictManager,
+                                      final boolean includeUserWords) throws IOException, JSONException {
+        final String json = exportToJson(prefs, userDictManager, includeUserWords);
         os.write(json.getBytes(StandardCharsets.UTF_8));
         os.flush();
     }
@@ -225,6 +285,8 @@ public final class BackupHelper {
         public final int version;
         public final int validEntriesCount;
         public final Map<String, Object> validatedEntries;
+        public final List<UserDictionaryEntry> learnedWords;
+        public final List<String> blockedWords;
         public final Set<String> ignoredKeys;
         @Nullable public final String errorMessage;
 
@@ -232,28 +294,44 @@ public final class BackupHelper {
                                  final int version,
                                  final int validEntriesCount,
                                  @NonNull final Map<String, Object> validatedEntries,
+                                 @NonNull final List<UserDictionaryEntry> learnedWords,
+                                 @NonNull final List<String> blockedWords,
                                  @NonNull final Set<String> ignoredKeys,
                                  @Nullable final String errorMessage) {
             this.success = success;
             this.version = version;
             this.validEntriesCount = validEntriesCount;
             this.validatedEntries = Collections.unmodifiableMap(validatedEntries);
+            this.learnedWords = Collections.unmodifiableList(learnedWords);
+            this.blockedWords = Collections.unmodifiableList(blockedWords);
             this.ignoredKeys = Collections.unmodifiableSet(ignoredKeys);
             this.errorMessage = errorMessage;
+        }
+
+        public boolean hasUserWords() {
+            return !learnedWords.isEmpty() || !blockedWords.isEmpty();
+        }
+
+        public static ValidationResult ok(final int version,
+                                          @NonNull final Map<String, Object> validatedEntries,
+                                          @NonNull final List<UserDictionaryEntry> learnedWords,
+                                          @NonNull final List<String> blockedWords,
+                                          @NonNull final Set<String> ignoredKeys) {
+            return new ValidationResult(true, version, validatedEntries.size(), validatedEntries, learnedWords, blockedWords, ignoredKeys, null);
         }
 
         public static ValidationResult ok(final int version,
                                           @NonNull final Map<String, Object> validatedEntries,
                                           @NonNull final Set<String> ignoredKeys) {
-            return new ValidationResult(true, version, validatedEntries.size(), validatedEntries, ignoredKeys, null);
+            return ok(version, validatedEntries, Collections.emptyList(), Collections.emptyList(), ignoredKeys);
         }
 
         public static ValidationResult error(@NonNull final String errorMessage) {
-            return new ValidationResult(false, 0, 0, Collections.emptyMap(), Collections.emptySet(), errorMessage);
+            return new ValidationResult(false, 0, 0, Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), Collections.emptySet(), errorMessage);
         }
 
         public static ValidationResult error(@NonNull final String errorMessage, @NonNull final Set<String> ignoredKeys) {
-            return new ValidationResult(false, 0, 0, Collections.emptyMap(), ignoredKeys, errorMessage);
+            return new ValidationResult(false, 0, 0, Collections.emptyMap(), Collections.emptyList(), Collections.emptyList(), ignoredKeys, errorMessage);
         }
     }
 
@@ -267,7 +345,7 @@ public final class BackupHelper {
             while ((read = is.read(buffer)) != -1) {
                 totalBytesRead += read;
                 if (totalBytesRead > MAX_BACKUP_SIZE_BYTES) {
-                    return ValidationResult.error("File exceeds maximum allowed size of 512 KB.");
+                    return ValidationResult.error("File exceeds maximum allowed size of 2 MB.");
                 }
                 baos.write(buffer, 0, read);
             }
@@ -288,7 +366,7 @@ public final class BackupHelper {
             return ValidationResult.error("Backup JSON content is empty.");
         }
         if (jsonStr.getBytes(StandardCharsets.UTF_8).length > MAX_BACKUP_SIZE_BYTES) {
-            return ValidationResult.error("Backup content exceeds 512 KB limit.");
+            return ValidationResult.error("Backup content exceeds 2 MB limit.");
         }
 
         final JSONObject root;
@@ -411,11 +489,62 @@ public final class BackupHelper {
             }
         }
 
-        if (validatedEntries.isEmpty() && prefsObj.length() > 0 && ignoredKeys.size() == prefsObj.length()) {
+        final List<UserDictionaryEntry> learnedWords = new ArrayList<>();
+        if (root.has(KEY_LEARNED_WORDS)) {
+            final Object rawLearned = root.opt(KEY_LEARNED_WORDS);
+            if (rawLearned instanceof org.json.JSONArray) {
+                final org.json.JSONArray arr = (org.json.JSONArray) rawLearned;
+                final int len = Math.min(arr.length(), MAX_USER_WORDS_LIMIT);
+                for (int i = 0; i < len; i++) {
+                    final Object item = arr.opt(i);
+                    if (item instanceof JSONObject) {
+                        final JSONObject obj = (JSONObject) item;
+                        final String word = obj.optString(KEY_WORD, null);
+                        if (word != null && !word.trim().isEmpty() && word.length() <= 64) {
+                            final int freq = obj.optInt(KEY_FREQUENCY, 250);
+                            final String shortcut = obj.optString(KEY_SHORTCUT, null);
+                            learnedWords.add(new UserDictionaryEntry(-1, word.trim(), StringUtils.toNormalizedLower(word.trim()),
+                                    Math.min(Math.max(freq, 1), 255), shortcut, System.currentTimeMillis()));
+                        }
+                    } else if (item instanceof String) {
+                        final String word = (String) item;
+                        if (!word.trim().isEmpty() && word.length() <= 64) {
+                            learnedWords.add(new UserDictionaryEntry(word.trim(), 250));
+                        }
+                    }
+                }
+            }
+        }
+
+        final List<String> blockedWords = new ArrayList<>();
+        if (root.has(KEY_BLOCKED_WORDS)) {
+            final Object rawBlocked = root.opt(KEY_BLOCKED_WORDS);
+            if (rawBlocked instanceof org.json.JSONArray) {
+                final org.json.JSONArray arr = (org.json.JSONArray) rawBlocked;
+                final int len = Math.min(arr.length(), MAX_USER_WORDS_LIMIT);
+                for (int i = 0; i < len; i++) {
+                    final Object item = arr.opt(i);
+                    if (item instanceof String) {
+                        final String word = (String) item;
+                        if (!word.trim().isEmpty() && word.length() <= 64) {
+                            blockedWords.add(word.trim());
+                        }
+                    } else if (item instanceof JSONObject) {
+                        final JSONObject obj = (JSONObject) item;
+                        final String word = obj.optString(KEY_WORD, null);
+                        if (word != null && !word.trim().isEmpty() && word.length() <= 64) {
+                            blockedWords.add(word.trim());
+                        }
+                    }
+                }
+            }
+        }
+
+        if (validatedEntries.isEmpty() && learnedWords.isEmpty() && blockedWords.isEmpty() && prefsObj.length() > 0 && ignoredKeys.size() == prefsObj.length()) {
             return ValidationResult.error("No valid or compatible preferences found in backup.", ignoredKeys);
         }
 
-        return ValidationResult.ok(version, validatedEntries, ignoredKeys);
+        return ValidationResult.ok(version, validatedEntries, learnedWords, blockedWords, ignoredKeys);
     }
 
     public static boolean applyValidatedBackup(@NonNull final SharedPreferences prefs, @NonNull final ValidationResult result) {
@@ -456,5 +585,23 @@ public final class BackupHelper {
             editor.apply();
         }
         return true;
+    }
+
+    public static int applyValidatedUserWords(@NonNull final UserDictionaryManager userDictManager, @NonNull final ValidationResult result) {
+        if (!result.success) {
+            return 0;
+        }
+        int count = 0;
+        for (final UserDictionaryEntry entry : result.learnedWords) {
+            if (userDictManager.addWord(entry.word, entry.frequency, entry.shortcut)) {
+                count++;
+            }
+        }
+        for (final String blocked : result.blockedWords) {
+            if (userDictManager.blockWord(blocked)) {
+                count++;
+            }
+        }
+        return count;
     }
 }

@@ -25,3 +25,13 @@ Reglas de rendimiento y estabilidad para este repositorio:
 - **Soporte para `TYPE_NULL`**: Si el editor reporta `InputType.TYPE_NULL`, despacha los caracteres mediante eventos físicos (`sendKeyChar` o `sendDownUpKeyEvent`).
 - **Verificación**: Compila el código y asegúrate de pasar todos los tests:
   `./gradlew testDebugUnitTest assembleDebug assembleRelease`
+
+## 5. Archivos Bloqueados (Core Neuronal)
+**ESTRICTAMENTE PROHIBIDO:** Ningún contribuidor, agente de IA o desarrollador de UI debe modificar los siguientes archivos sin la aprobación explícita del Arquitecto Principal. Estos archivos contienen la lógica matemática de Inferencia Ternaria (1.58-bit), paridad de tokenización, optimizaciones Cero-Alocación (zero-allocation) y la integración de memoria segura nativa. Cualquier modificación irresponsable aquí causará crashes de VRAM, Memory Leaks, ANRs, o romperá la paridad de la Loss con el entrenamiento en PyTorch.
+
+- `app/src/main/java/rkr/simplekeyboard/inputmethod/latin/dict/neural/MicroTransformerModel.java` *(Motor de Inferencia, SIMD unrolled)*
+- `app/src/main/java/rkr/simplekeyboard/inputmethod/latin/dict/PrefixDictionary.java` *(Integración del Diccionario C++ con Neural, manejo de OOV)*
+- `app/src/test/java/rkr/simplekeyboard/inputmethod/latin/dict/neural/MicroTransformerModelTest.java` *(Golden Tests de paridad)*
+
+Para el repositorio de entrenamiento (`simple-keyboard-neural`):
+- `transformer_neural.ipynb` *(Notebook con la destilación Gemma 26B, Focal Loss y Ruido QWERTY)*

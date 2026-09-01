@@ -410,19 +410,7 @@ public final class MicroTransformerModel {
         if (c == WORD_START_CHAR || Character.isWhitespace(c)) {
             return ' ';
         }
-        if (c >= 'A' && c <= 'Z') {
-            return (char) (c + 32);
-        }
-        switch (c) {
-            case 'Á': return 'á';
-            case 'É': return 'é';
-            case 'Í': return 'í';
-            case 'Ó': return 'ó';
-            case 'Ú': return 'ú';
-            case 'Ü': return 'ü';
-            case 'Ñ': return 'ñ';
-            default: return c;
-        }
+        return Character.toLowerCase(c);
     }
 
     /**

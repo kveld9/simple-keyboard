@@ -689,7 +689,13 @@ public final class PrefixDictionary {
                             }
                         }
                         Collections.sort(mScratchScoredWords);
-                        Log.d(TAG, "Neural rescoring applied on " + n + " candidates for context: '" + trimmedContext + "'");
+                        StringBuilder sb = new StringBuilder("Neural rescoring applied on ").append(n).append(" candidates for context: '").append(trimmedContext).append("'.\n");
+                        for (int i = 0; i < n; i++) {
+                            sb.append("  - ").append(mScratchScoredWords.get(i).word)
+                              .append(" | Neural Logit: ").append(mScratchNeuralLogits[i])
+                              .append(" | Final Score: ").append(mScratchScoredWords.get(i).score).append("\n");
+                        }
+                        Log.d(TAG, sb.toString());
                     }
                 }
             }

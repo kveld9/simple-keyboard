@@ -509,7 +509,7 @@ public final class CustomDictionaryManager {
                 final ByteBuffer buf = channel.map(FileChannel.MapMode.READ_ONLY, 0, Math.min(stagingFile.length(), 32));
                 buf.order(ByteOrder.LITTLE_ENDIAN);
                 final int magic = buf.getInt(0);
-                if (magic == 0x54524631 || magic == 0x31465254 || (buf.get(0) == 'T' && buf.get(1) == 'R' && buf.get(2) == 'F' && buf.get(3) == '1')) {
+                if (magic == 0x54524631 || magic == 0x31465254 || magic == 0x54524632 || magic == 0x32465254 || (buf.get(0) == 'T' && buf.get(1) == 'R' && buf.get(2) == 'F' && (buf.get(3) == '1' || buf.get(3) == '2'))) {
                     vocabSize = buf.getInt(8);
                 }
             } catch (Exception ignored) {

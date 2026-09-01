@@ -1966,14 +1966,28 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             return;
         }
         final String cleanCommitted = committedWord.trim();
-        if (cleanCommitted.contains(" ")) {
-            final String[] parts = cleanCommitted.split("\\s+");
+        final int firstSpace = cleanCommitted.indexOf(' ');
+        if (firstSpace >= 0) {
             String prev = w2;
             String prevPrev = w1;
-            for (String p : parts) {
+            int start = 0;
+            final int len = cleanCommitted.length();
+            while (start < len) {
+                while (start < len && Character.isWhitespace(cleanCommitted.charAt(start))) {
+                    start++;
+                }
+                if (start >= len) {
+                    break;
+                }
+                int end = start;
+                while (end < len && !Character.isWhitespace(cleanCommitted.charAt(end))) {
+                    end++;
+                }
+                final String p = cleanCommitted.substring(start, end);
                 learnNgramAsync(prevPrev, prev, p);
                 prevPrev = prev;
                 prev = p;
+                start = end;
             }
             return;
         }

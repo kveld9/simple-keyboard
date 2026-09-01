@@ -66,68 +66,49 @@ public final class UserDictionaryManager {
         }
     }
 
-    private void notifyWordAdded(final UserDictionaryEntry entry) {
+    @FunctionalInterface
+    private interface ListenerAction {
+        void execute(UserDictionaryListener listener);
+    }
+
+    private void notifyListeners(final ListenerAction action) {
         mMainHandler.post(() -> {
             for (final UserDictionaryListener listener : mListeners) {
-                listener.onWordAdded(entry);
+                action.execute(listener);
             }
         });
+    }
+
+    private void notifyWordAdded(final UserDictionaryEntry entry) {
+        notifyListeners(listener -> listener.onWordAdded(entry));
     }
 
     private void notifyWordRemoved(final String word, final long id) {
-        mMainHandler.post(() -> {
-            for (final UserDictionaryListener listener : mListeners) {
-                listener.onWordRemoved(word, id);
-            }
-        });
+        notifyListeners(listener -> listener.onWordRemoved(word, id));
     }
 
     private void notifyAllLearnedWordsCleared() {
-        mMainHandler.post(() -> {
-            for (final UserDictionaryListener listener : mListeners) {
-                listener.onAllLearnedWordsCleared();
-            }
-        });
+        notifyListeners(UserDictionaryListener::onAllLearnedWordsCleared);
     }
 
     private void notifyWordBlocked(final String word) {
-        mMainHandler.post(() -> {
-            for (final UserDictionaryListener listener : mListeners) {
-                listener.onWordBlocked(word);
-            }
-        });
+        notifyListeners(listener -> listener.onWordBlocked(word));
     }
 
     private void notifyWordUnblocked(final String word, final long id) {
-        mMainHandler.post(() -> {
-            for (final UserDictionaryListener listener : mListeners) {
-                listener.onWordUnblocked(word, id);
-            }
-        });
+        notifyListeners(listener -> listener.onWordUnblocked(word, id));
     }
 
     private void notifyAllBlockedWordsCleared() {
-        mMainHandler.post(() -> {
-            for (final UserDictionaryListener listener : mListeners) {
-                listener.onAllBlockedWordsCleared();
-            }
-        });
+        notifyListeners(UserDictionaryListener::onAllBlockedWordsCleared);
     }
 
     private void notifyBigramAdded(final UserBigramEntry entry) {
-        mMainHandler.post(() -> {
-            for (final UserDictionaryListener listener : mListeners) {
-                listener.onBigramAdded(entry);
-            }
-        });
+        notifyListeners(listener -> listener.onBigramAdded(entry));
     }
 
     private void notifyAllBigramsCleared() {
-        mMainHandler.post(() -> {
-            for (final UserDictionaryListener listener : mListeners) {
-                listener.onAllBigramsCleared();
-            }
-        });
+        notifyListeners(UserDictionaryListener::onAllBigramsCleared);
     }
 
     // --- Learned Words ---

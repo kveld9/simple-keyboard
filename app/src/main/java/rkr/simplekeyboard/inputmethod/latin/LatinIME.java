@@ -1863,23 +1863,35 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (!isAutocorrectRevertible()) {
             return false;
         }
-        final String textBefore = mInputLogic.mConnection.getTextBeforeCursor(mAutocorrectedWord.length() + 2, 0);
+        final String textBefore = mInputLogic.mConnection.getTextBeforeCursor(mAutocorrectedWord.length() + 4, 0);
         if (textBefore == null) {
             return false;
         }
         if (textBefore.endsWith(mAutocorrectedWord + " ")) {
-            executeBackspaceRevert(event, true);
+            executeBackspaceRevert(event, 1);
             return true;
         } else if (textBefore.endsWith(mAutocorrectedWord)) {
-            executeBackspaceRevert(event, false);
+            executeBackspaceRevert(event, 0);
             return true;
+        } else if (textBefore.length() > mAutocorrectedWord.length()) {
+            final int wordIndex = textBefore.lastIndexOf(mAutocorrectedWord);
+            if (wordIndex >= 0) {
+                final int suffixLen = textBefore.length() - (wordIndex + mAutocorrectedWord.length());
+                if (suffixLen > 0 && suffixLen <= 2) {
+                    final String suffix = textBefore.substring(wordIndex + mAutocorrectedWord.length());
+                    if (textBefore.endsWith(mAutocorrectedWord + suffix)) {
+                        executeBackspaceRevert(event, suffixLen);
+                        return true;
+                    }
+                }
+            }
         }
         return false;
     }
 
-    private void executeBackspaceRevert(final Event event, final boolean hasTrailingSpace) {
+    private void executeBackspaceRevert(final Event event, final int trailingCharsToDelete) {
         final String revertedWord = mOriginalTypedWordBeforeAutocorrect;
-        mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + (hasTrailingSpace ? 1 : 0));
+        mInputLogic.mConnection.deleteTextBeforeCursor(mAutocorrectedWord.length() + trailingCharsToDelete);
         mInputLogic.mConnection.commitText(revertedWord, 1);
 
         final String[] context = getEffectivePreviousWords();

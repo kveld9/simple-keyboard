@@ -100,6 +100,14 @@ public final class InputLogic {
         mLastSpaceTimestamp = 0;
         final String text = event.getTextToCommit().toString();
         final InputTransaction inputTransaction = new InputTransaction(settingsValues);
+        if (text.length() > 0 && StringUtils.shouldStripPrecedingSpace(text.codePointAt(0))) {
+            final String textBefore = mConnection.getTextBeforeCursor(2, 0);
+            if (textBefore.length() >= 2
+                    && textBefore.charAt(textBefore.length() - 1) == ' '
+                    && !Character.isWhitespace(textBefore.charAt(textBefore.length() - 2))) {
+                mConnection.deleteTextBeforeCursor(1);
+            }
+        }
         mConnection.commitText(text, 1);
         // Space state must be updated before calling updateShiftState
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
@@ -293,7 +301,16 @@ public final class InputLogic {
      * @param inputTransaction The transaction in progress.
      */
     private void handleSeparatorEvent(final Event event, final InputTransaction inputTransaction) {
-        sendKeyCodePoint(event.mCodePoint);
+        final int codePoint = event.mCodePoint;
+        if (StringUtils.shouldStripPrecedingSpace(codePoint)) {
+            final String textBefore = mConnection.getTextBeforeCursor(2, 0);
+            if (textBefore.length() >= 2
+                    && textBefore.charAt(textBefore.length() - 1) == ' '
+                    && !Character.isWhitespace(textBefore.charAt(textBefore.length() - 2))) {
+                mConnection.deleteTextBeforeCursor(1);
+            }
+        }
+        sendKeyCodePoint(codePoint);
 
         inputTransaction.requireShiftUpdate(InputTransaction.SHIFT_UPDATE_NOW);
     }

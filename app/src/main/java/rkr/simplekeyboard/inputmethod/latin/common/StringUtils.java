@@ -433,6 +433,16 @@ public final class StringUtils {
         return !Character.isLetterOrDigit(codePoint) && codePoint > 32;
     }
 
+    public static boolean shouldStripPrecedingSpace(final int codePoint) {
+        if (codePoint == '.' || codePoint == ',' || codePoint == '?' || codePoint == '!'
+                || codePoint == ':' || codePoint == ';' || codePoint == ')' || codePoint == ']'
+                || codePoint == '}' || codePoint == '>' || codePoint == '%' || codePoint == '\u2026' /* … */
+                || codePoint == '\u201D' /* ” */ || codePoint == '\u2019' /* ’ */ || codePoint == '\u00BB' /* » */) {
+            return true;
+        }
+        return Character.getType(codePoint) == Character.END_PUNCTUATION;
+    }
+
     public static boolean isWordCharacter(final int codePoint) {
         return Character.isLetter(codePoint) || codePoint == '\'' || codePoint == '-';
     }

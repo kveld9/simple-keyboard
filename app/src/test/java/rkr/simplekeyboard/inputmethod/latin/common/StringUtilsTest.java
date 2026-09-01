@@ -233,4 +233,32 @@ public class StringUtilsTest {
         assertTrue(StringUtils.hasInternalUpperCase("NASA"));
         assertTrue(StringUtils.hasInternalUpperCase("McDonalds"));
     }
+
+    @Test
+    public void testShouldStripPrecedingSpace() {
+        assertTrue(StringUtils.shouldStripPrecedingSpace('.'));
+        assertTrue(StringUtils.shouldStripPrecedingSpace(','));
+        assertTrue(StringUtils.shouldStripPrecedingSpace('?'));
+        assertTrue(StringUtils.shouldStripPrecedingSpace('!'));
+        assertTrue(StringUtils.shouldStripPrecedingSpace(':'));
+        assertTrue(StringUtils.shouldStripPrecedingSpace(';'));
+        assertTrue(StringUtils.shouldStripPrecedingSpace(')'));
+        assertTrue(StringUtils.shouldStripPrecedingSpace(']'));
+        assertTrue(StringUtils.shouldStripPrecedingSpace('}'));
+        assertTrue(StringUtils.shouldStripPrecedingSpace('%'));
+        assertTrue(StringUtils.shouldStripPrecedingSpace('\u2026')); // …
+        assertTrue(StringUtils.shouldStripPrecedingSpace('\u201D')); // ”
+        assertTrue(StringUtils.shouldStripPrecedingSpace('\u00BB')); // »
+
+        assertFalse(StringUtils.shouldStripPrecedingSpace('('));
+        assertFalse(StringUtils.shouldStripPrecedingSpace('['));
+        assertFalse(StringUtils.shouldStripPrecedingSpace('{'));
+        assertFalse(StringUtils.shouldStripPrecedingSpace('¿'));
+        assertFalse(StringUtils.shouldStripPrecedingSpace('¡'));
+        assertFalse(StringUtils.shouldStripPrecedingSpace('$'));
+        assertFalse(StringUtils.shouldStripPrecedingSpace('@'));
+        assertFalse(StringUtils.shouldStripPrecedingSpace('#'));
+        assertFalse(StringUtils.shouldStripPrecedingSpace('a'));
+        assertFalse(StringUtils.shouldStripPrecedingSpace('1'));
+    }
 }

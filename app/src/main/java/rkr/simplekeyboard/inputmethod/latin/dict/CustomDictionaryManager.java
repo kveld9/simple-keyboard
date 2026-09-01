@@ -159,7 +159,9 @@ public final class CustomDictionaryManager {
                 buffer.order(ByteOrder.LITTLE_ENDIAN);
                 if (isTrf) {
                     final int magic = buffer.getInt(0);
-                    if (magic == 0x54524631 || magic == 0x31465254 || (buffer.get(0) == 'T' && buffer.get(1) == 'R' && buffer.get(2) == 'F' && buffer.get(3) == '1')) {
+                    if (magic == 0x54524631 || magic == 0x31465254
+                            || magic == 0x54524632 || magic == 0x32465254
+                            || (buffer.get(0) == 'T' && buffer.get(1) == 'R' && buffer.get(2) == 'F' && (buffer.get(3) == '1' || buffer.get(3) == '2'))) {
                         wordCount = buffer.getInt(8);
                     }
                 } else if (buffer.getInt(0) == 0x42444B53) {

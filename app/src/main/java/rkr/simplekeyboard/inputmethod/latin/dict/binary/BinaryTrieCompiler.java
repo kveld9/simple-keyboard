@@ -70,10 +70,14 @@ public final class BinaryTrieCompiler {
     }
 
     public static void compile(final List<WordEntry> words, final File outputFile) throws IOException {
-        compile(words, Collections.emptyList(), outputFile);
+        compile(words, Collections.emptyList(), outputFile, 2);
     }
 
     public static void compile(final List<WordEntry> words, final List<BigramEntry> bigrams, final File outputFile) throws IOException {
+        compile(words, bigrams, outputFile, 2);
+    }
+
+    public static void compile(final List<WordEntry> words, final List<BigramEntry> bigrams, final File outputFile, final int version) throws IOException {
         final BuildNode root = new BuildNode('\0');
 
         for (final WordEntry entry : words) {
@@ -103,7 +107,7 @@ public final class BinaryTrieCompiler {
         final Queue<List<BuildNode>> queue = new LinkedList<>();
 
         final int headerSize = 32;
-        final int nodeSize = 16;
+        final int nodeSize = (version >= 3) ? 8 : 16;
         int currentNodeOffset = headerSize;
 
         final List<BuildNode> rootList = Collections.singletonList(root);
@@ -167,7 +171,8 @@ public final class BinaryTrieCompiler {
             }
 
             final int bigramTableSize = dedupBigrams.size() * 12;
-            final int stringPoolStart = bigramTableOffset + bigramTableSize;
+            final int terminalTableSize = (version >= 3) ? (words.size() * 8) : 0;
+            final int stringPoolStart = bigramTableOffset + bigramTableSize + terminalTableSize;
 
             for (final Map.Entry<Long, Integer> entry : dedupBigrams.entrySet()) {
                 final long key = entry.getKey();
@@ -189,26 +194,39 @@ public final class BinaryTrieCompiler {
             });
         }
 
+        // Sort nodes by offset to write sequentially
+        Collections.sort(allNodes, (a, b) -> Integer.compare(a.offset, b.offset));
+
+        // Collect terminal entries
+        final List<int[]> terminalEntries = new ArrayList<>();
+        for (final BuildNode node : allNodes) {
+            if (node.isTerminal && node.word != null) {
+                final Integer rel = wordToOffset.get(node.word.toLowerCase());
+                final int relOff = (rel != null) ? rel : 0;
+                terminalEntries.add(new int[]{node.offset, relOff});
+            }
+        }
+        Collections.sort(terminalEntries, (a, b) -> Integer.compare(a[0], b[0]));
+
         final int bigramTableSize = compiledBigrams.size() * 12;
-        final int stringPoolStart = bigramTableOffset + bigramTableSize;
+        final int terminalTableOffset = bigramTableOffset + bigramTableSize;
+        final int terminalTableSize = (version >= 3) ? (terminalEntries.size() * 8) : 0;
+        final int stringPoolStart = terminalTableOffset + terminalTableSize;
         final byte[] stringPoolBytes = stringPoolStream.toByteArray();
 
         final ByteBuffer buffer = ByteBuffer.allocate(stringPoolStart + stringPoolBytes.length);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
 
         // Header (32 bytes):
-        // Magic "SKDB" (0x42444B53), Version 2, wordCount, rootOffset, bigramCount, bigramTableOffset, stringPoolOffset, reserved
+        // Magic "SKDB" (0x42444B53), Version (2 or 3), wordCount, rootOffset, bigramCount, bigramTableOffset, stringPoolOffset, terminalTableOffset
         buffer.putInt(0x42444B53);
-        buffer.putInt(2);
-        buffer.putInt(words.size());
+        buffer.putInt(version);
+        buffer.putInt(terminalEntries.size());
         buffer.putInt(root.offset);
         buffer.putInt(compiledBigrams.size());
         buffer.putInt(bigramTableOffset);
         buffer.putInt(stringPoolStart);
-        buffer.putInt(0);
-
-        // Sort nodes by offset to write sequentially
-        Collections.sort(allNodes, (a, b) -> Integer.compare(a.offset, b.offset));
+        buffer.putInt(terminalTableOffset);
 
         for (final BuildNode node : allNodes) {
             final short charVal = (short) node.character;
@@ -219,19 +237,32 @@ public final class BinaryTrieCompiler {
             final byte freq = (byte) (node.frequency & 0xFF);
             final byte childCount = (byte) Math.min(node.childrenList.size(), 255);
             final int childrenOffset = !node.childrenList.isEmpty() ? node.childrenList.get(0).offset : 0;
-            final Integer relWordOffset = (node.isTerminal && node.word != null)
-                    ? wordToOffset.get(node.word.toLowerCase()) : null;
-            final int wordOffset = relWordOffset != null ? stringPoolStart + relWordOffset : 0;
 
-            buffer.putShort(charVal);
-            buffer.put(flags);
-            buffer.put(freq);
-            buffer.put(childCount);
-            buffer.put((byte) 0); // 3 pad bytes
-            buffer.put((byte) 0);
-            buffer.put((byte) 0);
-            buffer.putInt(childrenOffset);
-            buffer.putInt(wordOffset);
+            if (version >= 3) {
+                // 8 bytes: char(2), flags(1), freq(1), childCount(1), childSlot(3)
+                final int childSlot = childrenOffset / 8;
+                buffer.putShort(charVal);
+                buffer.put(flags);
+                buffer.put(freq);
+                buffer.put(childCount);
+                buffer.put((byte) (childSlot & 0xFF));
+                buffer.put((byte) ((childSlot >>> 8) & 0xFF));
+                buffer.put((byte) ((childSlot >>> 16) & 0xFF));
+            } else {
+                // 16 bytes: char(2), flags(1), freq(1), childCount(1), pad(3), childrenOffset(4), wordOffset(4)
+                final Integer relWordOffset = (node.isTerminal && node.word != null)
+                        ? wordToOffset.get(node.word.toLowerCase()) : null;
+                final int wordOffset = relWordOffset != null ? stringPoolStart + relWordOffset : 0;
+                buffer.putShort(charVal);
+                buffer.put(flags);
+                buffer.put(freq);
+                buffer.put(childCount);
+                buffer.put((byte) 0);
+                buffer.put((byte) 0);
+                buffer.put((byte) 0);
+                buffer.putInt(childrenOffset);
+                buffer.putInt(wordOffset);
+            }
         }
 
         // Bigram table entries (12 bytes each)
@@ -240,6 +271,14 @@ public final class BinaryTrieCompiler {
             buffer.putInt(bg.word2Offset);
             buffer.putShort((short) (bg.frequency & 0xFFFF));
             buffer.putShort((short) 0); // pad/reserved
+        }
+
+        // Terminal table entries for version 3 (8 bytes each: nodeOffset(4), wordOffset(4))
+        if (version >= 3) {
+            for (final int[] term : terminalEntries) {
+                buffer.putInt(term[0]);
+                buffer.putInt(stringPoolStart + term[1]);
+            }
         }
 
         // String pool

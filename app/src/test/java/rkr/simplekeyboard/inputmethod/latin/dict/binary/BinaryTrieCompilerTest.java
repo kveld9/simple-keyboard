@@ -121,4 +121,60 @@ public class BinaryTrieCompilerTest {
             assertEquals(0, none.size());
         }
     }
+
+    @Test
+    public void testCompileAndLoadV3CompactTrie() throws Exception {
+        final List<BinaryTrieCompiler.WordEntry> words = new ArrayList<>();
+        words.add(new BinaryTrieCompiler.WordEntry("hola", 200));
+        words.add(new BinaryTrieCompiler.WordEntry("holanda", 150));
+        words.add(new BinaryTrieCompiler.WordEntry("bien", 220));
+        words.add(new BinaryTrieCompiler.WordEntry("también", 210));
+        words.add(new BinaryTrieCompiler.WordEntry("canción", 180));
+
+        final List<BinaryTrieCompiler.BigramEntry> bigrams = new ArrayList<>();
+        bigrams.add(new BinaryTrieCompiler.BigramEntry("hola", "bien", 190));
+        bigrams.add(new BinaryTrieCompiler.BigramEntry("bien", "también", 170));
+
+        final File tempFile = mTempFolder.newFile("test_v3_compact.bin");
+        BinaryTrieCompiler.compile(words, bigrams, tempFile, 3);
+
+        assertTrue(tempFile.exists());
+        assertTrue(tempFile.length() > 32);
+
+        try (FileInputStream fis = new FileInputStream(tempFile);
+             FileChannel channel = fis.getChannel()) {
+            final ByteBuffer buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, tempFile.length());
+            final BinaryTrieDictionary dict = new BinaryTrieDictionary(buffer);
+
+            assertEquals(3, dict.getVersion());
+            assertEquals(5, dict.getWordCount());
+            assertEquals(2, dict.getBigramCount());
+            assertTrue(dict.validateStructure());
+
+            assertTrue(dict.containsWord("hola"));
+            assertTrue(dict.containsWord("holanda"));
+            assertTrue(dict.containsWord("bien"));
+            assertTrue(dict.containsWord("también"));
+            assertTrue(dict.containsWord("canción"));
+            assertFalse(dict.containsWord("bién"));
+            assertFalse(dict.containsWord("nonexistent"));
+
+            assertEquals(200, dict.getWordFrequency("hola"));
+            assertEquals(220, dict.getWordFrequency("bien"));
+            assertEquals(210, dict.getWordFrequency("también"));
+
+            final List<CharSequence> suggestions = new ArrayList<>();
+            dict.getPrefixSuggestions("hol", 5, suggestions);
+            assertTrue(suggestions.size() >= 2);
+            assertEquals("también", dict.getCanonicalWord("tambien"));
+
+            assertEquals(190, dict.getBigramFrequency("hola", "bien"));
+            assertEquals(170, dict.getBigramFrequency("bien", "también"));
+
+            final List<CharSequence> nextWords = dict.getNextWordPredictions("hola", 5);
+            assertNotNull(nextWords);
+            assertEquals(1, nextWords.size());
+            assertEquals("bien", nextWords.get(0).toString());
+        }
+    }
 }

@@ -1,1 +1,1 @@
-We don't store your data. Period.
+Simple Keyboard does not collect or store user data.

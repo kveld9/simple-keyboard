@@ -32,6 +32,7 @@ public final class MicroTransformerModel {
     // Model Hyperparameters
     private int mVocabSize = 0;
     private int mDModel = 0;
+    private int mDFf = 0;
     private int mNHeads = 0;
     private int mNLayers = 0;
     private float mScaleEmb = 1.0f;
@@ -206,7 +207,6 @@ public final class MicroTransformerModel {
 
             mInvD = 1.0f / (float) mDModel;
             mScaleAttn = (float) (1.0 / Math.sqrt((double) mDModel / mNHeads));
-            int dFf = 2 * mDModel;
 
             // 2. Read BPE Table at offBpe
             if (offBpe < 64 || offBpe >= fileSize) {
@@ -310,6 +310,16 @@ public final class MicroTransformerModel {
                 return false;
             }
 
+            int qkvPackedBytes = ((3 * mDModel) * mDModel + 3) / 4;
+            int projPackedBytes = (mDModel * mDModel + 3) / 4;
+
+            // Dynamically detect d_ff (1x d_model or 2x d_model) based on layer stride and file bounds
+            int rawBytes2x = qkvPackedBytes + projPackedBytes + ((2 * mDModel * mDModel + 3) / 4) + ((mDModel * 2 * mDModel + 3) / 4) +
+                    (mDModel * 4) + (mDModel * 4) + 4 + 4;
+            int stride2x = (rawBytes2x + 63) & ~63;
+            int dFf = (offLayer0 + (mNLayers - 1) * stride2x + rawBytes2x <= fileSize) ? (2 * mDModel) : mDModel;
+            mDFf = dFf;
+
             mQkvW = new byte[mNLayers * (3 * mDModel) * mDModel];
             mProjW = new byte[mNLayers * mDModel * mDModel];
             mMlpUpW = new byte[mNLayers * dFf * mDModel];
@@ -319,8 +329,6 @@ public final class MicroTransformerModel {
             mScaleProj = new float[mNLayers];
             mScaleDown = new float[mNLayers];
 
-            int qkvPackedBytes = ((3 * mDModel) * mDModel + 3) / 4;
-            int projPackedBytes = (mDModel * mDModel + 3) / 4;
             int mlpUpPackedBytes = (dFf * mDModel + 3) / 4;
             int mlpDownPackedBytes = (mDModel * dFf + 3) / 4;
             int rawLayerBytes = qkvPackedBytes + projPackedBytes + mlpUpPackedBytes + mlpDownPackedBytes +
@@ -458,6 +466,7 @@ public final class MicroTransformerModel {
         mIsLoaded = false;
         mVocabSize = 0;
         mDModel = 0;
+        mDFf = 0;
         mNHeads = 0;
         mNLayers = 0;
         mScaleEmb = 1.0f;
@@ -733,7 +742,7 @@ public final class MicroTransformerModel {
         final float invD = 1.0f / (float) D;
         final int H = mNHeads;
         final int dk = D / H;
-        final int dFf = 2 * D;
+        final int dFf = mDFf;
 
         // Compute 64-bit context hash for LRU caching
         long contextHash = 1125899906842597L;

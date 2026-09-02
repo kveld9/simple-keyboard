@@ -16,7 +16,7 @@ Reglas de rendimiento y estabilidad para este repositorio:
 - **Corrige el origen**: Si un componente falla por falta de estado, no parches los consumidores finales con llamadas cruzadas. Busca dónde nace la entidad e inicialízala allí.
 - **Respeta el motor nativo**: Este proyecto deriva de AOSP LatinIME. No refactorices pipelines centrales (decodificadores, parsers, renderers) a menos que el ticket lo exija.
 - **Usa los parámetros**: Si un método recibe `Context` o `SharedPreferences`, úsalos. No ignores parámetros para consultar singletons globales.
-- **Itera directo**: No uses `for (int i = 0; i < MAX; i++)` con colecciones dinámicas o dispersas. Itera directamente sobre los elementos activos.
+- **Itera directo**: No uses `for (int i = 0; i < MAX; i++)` con colecciones dinámicas o dispersas. Itera sobre los elementos activos.
 - **Usa tags reales**: Registra logs con el `TAG` de la clase o `NombreClase.class.getSimpleName()`. No inventes tags como `"SlopSweep"` o `"AIFix"`.
 - **Cero código muerto y redundancia**: Revisa la implementación actual y el código nuevo antes de hacer commit o PR. Busca métodos sin invocar, constantes huérfanas, ramas inalcanzables y lógica repetida. Extrae bloques comunes y elimina restos no utilizados.
 - **PRs atómicos**: Envía un PR por bug o característica con el diff mínimo. Separa los cambios cosméticos de las correcciones funcionales.

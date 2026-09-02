@@ -39,6 +39,7 @@ public final class MicroTransformerModel {
     }
 
     private long mNativeHandle = 0;
+    private final int[] mScratchTokenBuf = new int[64];
 
     public MicroTransformerModel() {
         if (sLibraryLoaded) {
@@ -78,12 +79,15 @@ public final class MicroTransformerModel {
         if (outOffset == 0) {
             return nativeTokenize(mNativeHandle, text.toString(), outTokens, maxTokens);
         }
-        int[] tmp = new int[maxTokens];
-        int count = nativeTokenize(mNativeHandle, text.toString(), tmp, maxTokens);
-        if (count > 0) {
-            System.arraycopy(tmp, 0, outTokens, outOffset, count);
+        int[] tmp;
+        synchronized (mScratchTokenBuf) {
+            tmp = (maxTokens <= mScratchTokenBuf.length) ? mScratchTokenBuf : new int[maxTokens];
+            int count = nativeTokenize(mNativeHandle, text.toString(), tmp, maxTokens);
+            if (count > 0) {
+                System.arraycopy(tmp, 0, outTokens, outOffset, Math.min(count, outTokens.length - outOffset));
+            }
+            return count;
         }
-        return count;
     }
 
     public int tokenize(CharSequence text, int[] outTokens, int maxTokens) {

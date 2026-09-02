@@ -195,6 +195,7 @@ public final class PrefixDictionary {
     private final float[] mScratchNeuralLogits = new float[8192];
     private final float[] mScratchNeuralHidden = new float[512];
     private final int[] mScratchNeuralTokens = new int[32];
+    private final int[] mScratchSingleWordTokens = new int[4];
     private volatile rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary mBinaryDict = null;
     private MicroTransformerModel mTransformerModel;
 
@@ -675,11 +676,11 @@ public final class PrefixDictionary {
                         final int n = Math.min(mScratchScoredWords.size(), mScratchNeuralCandIds.length);
                         for (int i = 0; i < n; i++) {
                             final String word = mScratchScoredWords.get(i).word;
-                            final int wordCount = trf.tokenize(word, mScratchNeuralCandIds, mScratchNeuralCandIds.length - 2, 2);
-                            if (wordCount != 1) {
-                                mScratchNeuralCandIds[i] = MicroTransformerModel.UNK_TOKEN_ID;
+                            final int wordCount = trf.tokenize(word, mScratchSingleWordTokens, 2);
+                            if (wordCount == 1) {
+                                mScratchNeuralCandIds[i] = mScratchSingleWordTokens[0];
                             } else {
-                                mScratchNeuralCandIds[i] = mScratchNeuralCandIds[mScratchNeuralCandIds.length - 2];
+                                mScratchNeuralCandIds[i] = MicroTransformerModel.UNK_TOKEN_ID;
                             }
                         }
                         trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, n, mScratchNeuralLogits);
@@ -1422,11 +1423,11 @@ public final class PrefixDictionary {
                     final int n = Math.min(mScratchScoredWords.size(), mScratchNeuralCandIds.length);
                     for (int i = 0; i < n; i++) {
                         final String word = mScratchScoredWords.get(i).word;
-                        final int wordCount = trf.tokenize(word, mScratchNeuralCandIds, mScratchNeuralCandIds.length - 2, 2);
-                        if (wordCount != 1) {
-                            mScratchNeuralCandIds[i] = MicroTransformerModel.UNK_TOKEN_ID;
+                        final int wordCount = trf.tokenize(word, mScratchSingleWordTokens, 2);
+                        if (wordCount == 1) {
+                            mScratchNeuralCandIds[i] = mScratchSingleWordTokens[0];
                         } else {
-                            mScratchNeuralCandIds[i] = mScratchNeuralCandIds[mScratchNeuralCandIds.length - 2];
+                            mScratchNeuralCandIds[i] = MicroTransformerModel.UNK_TOKEN_ID;
                         }
                     }
 
@@ -1475,7 +1476,8 @@ public final class PrefixDictionary {
                         if (candCount > 0) {
                             System.arraycopy(wordStarts, 0, mScratchNeuralCandIds, 0, candCount);
                             trf.scoreCandidates(mScratchNeuralHidden, mScratchNeuralCandIds, candCount, mScratchNeuralLogits);
-                            for (int pick = 0; pick < limit - mScratchScoredWords.size() + 2 && pick < candCount; pick++) {
+                            final int targetPicks = Math.min(limit - mScratchScoredWords.size() + 2, candCount);
+                            for (int pick = 0; pick < targetPicks && mScratchScoredWords.size() < limit + 2; pick++) {
                                 int bestIdx = -1;
                                 float bestLogit = -Float.MAX_VALUE;
                                 for (int j = 0; j < candCount; j++) {

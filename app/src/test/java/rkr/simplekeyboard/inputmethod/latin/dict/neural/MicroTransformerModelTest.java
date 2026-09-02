@@ -19,7 +19,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Unit tests for {@link MicroTransformerModel} pure Java TRF2 (1.58-bit Ternary) inference engine.
+ * Unit tests for {@link MicroTransformerModel} C++ Native TRF2 (1.58-bit Ternary) inference engine via JNI.
  */
 public class MicroTransformerModelTest {
 
@@ -549,20 +549,20 @@ public class MicroTransformerModelTest {
         final MicroTransformerModel model = new MicroTransformerModel();
         assertTrue(model.loadModel(modelFile));
 
-        // Create an array of 20 tokens: 0..19
-        final int[] longTokens = new int[20];
-        for (int i = 0; i < 20; i++) {
+        // Create an array of 40 tokens (> MAX_SEQ_LEN of 32)
+        final int[] longTokens = new int[40];
+        for (int i = 0; i < 40; i++) {
             longTokens[i] = (i % 14) + 2;
         }
 
         final float[] outHiddenLong = new float[4];
-        assertTrue(model.forward(longTokens, 20, outHiddenLong));
+        assertTrue(model.forward(longTokens, 40, outHiddenLong));
 
-        // Forward with only the last 16 tokens should produce exact same output
-        final int[] tailTokens = new int[16];
-        System.arraycopy(longTokens, 4, tailTokens, 0, 16);
+        // Forward with only the last 32 tokens should produce exact same output
+        final int[] tailTokens = new int[32];
+        System.arraycopy(longTokens, 8, tailTokens, 0, 32);
         final float[] outHiddenTail = new float[4];
-        assertTrue(model.forward(tailTokens, 16, outHiddenTail));
+        assertTrue(model.forward(tailTokens, 32, outHiddenTail));
 
         assertArrayEquals(outHiddenTail, outHiddenLong, 1e-5f);
     }

@@ -62,6 +62,7 @@ def appVersionName = project.findProperty("versionName") ?: getGitVersionName()
 def appVersionCode = project.findProperty("versionCode") ? project.property("versionCode").toInteger() : computeVersionCode(appVersionName)
 
 android {
+    ndkVersion "29.0.14206865"
     defaultConfig {
         applicationId "rkr.simplekeyboard.inputmethod"
         compileSdk 37
@@ -71,6 +72,27 @@ android {
         versionName appVersionName
         resourceConfigurations += ["en", "es"]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++17", "-O3", "-ffast-math"
+            }
+        }
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
+    }
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            universalApk true
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path file("src/main/cpp/CMakeLists.txt")
+        }
     }
     signingConfigs {
         release {
@@ -126,4 +148,28 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test:runner:1.6.1'
 }
+
+tasks.register("compileHostNativeLib", Exec) {
+    def outputDir = file("${project.layout.buildDirectory.get().asFile}/host-native")
+    def outputFile = file("${outputDir}/libmicrotransformer.so")
+    outputs.file(outputFile)
+    inputs.files(fileTree("src/main/cpp") { include "*.cpp", "*.h" })
+    doFirst {
+        outputDir.mkdirs()
+    }
+    def javaHome = System.getProperty("java.home")
+    def jniInclude = "${javaHome}/include"
+    def jniIncludeLinux = "${javaHome}/include/linux"
+    commandLine "clang++", "-shared", "-fPIC", "-O3", "-msse4.2", "-std=c++17",
+            "-I${jniInclude}", "-I${jniIncludeLinux}",
+            "src/main/cpp/micro_transformer.cpp",
+            "src/main/cpp/micro_transformer_jni.cpp",
+            "-o", outputFile.absolutePath
+}
+
+tasks.withType(Test).configureEach {
+    dependsOn "compileHostNativeLib"
+    systemProperty "java.library.path", "${project.layout.buildDirectory.get().asFile}/host-native"
+}
+
 

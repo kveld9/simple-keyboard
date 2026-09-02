@@ -193,8 +193,8 @@ public final class PrefixDictionary {
     // Scratch buffers para rescoring neural
     private final int[] mScratchNeuralCandIds = new int[8192];
     private final float[] mScratchNeuralLogits = new float[8192];
-    private final float[] mScratchNeuralHidden = new float[64];
-    private final int[] mScratchNeuralTokens = new int[16];
+    private final float[] mScratchNeuralHidden = new float[512];
+    private final int[] mScratchNeuralTokens = new int[32];
     private volatile rkr.simplekeyboard.inputmethod.latin.dict.binary.BinaryTrieDictionary mBinaryDict = null;
     private MicroTransformerModel mTransformerModel;
 
@@ -668,6 +668,7 @@ public final class PrefixDictionary {
             final String context = (w1 != null ? w1 + " " : "") + (w2 != null ? w2 : "");
             final String trimmedContext = context.trim();
             if (!trimmedContext.isEmpty()) {
+                final long t0 = System.nanoTime();
                 final int numTokens = trf.tokenize(trimmedContext, mScratchNeuralTokens, 0, mScratchNeuralTokens.length);
                 if (numTokens > 0) {
                     if (trf.forward(mScratchNeuralTokens, numTokens, mScratchNeuralHidden)) {
@@ -717,13 +718,12 @@ public final class PrefixDictionary {
                             }
                         }
                         Collections.sort(mScratchScoredWords);
-                        StringBuilder sb = new StringBuilder("Neural rescoring applied on ").append(n).append(" candidates for context: '").append(trimmedContext).append("'.\n");
-                        for (int i = 0; i < n; i++) {
-                            sb.append("  - ").append(mScratchScoredWords.get(i).word)
-                              .append(" | Neural Logit: ").append(mScratchNeuralLogits[i])
-                              .append(" | Final Score: ").append(mScratchScoredWords.get(i).score).append("\n");
-                        }
-                        Log.d(TAG, sb.toString());
+                        final long elapsedUs = (System.nanoTime() - t0) / 1000L;
+                        Log.i(TAG, "⚡ [Neural Rescore] '" + trimmedContext + "' -> Top: [" +
+                                (mScratchScoredWords.size() > 0 ? mScratchScoredWords.get(0).word : "") + ", " +
+                                (mScratchScoredWords.size() > 1 ? mScratchScoredWords.get(1).word : "") + ", " +
+                                (mScratchScoredWords.size() > 2 ? mScratchScoredWords.get(2).word : "") +
+                                "] (" + n + " cands, Latencia: " + elapsedUs + " µs)");
                     }
                 }
             }
@@ -1416,6 +1416,7 @@ public final class PrefixDictionary {
             final String context = (w1 != null ? w1 + " " : "") + w2;
             final String trimmedContext = context.trim();
             if (!trimmedContext.isEmpty()) {
+                final long t0 = System.nanoTime();
                 final int numTokens = trf.tokenize(trimmedContext, mScratchNeuralTokens, 0, mScratchNeuralTokens.length);
                 if (numTokens > 0 && trf.forward(mScratchNeuralTokens, numTokens, mScratchNeuralHidden)) {
                     final int n = Math.min(mScratchScoredWords.size(), mScratchNeuralCandIds.length);
@@ -1493,6 +1494,12 @@ public final class PrefixDictionary {
                             }
                         }
                     }
+                    final long elapsedUs = (System.nanoTime() - t0) / 1000L;
+                    Log.i(TAG, "⚡ [Neural Predict] '" + trimmedContext + "' -> Top: [" +
+                            (mScratchScoredWords.size() > 0 ? mScratchScoredWords.get(0).word : "") + ", " +
+                            (mScratchScoredWords.size() > 1 ? mScratchScoredWords.get(1).word : "") + ", " +
+                            (mScratchScoredWords.size() > 2 ? mScratchScoredWords.get(2).word : "") +
+                            "] (Latencia: " + elapsedUs + " µs)");
                 }
             }
         } else {

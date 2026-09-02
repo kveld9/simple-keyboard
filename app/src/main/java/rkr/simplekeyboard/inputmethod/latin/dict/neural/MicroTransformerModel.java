@@ -2,702 +2,101 @@ package rkr.simplekeyboard.inputmethod.latin.dict.neural;
 
 import android.util.Log;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**
- * Pure Java multiplication-free inference engine for the MicroBitNet (1.58-bit Ternary) Transformer.
- * Loads TRF2 binary weights, unpacks 2-bit ternary weights {-1, 0, +1}, and executes
- * a 2-layer causal BitNet Transformer forward pass using purely integer additions/subtractions
- * and zero hot-path allocations.
+ * Direct JNI interface for the high-performance C++ MicroBitNet (1.58-bit Ternary) Transformer.
+ * Executes SIMD-vectorized inference (ARM NEON / SSE / AVX) with zero Java hot-path allocations.
  */
 public final class MicroTransformerModel {
 
     private static final String TAG = "MicroTransformerModel";
 
-    public static final int MAGIC_TRF2 = 0x54524632; // "TRF2" (Ternary 1.58-bit BitNet format)
-    public static final int MAGIC_TRF2_ALT = 0x32465254; // ASCII "TRF2" LE
+    public static final int MAGIC_TRF2 = 0x54524632;      // "TRF2" (Ternary 1.58-bit BitNet format)
+    public static final int MAGIC_TRF2_ALT = 0x32465254;  // ASCII "TRF2" LE
     public static final int MAX_SEQ_LEN = 32;
     public static final int UNK_TOKEN_ID = 1;
-    public static final char WORD_START_CHAR = '\u2581'; // Lower One Eighth Block
+    public static final char WORD_START_CHAR = '\u2581';  // Lower One Eighth Block
 
-    // Model Hyperparameters
-    private int mVocabSize = 0;
-    private int mDModel = 0;
-    private int mDFf = 0;
-    private int mNHeads = 0;
-    private int mNLayers = 0;
-    private float mScaleEmb = 1.0f;
-    private float mScalePos = 1.0f;
-    private float mScaleDot = 1.0f;
-    private float mScaleEmbDot = 1.0f;
+    private static volatile boolean sLibraryLoaded = false;
 
-    // Weights (Embeddings stored compactly as byte {-128..127} INT8, 512 KB instead of 2 MB)
-    // Weights (Ternary weights stored as byte {-1, 0, 1})
-    private byte[] mEmbeddings;        // vocab_size * d_model (compact INT8)
-    private float[] mPosEmb;           // MAX_SEQ_LEN * d_model
-    private byte[] mQkvW;              // flat: [n_layers * (3 * d_model) * d_model]
-    private byte[] mProjW;             // flat: [n_layers * d_model * d_model]
-    private byte[] mMlpUpW;            // flat: [n_layers * d_ff * d_model]
-    private byte[] mMlpDownW;          // flat: [n_layers * d_model * d_ff]
-    private float[][] mGamma1Fused;    // [n_layers][d_model]
-    private float[][] mGamma2Fused;    // [n_layers][d_model]
-    private float[] mScaleProj;        // [n_layers]
-    private float[] mScaleDown;        // [n_layers]
-
-    // BPE Vocabulary, Trie & Precomputed Word Starts
-    private String[] mBpeVocab;
-    private TrieNode mBpeTrieRoot;
-    private int[] mWordStartTokenIds;
-
-    // Hyperparameter constants precomputed for fast forward pass
-    private float mInvD;
-    private float mScaleAttn;
-
-    // Pre-allocated intermediate buffers for 0-allocation forward pass
-    private final int[] mScratchTokenIds = new int[MAX_SEQ_LEN];
-    private float[] mX;                // MAX_SEQ_LEN * d_model
-    private float[] mNormed;           // MAX_SEQ_LEN * d_model
-    private float[] mQKV;              // MAX_SEQ_LEN * (3 * d_model)
-    private float[] mAttnOut;          // MAX_SEQ_LEN * d_model
-    private float[] mMlpHid;           // MAX_SEQ_LEN * d_ff
-    private float[] mMlpOut;           // MAX_SEQ_LEN * d_model
-    private float[] mHT;               // d_model
-    private float[] mAttnWeights;      // n_heads * MAX_SEQ_LEN * MAX_SEQ_LEN
-
-    // LRU Cache for h_T Hidden State (8 entries) to avoid redundant forward passes during typing
-    private static final int HT_CACHE_SIZE = 8;
-    private final long[] mCacheContextHashes = new long[HT_CACHE_SIZE];
-    private final int[] mCacheContextLengths = new int[HT_CACHE_SIZE];
-    private final int[][] mCacheTokens = new int[HT_CACHE_SIZE][MAX_SEQ_LEN];
-    private float[][] mCacheHiddenStates; // [HT_CACHE_SIZE][d_model]
-    private int mCacheNextSlot = 0;
-    private int mModelVersion = 1;
-
-    private volatile boolean mIsLoaded = false;
-
-    private static final class TrieNode {
-        int tokenId = -1;
-        char[] childChars;
-        TrieNode[] childNodes;
-
-        TrieNode getChild(char c) {
-            if (childChars == null) {
-                return null;
-            }
-            int len = childChars.length;
-            for (int i = 0; i < len; i++) {
-                if (childChars[i] == c) {
-                    return childNodes[i];
-                }
-            }
-            return null;
-        }
-
-        void addChild(char c, TrieNode node) {
-            if (childChars == null) {
-                childChars = new char[]{c};
-                childNodes = new TrieNode[]{node};
-                return;
-            }
-            int len = childChars.length;
-            char[] newChars = Arrays.copyOf(childChars, len + 1);
-            newChars[len] = c;
-            TrieNode[] newNodes = Arrays.copyOf(childNodes, len + 1);
-            newNodes[len] = node;
-            childChars = newChars;
-            childNodes = newNodes;
+    static {
+        try {
+            System.loadLibrary("microtransformer");
+            sLibraryLoaded = true;
+        } catch (UnsatisfiedLinkError e) {
+            Log.w(TAG, "Native library 'microtransformer' not found.", e);
+            sLibraryLoaded = false;
         }
     }
+
+    public static boolean isNativeAvailable() {
+        return sLibraryLoaded;
+    }
+
+    private long mNativeHandle = 0;
 
     public MicroTransformerModel() {
+        if (sLibraryLoaded) {
+            mNativeHandle = nativeCreate();
+        }
     }
 
-    /**
-     * Loads the model from a TRF2 (1.58-bit Ternary) binary file.
-     *
-     * @param modelFile The file containing the TRF2 weights and vocabulary.
-     * @return true if the model was successfully loaded, false otherwise.
-     */
     public synchronized boolean loadModel(File modelFile) {
-        if (modelFile == null || !modelFile.exists() || !modelFile.canRead()) {
+        if (mNativeHandle == 0 || modelFile == null || !modelFile.exists() || !modelFile.canRead()) {
             Log.e(TAG, "loadModel: Invalid or unreadable file: " + modelFile);
             return false;
         }
+        return nativeLoadModel(mNativeHandle, modelFile.getAbsolutePath());
+    }
 
-        unload();
-
-        try (FileInputStream fis = new FileInputStream(modelFile)) {
-
-            long fileSizeLong = modelFile.length();
-            if (fileSizeLong < 64 || fileSizeLong > 10 * 1024 * 1024) { // Max 10MB sanity check
-                Log.e(TAG, "loadModel: Invalid file size (" + fileSizeLong + " bytes)");
-                return false;
-            }
-            int fileSize = (int) fileSizeLong;
-            
-            byte[] fileBytes = new byte[fileSize];
-            int read = 0;
-            while (read < fileSize) {
-                int count = fis.read(fileBytes, read, fileSize - read);
-                if (count == -1) break;
-                read += count;
-            }
-            if (read != fileSize) {
-                Log.e(TAG, "loadModel: Failed to read entire file");
-                return false;
-            }
-
-            ByteBuffer buffer = ByteBuffer.wrap(fileBytes);
-            buffer.order(ByteOrder.LITTLE_ENDIAN);
-
-            // 1. Read Header (64 bytes)
-            int magic = buffer.getInt(0x00);
-            boolean validMagic = (magic == MAGIC_TRF2 || magic == MAGIC_TRF2_ALT ||
-                    (buffer.get(0) == 'T' && buffer.get(1) == 'R' && buffer.get(2) == 'F' && buffer.get(3) == '2'));
-            if (!validMagic) {
-                Log.e(TAG, String.format("loadModel: Invalid magic number (expected TRF2): 0x%08X", magic));
-                return false;
-            }
-
-            int version = buffer.getInt(0x04);
-            if (version != 2) {
-                Log.e(TAG, "loadModel: Unsupported version (expected 2 for TRF2): " + version);
-                return false;
-            }
-
-            mVocabSize = buffer.getInt(0x08);
-            mDModel = buffer.getInt(0x0C);
-            mNHeads = buffer.getInt(0x10);
-            mNLayers = buffer.getInt(0x14);
-            
-            // Safety bounds checks (P2 / P9 from 2.8T Audit)
-            if (mVocabSize <= 0 || mVocabSize > 128000 || 
-                mDModel <= 0 || mDModel > 4096 || 
-                mNHeads <= 0 || mNHeads > 64 || 
-                mNLayers <= 0 || mNLayers > 64) {
-                Log.e(TAG, "loadModel: Hyperparameters out of safe bounds.");
-                return false;
-            }
-            if (mDModel % 4 != 0) {
-                Log.e(TAG, "loadModel: d_model must be a multiple of 4 for unrolled SIMD loop.");
-                return false;
-            }
-            int offBpe = buffer.getInt(0x18);
-            int offEmb = buffer.getInt(0x1C);
-            int offPos = buffer.getInt(0x20);
-            int offLayer0 = buffer.getInt(0x24);
-            mScaleEmb = buffer.getFloat(0x28);
-            mScalePos = buffer.getFloat(0x2C);
-            mScaleDot = buffer.getFloat(0x30);
-
-            if (mVocabSize <= 0 || mDModel <= 0 || mNHeads <= 0 || mNLayers <= 0 || (mDModel % mNHeads) != 0) {
-                Log.e(TAG, "loadModel: Invalid header dimensions: vocab=" + mVocabSize +
-                        ", d_model=" + mDModel + ", n_heads=" + mNHeads + ", n_layers=" + mNLayers);
-                return false;
-            }
-
-            mInvD = 1.0f / (float) mDModel;
-            mScaleAttn = (float) (1.0 / Math.sqrt((double) mDModel / mNHeads));
-
-            // 2. Read BPE Table at offBpe
-            if (offBpe < 64 || offBpe >= fileSize) {
-                Log.e(TAG, "loadModel: Invalid off_bpe: " + offBpe);
-                return false;
-            }
-            buffer.position(offBpe);
-            int bpeVocabSize = buffer.getInt();
-            if (bpeVocabSize != mVocabSize) {
-                Log.w(TAG, "loadModel: BPE vocab size (" + bpeVocabSize + ") differs from header vocab (" + mVocabSize + ")");
-            }
-
-            int numBpeTokens = Math.min(bpeVocabSize, mVocabSize);
-            int[] offsets = new int[numBpeTokens];
-            for (int i = 0; i < numBpeTokens; i++) {
-                offsets[i] = buffer.getInt();
-            }
-
-            int stringPoolStart = offBpe + 4 + bpeVocabSize * 4;
-            mBpeVocab = new String[mVocabSize];
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(64);
-
-            for (int i = 0; i < numBpeTokens; i++) {
-                int strPos = stringPoolStart + offsets[i];
-                if (strPos < 0 || strPos >= fileSize) {
-                    Log.w(TAG, "loadModel: BPE token " + i + " string offset out of bounds: " + strPos);
-                    mBpeVocab[i] = "";
-                    continue;
-                }
-                buffer.position(strPos);
-                baos.reset();
-                byte b;
-                while (buffer.hasRemaining() && (b = buffer.get()) != 0) {
-                    baos.write(b);
-                }
-                mBpeVocab[i] = new String(baos.toByteArray(), StandardCharsets.UTF_8).replace(WORD_START_CHAR, ' ');
-            }
-            for (int i = numBpeTokens; i < mVocabSize; i++) {
-                mBpeVocab[i] = "";
-            }
-
-            buildBpeTrie();
-
-            // 3. Read Embeddings at offEmb (vocab_size * d_model bytes INT8 compactly stored in memory)
-            if (offEmb < 64 || offEmb >= fileSize) {
-                Log.e(TAG, "loadModel: Invalid off_emb: " + offEmb);
-                return false;
-            }
-            buffer.position(offEmb);
-            int embTotal = mVocabSize * mDModel;
-            mEmbeddings = new byte[embTotal];
-            buffer.get(mEmbeddings);
-            mScaleEmbDot = mScaleEmb * mScaleDot;
-
-            // Pre-calculate word-start candidate tokens once at load time to avoid hot-path allocations
-            int startCount = 0;
-            for (int i = 2; i < mVocabSize; i++) {
-                String piece = mBpeVocab[i];
-                if (piece != null && piece.length() > 1 && (piece.charAt(0) == ' ' || piece.charAt(0) == WORD_START_CHAR)) {
-                    boolean hasLetter = false;
-                    for (int k = 1; k < piece.length(); k++) {
-                        if (Character.isLetter(piece.charAt(k))) {
-                            hasLetter = true;
-                            break;
-                        }
-                    }
-                    if (hasLetter) startCount++;
-                }
-            }
-            mWordStartTokenIds = new int[startCount];
-            int startIdx = 0;
-            for (int i = 2; i < mVocabSize; i++) {
-                String piece = mBpeVocab[i];
-                if (piece != null && piece.length() > 1 && (piece.charAt(0) == ' ' || piece.charAt(0) == WORD_START_CHAR)) {
-                    boolean hasLetter = false;
-                    for (int k = 1; k < piece.length(); k++) {
-                        if (Character.isLetter(piece.charAt(k))) {
-                            hasLetter = true;
-                            break;
-                        }
-                    }
-                    if (hasLetter) mWordStartTokenIds[startIdx++] = i;
-                }
-            }
-
-            // 4. Read Positional Embeddings at offPos (16 * d_model bytes INT8)
-            if (offPos < 64 || offPos >= fileSize) {
-                Log.e(TAG, "loadModel: Invalid off_pos: " + offPos);
-                return false;
-            }
-            buffer.position(offPos);
-            int posTotal = MAX_SEQ_LEN * mDModel;
-            mPosEmb = new float[posTotal];
-            for (int i = 0; i < posTotal; i++) {
-                mPosEmb[i] = ((float) buffer.get()) * mScalePos;
-            }
-
-            // 5. Read Transformer Layers from offLayer0
-            if (offLayer0 < 64 || offLayer0 >= fileSize) {
-                Log.e(TAG, "loadModel: Invalid off_layer0: " + offLayer0);
-                return false;
-            }
-
-            int qkvPackedBytes = ((3 * mDModel) * mDModel + 3) / 4;
-            int projPackedBytes = (mDModel * mDModel + 3) / 4;
-
-            // Dynamically detect d_ff (1x d_model or 2x d_model) based on layer stride and file bounds
-            int rawBytes2x = qkvPackedBytes + projPackedBytes + ((2 * mDModel * mDModel + 3) / 4) + ((mDModel * 2 * mDModel + 3) / 4) +
-                    (mDModel * 4) + (mDModel * 4) + 4 + 4;
-            int stride2x = (rawBytes2x + 63) & ~63;
-            int dFf = (offLayer0 + (mNLayers - 1) * stride2x + rawBytes2x <= fileSize) ? (2 * mDModel) : mDModel;
-            mDFf = dFf;
-
-            mQkvW = new byte[mNLayers * (3 * mDModel) * mDModel];
-            mProjW = new byte[mNLayers * mDModel * mDModel];
-            mMlpUpW = new byte[mNLayers * dFf * mDModel];
-            mMlpDownW = new byte[mNLayers * mDModel * dFf];
-            mGamma1Fused = new float[mNLayers][mDModel];
-            mGamma2Fused = new float[mNLayers][mDModel];
-            mScaleProj = new float[mNLayers];
-            mScaleDown = new float[mNLayers];
-
-            int mlpUpPackedBytes = (dFf * mDModel + 3) / 4;
-            int mlpDownPackedBytes = (mDModel * dFf + 3) / 4;
-            int rawLayerBytes = qkvPackedBytes + projPackedBytes + mlpUpPackedBytes + mlpDownPackedBytes +
-                    (mDModel * 4) + (mDModel * 4) + 4 + 4;
-            int layerStride = (rawLayerBytes + 63) & ~63;
-
-            for (int l = 0; l < mNLayers; l++) {
-                int layerStart = offLayer0 + l * layerStride;
-                if (layerStart + rawLayerBytes > fileSize) {
-                    Log.e(TAG, "loadModel: Layer " + l + " exceeds file bounds: " + layerStart);
-                    return false;
-                }
-                buffer.position(layerStart);
-
-                // 1. QKV weights (Ternary 2-bit packed)
-                int qkvCount = (3 * mDModel) * mDModel;
-                readTernaryWeights(buffer, mQkvW, l * qkvCount, qkvCount);
-
-                // 2. Proj weights (Ternary 2-bit packed)
-                int projCount = mDModel * mDModel;
-                readTernaryWeights(buffer, mProjW, l * projCount, projCount);
-
-                // 3. MLP up weights (Ternary 2-bit packed)
-                int mlpUpCount = dFf * mDModel;
-                readTernaryWeights(buffer, mMlpUpW, l * mlpUpCount, mlpUpCount);
-
-                // 4. MLP down weights (Ternary 2-bit packed)
-                int mlpDownCount = mDModel * dFf;
-                readTernaryWeights(buffer, mMlpDownW, l * mlpDownCount, mlpDownCount);
-
-                // 5. Gamma1 fused: D floats
-                for (int i = 0; i < mDModel; i++) {
-                    mGamma1Fused[l][i] = buffer.getFloat();
-                }
-
-                // 6. Gamma2 fused: D floats
-                for (int i = 0; i < mDModel; i++) {
-                    mGamma2Fused[l][i] = buffer.getFloat();
-                }
-
-                // 7. Scale Proj & Scale Down (1 float each)
-                mScaleProj[l] = buffer.getFloat();
-                mScaleDown[l] = buffer.getFloat();
-            }
-
-            // Calculate dynamic hyperparameters based on mDModel and mNHeads
-            mInvD = 1.0f / (float) mDModel;
-            mScaleAttn = 1.0f / (float) Math.sqrt(mDModel / mNHeads);
-
-            // 6. Pre-allocate intermediate buffers for 0-allocation forward execution
-            mX = new float[MAX_SEQ_LEN * mDModel];
-            mNormed = new float[MAX_SEQ_LEN * mDModel];
-            mQKV = new float[MAX_SEQ_LEN * (3 * mDModel)];
-            mAttnOut = new float[MAX_SEQ_LEN * mDModel];
-            mMlpHid = new float[MAX_SEQ_LEN * dFf];
-            mMlpOut = new float[MAX_SEQ_LEN * mDModel];
-            mHT = new float[mDModel];
-            mAttnWeights = new float[mNHeads * MAX_SEQ_LEN * MAX_SEQ_LEN];
-
-            // Initialize LRU h_T cache with token verification
-            mModelVersion++;
-            mCacheHiddenStates = new float[HT_CACHE_SIZE][mDModel];
-            Arrays.fill(mCacheContextHashes, 0L);
-            Arrays.fill(mCacheContextLengths, 0);
-            for (int i = 0; i < HT_CACHE_SIZE; i++) {
-                Arrays.fill(mCacheTokens[i], 0);
-            }
-            mCacheNextSlot = 0;
-
-            mIsLoaded = true;
-            return true;
-        } catch (IOException | RuntimeException e) {
-            Log.e(TAG, "loadModel: Failed to load model file: " + modelFile, e);
-            unload();
+    public synchronized boolean loadModelBuffer(ByteBuffer buffer) {
+        if (mNativeHandle == 0 || buffer == null) {
             return false;
         }
+        return nativeLoadModelBuffer(mNativeHandle, buffer);
     }
 
-    private static void readTernaryWeights(ByteBuffer buffer, byte[] dest, int startOffset, int count) {
-        // Unpack 4 ternary {-1, 0, +1} weights per byte
-        int packedBytes = (count + 3) / 4;
-        int destIdx = startOffset;
-        int endIdx = startOffset + count;
-        for (int b = 0; b < packedBytes; b++) {
-            int val = buffer.get() & 0xFF;
-            for (int k = 0; k < 4 && destIdx < endIdx; k++) {
-                int code = (val >> (k * 2)) & 0x03;
-                if (code == 0x01) {
-                    dest[destIdx++] = (byte) 1;
-                } else if (code == 0x03) {
-                    dest[destIdx++] = (byte) -1;
-                } else {
-                    dest[destIdx++] = (byte) 0;
-                }
-            }
-        }
-    }
-
-    private void buildBpeTrie() {
-        mBpeTrieRoot = new TrieNode();
-        if (mBpeVocab == null) {
-            return;
-        }
-        for (int id = 0; id < mVocabSize; id++) {
-            String piece = mBpeVocab[id];
-            if (piece == null || piece.isEmpty()) {
-                continue;
-            }
-            TrieNode current = mBpeTrieRoot;
-            int len = piece.length();
-            for (int i = 0; i < len; i++) {
-                char c = piece.charAt(i);
-                TrieNode child = current.getChild(c);
-                if (child == null) {
-                    child = new TrieNode();
-                    current.addChild(c, child);
-                }
-                current = child;
-            }
-            current.tokenId = id;
-        }
-    }
-
-    /**
-     * Checks if the model is currently loaded and ready for inference.
-     */
-    public boolean isLoaded() {
-        return mIsLoaded;
-    }
-
-    /**
-     * Releases all memory buffers and model weights.
-     */
     public synchronized void unload() {
-        mIsLoaded = false;
-        mVocabSize = 0;
-        mDModel = 0;
-        mDFf = 0;
-        mNHeads = 0;
-        mNLayers = 0;
-        mScaleEmb = 1.0f;
-        mScalePos = 1.0f;
-        mScaleDot = 1.0f;
-        mScaleEmbDot = 1.0f;
-
-        mEmbeddings = null;
-        mPosEmb = null;
-        mQkvW = null;
-        mProjW = null;
-        mMlpUpW = null;
-        mMlpDownW = null;
-        mGamma1Fused = null;
-        mGamma2Fused = null;
-        mScaleProj = null;
-        mScaleDown = null;
-
-        mBpeVocab = null;
-        mBpeTrieRoot = null;
-        mWordStartTokenIds = null;
-
-        mX = null;
-        mNormed = null;
-        mQKV = null;
-        mAttnOut = null;
-        mMlpHid = null;
-        mMlpOut = null;
-        mHT = null;
-        mAttnWeights = null;
-
-        mCacheHiddenStates = null;
-        mModelVersion++;
-        Arrays.fill(mCacheContextHashes, 0L);
-        Arrays.fill(mCacheContextLengths, 0);
-        for (int i = 0; i < HT_CACHE_SIZE; i++) {
-            Arrays.fill(mCacheTokens[i], 0);
+        if (mNativeHandle != 0) {
+            nativeUnload(mNativeHandle);
         }
-        mCacheNextSlot = 0;
     }
 
+    public boolean isLoaded() {
+        return mNativeHandle != 0 && nativeIsLoaded(mNativeHandle);
+    }
 
-
-    /**
-     * Tokenizes a text into BPE token IDs writing directly to outTokens without String allocations.
-     *
-     * @param text The input text to tokenize.
-     * @param outTokens Destination array for token IDs.
-     * @param outOffset Starting offset in outTokens.
-     * @param maxTokens Maximum number of tokens to write.
-     * @return Number of tokens written.
-     */
-    public synchronized int tokenize(CharSequence text, int[] outTokens, int outOffset, int maxTokens) {
-        if (!mIsLoaded) {
-            Log.w(TAG, "tokenize: Model not loaded");
+    public int tokenize(CharSequence text, int[] outTokens, int outOffset, int maxTokens) {
+        if (mNativeHandle == 0 || text == null || outTokens == null || maxTokens <= 0 || outOffset < 0 || outOffset >= outTokens.length) {
             return 0;
         }
-        if (text == null || text.length() == 0 || outTokens == null || maxTokens <= 0 || outOffset < 0 || outOffset >= outTokens.length) {
-            return 0;
+        if (outOffset == 0) {
+            return nativeTokenize(mNativeHandle, text.toString(), outTokens, maxTokens);
         }
-        final int textLen = text.length();
-
-        int bufLen = 0;
-        boolean lastWasSpace = true;
-        for (int i = 0; i < textLen && bufLen < mScratchTextBuffer.length - 2; i++) {
-            char c = text.charAt(i);
-            if (c == WORD_START_CHAR || Character.isWhitespace(c) || !Character.isLetterOrDigit(c)) {
-                if (!lastWasSpace) {
-                    mScratchTextBuffer[bufLen++] = ' ';
-                    lastWasSpace = true;
-                }
-            } else {
-                mScratchTextBuffer[bufLen++] = Character.toLowerCase(c);
-                lastWasSpace = false;
-            }
+        int[] tmp = new int[maxTokens];
+        int count = nativeTokenize(mNativeHandle, text.toString(), tmp, maxTokens);
+        if (count > 0) {
+            System.arraycopy(tmp, 0, outTokens, outOffset, count);
         }
-        
-        while (bufLen > 0 && mScratchTextBuffer[bufLen - 1] == ' ') {
-            bufLen--;
-        }
-        if (bufLen <= 0) return 0;
-
-        final int limit = Math.min(maxTokens, outTokens.length - outOffset);
-        int count = 0;
-        int pos = 0;
-
-        final char firstChar = mScratchTextBuffer[0];
-        final boolean hasVirtualStart = (firstChar != ' ');
-        final int virtualLen = hasVirtualStart ? bufLen + 1 : bufLen;
-
-        while (pos < virtualLen && count < limit) {
-            int bestLen = 0;
-            int bestId = UNK_TOKEN_ID;
-
-            if (mBpeTrieRoot != null) {
-                TrieNode node = mBpeTrieRoot;
-                for (int i = pos; i < virtualLen; i++) {
-                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : mScratchTextBuffer[i - 1]) : mScratchTextBuffer[i];
-                    char c = (rawChar == ' ') ? ' ' : rawChar;
-
-                    TrieNode child = node.getChild(c);
-                    if (child == null) {
-                        break;
-                    }
-                    node = child;
-                    if (node.tokenId != -1) {
-                        bestLen = (i - pos) + 1;
-                        bestId = node.tokenId;
-                    }
-                }
-            }
-
-            if (bestLen == 0) {
-                bestLen = 1;
-                bestId = UNK_TOKEN_ID;
-            }
-            outTokens[outOffset + count++] = bestId;
-            pos += bestLen;
-        }
-
         return count;
     }
 
-    public synchronized int tokenize(CharSequence text, int[] outTokens, int maxTokens) {
+    public int tokenize(CharSequence text, int[] outTokens, int maxTokens) {
         return tokenize(text, outTokens, 0, maxTokens);
     }
 
-    private final int[] mTailRing = new int[256];
-    private final char[] mScratchTextBuffer = new char[512];
-
-    /**
-     * Tokenizes text and stores only the trailing tokens (the most recent context),
-     * scanning through the full sequence with a ring buffer to avoid allocations.
-     *
-     * @param text The input sequence.
-     * @param outTokens Array where the tail tokens will be written.
-     * @param maxTokens Maximum number of tail tokens to return.
-     * @return Number of tokens written to outTokens.
-     */
-    public synchronized int tokenizeTail(CharSequence text, int[] outTokens, int maxTokens) {
-        if (!mIsLoaded || text == null || maxTokens <= 0 || outTokens == null) return 0;
-        int len = text.length();
-        while (len > 0 && Character.isWhitespace(text.charAt(len - 1))) {
-            len--;
+    public int tokenizeTail(CharSequence text, int[] outTokens, int maxTokens) {
+        if (mNativeHandle == 0 || text == null || outTokens == null || maxTokens <= 0) {
+            return 0;
         }
-        if (len <= 0) return 0;
-
-        final int charWindow = Math.min(len, mScratchTextBuffer.length - 2);
-        final int windowStart = len - charWindow;
-
-        int bufLen = 0;
-        boolean lastWasSpace = true;
-        for (int i = windowStart; i < len; i++) {
-            char c = text.charAt(i);
-            if (c == WORD_START_CHAR || Character.isWhitespace(c) || !Character.isLetterOrDigit(c)) {
-                if (!lastWasSpace) {
-                    mScratchTextBuffer[bufLen++] = ' ';
-                    lastWasSpace = true;
-                }
-            } else {
-                mScratchTextBuffer[bufLen++] = Character.toLowerCase(c);
-                lastWasSpace = false;
-            }
-        }
-        
-        while (bufLen > 0 && mScratchTextBuffer[bufLen - 1] == ' ') {
-            bufLen--;
-        }
-        if (bufLen <= 0) return 0;
-
-        final int ringCap = mTailRing.length;
-        final int targetKeep = Math.min(maxTokens, Math.min(ringCap, outTokens.length));
-
-        final char firstChar = mScratchTextBuffer[0];
-        final boolean hasVirtualStart = (firstChar != ' ');
-        final int virtualLen = hasVirtualStart ? (bufLen + 1) : bufLen;
-
-        int pos = 0;
-        int count = 0;
-
-        while (pos < virtualLen) {
-            int bestLen = 0;
-            int bestId = UNK_TOKEN_ID;
-
-            if (mBpeTrieRoot != null) {
-                TrieNode node = mBpeTrieRoot;
-                for (int i = pos; i < virtualLen; i++) {
-                    char rawChar = hasVirtualStart ? ((i == 0) ? ' ' : mScratchTextBuffer[i - 1]) : mScratchTextBuffer[i];
-                    char c = (rawChar == ' ') ? ' ' : rawChar;
-
-                    TrieNode child = node.getChild(c);
-                    if (child == null) {
-                        break;
-                    }
-                    node = child;
-                    if (node.tokenId != -1) {
-                        bestLen = (i - pos) + 1;
-                        bestId = node.tokenId;
-                    }
-                }
-            }
-
-            if (bestLen == 0) {
-                bestLen = 1;
-                bestId = UNK_TOKEN_ID;
-            }
-
-            mTailRing[count % ringCap] = bestId;
-            count++;
-            pos += bestLen;
-        }
-
-        int keep = Math.min(count, targetKeep);
-        if (keep <= 0) return 0;
-
-        int start = (count - keep) % ringCap;
-        for (int i = 0; i < keep; i++) {
-            outTokens[i] = mTailRing[(start + i) % ringCap];
-        }
-        return keep;
+        return nativeTokenizeTail(mNativeHandle, text.toString(), outTokens, maxTokens);
     }
 
-    /**
-     * Tokenizes a text string into BPE token IDs using greedy longest match.
-     *
-     * @param text The input string to tokenize.
-     * @param maxTokens Maximum number of tokens to return.
-     * @return Array of token IDs of length at most maxTokens.
-     */
-    public synchronized int[] tokenize(String text, int maxTokens) {
-        if (!mIsLoaded || text == null || maxTokens <= 0) {
+    public int[] tokenize(String text, int maxTokens) {
+        if (mNativeHandle == 0 || text == null || maxTokens <= 0) {
             return new int[0];
         }
         int[] buffer = new int[maxTokens];
@@ -705,373 +104,74 @@ public final class MicroTransformerModel {
         return Arrays.copyOf(buffer, count);
     }
 
-    /**
-     * Executes the forward pass of the micro-transformer and writes the final hidden state vector
-     * h_T into outHidden.
-     *
-     * @param contextTokens Array of BPE token IDs.
-     * @param numTokens Number of valid tokens in contextTokens.
-     * @param outHidden Output buffer for h_T (size at least d_model).
-     * @return True if successful, false on error.
-     */
-    public synchronized boolean forward(int[] contextTokens, int numTokens, float[] outHidden) {
-        if (!mIsLoaded) {
-            Log.w(TAG, "forward: Model not loaded");
+    public boolean forward(int[] contextTokens, int numTokens, float[] outHidden) {
+        if (mNativeHandle == 0 || contextTokens == null || numTokens <= 0 || outHidden == null) {
             return false;
         }
-        if (contextTokens == null || numTokens <= 0 || outHidden == null || outHidden.length < mDModel) {
-            Log.w(TAG, "forward: Invalid arguments (numTokens=" + numTokens + ")");
-            return false;
-        }
-
-        int actualStart = Math.max(0, numTokens - MAX_SEQ_LEN);
-        int consecutiveUnk = 0;
-        for (int t = actualStart; t < numTokens; t++) {
-            if (contextTokens[t] == UNK_TOKEN_ID) {
-                consecutiveUnk++;
-                if (consecutiveUnk >= 2) {
-                    actualStart = t; // Reset context to just the last UNK
-                }
-            } else {
-                consecutiveUnk = 0;
-            }
-        }
-        final int start = actualStart;
-        final int T = numTokens - start;
-        final int D = mDModel;
-        final float invD = 1.0f / (float) D;
-        final int H = mNHeads;
-        final int dk = D / H;
-        final int dFf = mDFf;
-
-        // Compute 64-bit context hash for LRU caching
-        long contextHash = 1125899906842597L;
-        for (int t = 0; t < T; t++) {
-            int tok = contextTokens[start + t];
-            if (tok < 0 || tok >= mVocabSize) tok = UNK_TOKEN_ID;
-            contextHash = contextHash * 31L + tok;
-        }
-
-        if (mCacheHiddenStates != null) {
-            for (int i = 0; i < HT_CACHE_SIZE; i++) {
-                if (mCacheContextHashes[i] == contextHash && mCacheContextLengths[i] == T) {
-                    boolean exactMatch = true;
-                    final int[] cached = mCacheTokens[i];
-                    for (int t = 0; t < T; t++) {
-                        int tok = contextTokens[start + t];
-                        if (tok < 0 || tok >= mVocabSize) tok = UNK_TOKEN_ID;
-                        if (cached[t] != tok) {
-                            exactMatch = false;
-                            break;
-                        }
-                    }
-                    if (exactMatch) {
-                        System.arraycopy(mCacheHiddenStates[i], 0, outHidden, 0, D);
-                        return true; // Cache Hit (Verified Exact)
-                    }
-                }
-            }
-        }
-
-        // 1. Token Embeddings + Positional Embeddings (taking tail of contextTokens, scaling INT8 on-the-fly)
-        final float scaleEmb = mScaleEmb;
-        for (int t = 0; t < T; t++) {
-            int tok = contextTokens[start + t];
-            if (tok < 0 || tok >= mVocabSize) {
-                tok = UNK_TOKEN_ID;
-            }
-            int embOffset = tok * D;
-            int posOffset = t * D;
-            int xOffset = t * D;
-            for (int d = 0; d < D; d++) {
-                mX[xOffset + d] = (mEmbeddings[embOffset + d] * scaleEmb) + mPosEmb[posOffset + d];
-            }
-        }
-
-        // 2. Transformer layers
-        for (int layer = 0; layer < mNLayers; layer++) {
-            // 2a. RMSNorm pre-attention with fused gamma
-            float[] gamma1 = mGamma1Fused[layer];
-            for (int t = 0; t < T; t++) {
-                int offset = t * D;
-                float sumSq = 0.0f;
-                for (int d = 0; d < D; d++) {
-                    float val = mX[offset + d];
-                    sumSq += val * val;
-                }
-                float invRms = (float) (1.0 / Math.sqrt(sumSq * invD + 1e-5f));
-                for (int d = 0; d < D; d++) {
-                    mNormed[offset + d] = mX[offset + d] * invRms * gamma1[d];
-                }
-            }
-
-            // 2b. QKV projection: mQKV[t, :] = mNormed[t, :] * qkv_weight^T (Ternary additions/subtractions)
-            // qkv_weight has shape (3*D, D), row-major, elements in {-1, 0, +1}
-            int outDimQKV = 3 * D;
-            int qkvLayerOffset = layer * outDimQKV * D;
-            for (int t = 0; t < T; t++) {
-                int normedOffset = t * D;
-                int qkvRowOffset = t * outDimQKV;
-                for (int j = 0; j < outDimQKV; j++) {
-                    int wOffset = qkvLayerOffset + j * D;
-                    float sum = 0.0f;
-                    float s0 = 0f, s1 = 0f, s2 = 0f, s3 = 0f;
-                    for (int k = 0; k < D; k += 4) {
-                        s0 += mQkvW[wOffset + k] * mNormed[normedOffset + k];
-                        s1 += mQkvW[wOffset + k + 1] * mNormed[normedOffset + k + 1];
-                        s2 += mQkvW[wOffset + k + 2] * mNormed[normedOffset + k + 2];
-                        s3 += mQkvW[wOffset + k + 3] * mNormed[normedOffset + k + 3];
-                    }
-                    sum = (s0 + s1) + (s2 + s3);
-                    mQKV[qkvRowOffset + j] = sum;
-                }
-            }
-
-            // 2c. Causal Multi-Head Self-Attention
-            Arrays.fill(mAttnOut, 0, T * D, 0.0f);
-            final float scaleAttn = mScaleAttn;
-
-            for (int h = 0; h < H; h++) {
-                int qOff = h * dk;
-                int kOff = D + h * dk;
-                int vOff = 2 * D + h * dk;
-
-                for (int i = 0; i < T; i++) {
-                    int qRowOffset = i * outDimQKV + qOff;
-                    float maxVal = -Float.MAX_VALUE;
-
-                    // Compute attention scores for j <= i
-                    for (int j = 0; j <= i; j++) {
-                        int kRowOffset = j * outDimQKV + kOff;
-                        float dot = 0.0f;
-                        for (int d = 0; d < dk; d++) {
-                            dot += mQKV[qRowOffset + d] * mQKV[kRowOffset + d];
-                        }
-                        dot *= scaleAttn;
-                        int weightIdx = (h * MAX_SEQ_LEN + i) * MAX_SEQ_LEN + j;
-                        mAttnWeights[weightIdx] = dot;
-                        if (dot > maxVal) {
-                            maxVal = dot;
-                        }
-                    }
-
-                    // Softmax
-                    float sumExp = 0.0f;
-                    for (int j = 0; j <= i; j++) {
-                        int weightIdx = (h * MAX_SEQ_LEN + i) * MAX_SEQ_LEN + j;
-                        float val = (float) Math.exp(mAttnWeights[weightIdx] - maxVal);
-                        mAttnWeights[weightIdx] = val;
-                        sumExp += val;
-                    }
-                    float invSum = (sumExp > 0.0f) ? (1.0f / sumExp) : 0.0f;
-
-                    // Weighted sum of values -> output[i, h*dk + d]
-                    int outRowOffset = i * D + h * dk;
-                    for (int j = 0; j <= i; j++) {
-                        int weightIdx = (h * MAX_SEQ_LEN + i) * MAX_SEQ_LEN + j;
-                        float w = mAttnWeights[weightIdx] * invSum;
-                        int vRowOffset = j * outDimQKV + vOff;
-                        for (int d = 0; d < dk; d++) {
-                            mAttnOut[outRowOffset + d] += w * mQKV[vRowOffset + d];
-                        }
-                    }
-                }
-            }
-
-            // 2d. Output projection + Residual: mX += (mAttnOut * proj_weight^T) * s_proj
-            // proj_weight has shape (D, D), row-major, elements in {-1, 0, +1}
-            final float sProj = (mScaleProj != null && layer < mScaleProj.length) ? mScaleProj[layer] : 1.0f;
-            int projLayerOffset = layer * D * D;
-            for (int t = 0; t < T; t++) {
-                int attnOffset = t * D;
-                int xOffset = t * D;
-                for (int j = 0; j < D; j++) {
-                    int wOffset = projLayerOffset + j * D;
-                    float sum = 0.0f;
-                    float s0 = 0f, s1 = 0f, s2 = 0f, s3 = 0f;
-                    for (int k = 0; k < D; k += 4) {
-                        s0 += mProjW[wOffset + k] * mAttnOut[attnOffset + k];
-                        s1 += mProjW[wOffset + k + 1] * mAttnOut[attnOffset + k + 1];
-                        s2 += mProjW[wOffset + k + 2] * mAttnOut[attnOffset + k + 2];
-                        s3 += mProjW[wOffset + k + 3] * mAttnOut[attnOffset + k + 3];
-                    }
-                    sum = (s0 + s1) + (s2 + s3);
-                    mX[xOffset + j] += sum * sProj;
-                }
-            }
-
-            // 2e. RMSNorm pre-MLP with fused gamma
-            float[] gamma2 = mGamma2Fused[layer];
-            for (int t = 0; t < T; t++) {
-                int offset = t * D;
-                float sumSq = 0.0f;
-                for (int d = 0; d < D; d++) {
-                    float val = mX[offset + d];
-                    sumSq += val * val;
-                }
-                float invRms = (float) (1.0 / Math.sqrt(sumSq * invD + 1e-5f));
-                for (int d = 0; d < D; d++) {
-                    mNormed[offset + d] = mX[offset + d] * invRms * gamma2[d];
-                }
-            }
-
-            // 2f. MLP Forward:
-            // up = ReLU(mNormed * mlp_up^T) (shape: T x d_ff, Ternary additions/subtractions)
-            // mlp_up has shape (d_ff, D), elements in {-1, 0, +1}
-            int mlpUpLayerOffset = layer * dFf * D;
-            for (int t = 0; t < T; t++) {
-                int normedOffset = t * D;
-                int hidOffset = t * dFf;
-                for (int j = 0; j < dFf; j++) {
-                    int wOffset = mlpUpLayerOffset + j * D;
-                    float sum = 0.0f;
-                    float s0 = 0f, s1 = 0f, s2 = 0f, s3 = 0f;
-                    for (int k = 0; k < D; k += 4) {
-                        s0 += mMlpUpW[wOffset + k] * mNormed[normedOffset + k];
-                        s1 += mMlpUpW[wOffset + k + 1] * mNormed[normedOffset + k + 1];
-                        s2 += mMlpUpW[wOffset + k + 2] * mNormed[normedOffset + k + 2];
-                        s3 += mMlpUpW[wOffset + k + 3] * mNormed[normedOffset + k + 3];
-                    }
-                    sum = (s0 + s1) + (s2 + s3);
-                    mMlpHid[hidOffset + j] = (sum > 0.0f) ? sum : 0.0f; // ReLU
-                }
-            }
-
-            // down = mMlpHid * mlp_down^T (shape: T x D, Ternary additions/subtractions)
-            // mlp_down has shape (D, d_ff), elements in {-1, 0, +1}
-            // Residual: mX += down * s_down
-            final float sDown = (mScaleDown != null && layer < mScaleDown.length) ? mScaleDown[layer] : 1.0f;
-            int mlpDownLayerOffset = layer * D * dFf;
-            for (int t = 0; t < T; t++) {
-                int hidOffset = t * dFf;
-                int xOffset = t * D;
-                for (int j = 0; j < D; j++) {
-                    int wOffset = mlpDownLayerOffset + j * dFf;
-                    float sum = 0.0f;
-                    float s0 = 0f, s1 = 0f, s2 = 0f, s3 = 0f;
-                    for (int k = 0; k < dFf; k += 4) {
-                        s0 += mMlpDownW[wOffset + k] * mMlpHid[hidOffset + k];
-                        s1 += mMlpDownW[wOffset + k + 1] * mMlpHid[hidOffset + k + 1];
-                        s2 += mMlpDownW[wOffset + k + 2] * mMlpHid[hidOffset + k + 2];
-                        s3 += mMlpDownW[wOffset + k + 3] * mMlpHid[hidOffset + k + 3];
-                    }
-                    sum = (s0 + s1) + (s2 + s3);
-                    mX[xOffset + j] += sum * sDown;
-                }
-            }
-        }
-
-        // 3. RMSNorm final on the last token (t = T - 1)
-        int lastTokenOffset = (T - 1) * D;
-        float sumSq = 0.0f;
-        for (int d = 0; d < D; d++) {
-            float val = mX[lastTokenOffset + d];
-            sumSq += val * val;
-        }
-        float invRms = (float) (1.0 / Math.sqrt(sumSq * invD + 1e-5f));
-        for (int d = 0; d < D; d++) {
-            outHidden[d] = mX[lastTokenOffset + d] * invRms;
-        }
-
-        // Store in LRU Cache with exact token IDs
-        if (mCacheHiddenStates != null) {
-            int slot = mCacheNextSlot;
-            System.arraycopy(outHidden, 0, mCacheHiddenStates[slot], 0, D);
-            mCacheContextHashes[slot] = contextHash;
-            mCacheContextLengths[slot] = T;
-            for (int t = 0; t < T; t++) {
-                int tok = contextTokens[start + t];
-                if (tok < 0 || tok >= mVocabSize) tok = UNK_TOKEN_ID;
-                mCacheTokens[slot][t] = tok;
-            }
-            mCacheNextSlot = (slot + 1) % HT_CACHE_SIZE;
-        }
-
-        return true;
+        return nativeForward(mNativeHandle, contextTokens, numTokens, outHidden);
     }
 
-    private boolean isBadCandidate(int tokenId) {
-        if (tokenId < 0 || tokenId >= mVocabSize || tokenId == UNK_TOKEN_ID || tokenId == 0) {
-            return true;
-        }
-        if (mBpeVocab != null && tokenId < mBpeVocab.length) {
-            String s = mBpeVocab[tokenId];
-            if (s == null || s.isEmpty()) return true;
-            if (s.length() >= 2 && s.charAt(0) == '<' && s.charAt(s.length() - 1) == '>') {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Scores candidate tokens by computing dot(h_T, embedding[candidateId]) * scale_dot.
-     *
-     * @param hT Hidden state vector of length d_model (output of forward pass).
-     * @param candidateIds Array of candidate BPE token IDs.
-     * @param numCandidates Number of valid candidates in candidateIds.
-     * @param outLogits Output array for scores (size at least numCandidates).
-     */
-    public synchronized void scoreCandidates(float[] hT, int[] candidateIds, int numCandidates, float[] outLogits) {
-        if (!mIsLoaded || mEmbeddings == null) {
+    public void scoreCandidates(float[] hT, int[] candidateIds, int numCandidates, float[] outLogits) {
+        if (mNativeHandle == 0 || hT == null || candidateIds == null || outLogits == null || numCandidates <= 0) {
             return;
         }
-        if (hT == null || candidateIds == null || outLogits == null || numCandidates <= 0) {
-            return;
-        }
-
-        int D = mDModel;
-        int n = Math.min(numCandidates, Math.min(candidateIds.length, outLogits.length));
-        float scale = mScaleEmbDot;
-
-        for (int c = 0; c < n; c++) {
-            int candId = candidateIds[c];
-            if (isBadCandidate(candId)) {
-                outLogits[c] = -Float.MAX_VALUE;
-                continue;
-            }
-            int embOffset = candId * D;
-            float dot0 = 0.0f, dot1 = 0.0f, dot2 = 0.0f, dot3 = 0.0f;
-            for (int d = 0; d < D; d += 4) {
-                dot0 += hT[d] * mEmbeddings[embOffset + d];
-                dot1 += hT[d + 1] * mEmbeddings[embOffset + d + 1];
-                dot2 += hT[d + 2] * mEmbeddings[embOffset + d + 2];
-                dot3 += hT[d + 3] * mEmbeddings[embOffset + d + 3];
-            }
-            float dot = (dot0 + dot1) + (dot2 + dot3);
-            outLogits[c] = dot * scale;
-        }
+        nativeScoreCandidates(mNativeHandle, hT, candidateIds, numCandidates, outLogits);
     }
 
-    /**
-     * Returns the pre-calculated array of candidate token IDs that represent valid word starts.
-     */
+    public int scoreTopK(float[] hT, int[] candidateIds, int numCandidates, int k,
+                         int[] outTopTokens, float[] outTopScores) {
+        if (mNativeHandle == 0 || hT == null || candidateIds == null || outTopTokens == null || outTopScores == null || numCandidates <= 0 || k <= 0) {
+            return 0;
+        }
+        return nativeScoreTopK(mNativeHandle, hT, candidateIds, numCandidates, k, outTopTokens, outTopScores);
+    }
+
     public int[] getWordStartTokenIds() {
-        return mWordStartTokenIds != null ? mWordStartTokenIds : new int[0];
+        if (mNativeHandle == 0) return new int[0];
+        return nativeGetWordStartTokenIds(mNativeHandle);
     }
 
-    /**
-     * Returns the text of a BPE token given its ID, cleaning the word-start marker.
-     *
-     * @param tokenId The BPE token ID.
-     * @return Decoded token text with word-start marker replaced by space, or empty string on error.
-     */
-    public synchronized String getTokenText(int tokenId) {
-        if (!mIsLoaded || mBpeVocab == null) {
-            return "";
-        }
-        if (tokenId < 0 || tokenId >= mBpeVocab.length) {
-            return "";
-        }
-        final String piece = mBpeVocab[tokenId];
-        return (piece != null) ? piece : "";
+    public String getTokenText(int tokenId) {
+        if (mNativeHandle == 0) return "";
+        return nativeGetTokenText(mNativeHandle, tokenId);
     }
 
     public int getVocabSize() {
-        return mVocabSize;
+        if (mNativeHandle == 0) return 0;
+        return nativeGetVocabSize(mNativeHandle);
     }
 
     public int getModelDim() {
-        return mDModel;
+        if (mNativeHandle == 0) return 0;
+        return nativeGetModelDim(mNativeHandle);
     }
+
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+            if (mNativeHandle != 0) {
+                nativeDestroy(mNativeHandle);
+                mNativeHandle = 0;
+            }
+        } finally {
+            super.finalize();
+        }
+    }
+
+    // --- Native JNI Method Declarations ---
+    private static native long nativeCreate();
+    private static native void nativeDestroy(long handle);
+    private static native boolean nativeLoadModel(long handle, String filePath);
+    private static native boolean nativeLoadModelBuffer(long handle, ByteBuffer buffer);
+    private static native void nativeUnload(long handle);
+    private static native boolean nativeIsLoaded(long handle);
+    private static native int nativeTokenize(long handle, String text, int[] outTokens, int maxTokens);
+    private static native int nativeTokenizeTail(long handle, String text, int[] outTokens, int maxTokens);
+    private static native boolean nativeForward(long handle, int[] contextTokens, int numTokens, float[] outHidden);
+    private static native void nativeScoreCandidates(long handle, float[] hT, int[] candidateIds, int numCandidates, float[] outLogits);
+    private static native int nativeScoreTopK(long handle, float[] hT, int[] candidateIds, int numCandidates, int k, int[] outTopTokens, float[] outTopScores);
+    private static native int[] nativeGetWordStartTokenIds(long handle);
+    private static native String nativeGetTokenText(long handle, int tokenId);
+    private static native int nativeGetVocabSize(long handle);
+    private static native int nativeGetModelDim(long handle);
 }

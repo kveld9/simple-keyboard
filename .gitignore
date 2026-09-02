@@ -17,6 +17,7 @@ out/
 
 # Gradle files
 .gradle/
+.cxx/
 build/
 release/
 !gradle/wrapper/gradle-wrapper.jar

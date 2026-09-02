@@ -47,6 +47,18 @@ To maintain its zero-allocation architecture, minimal footprint, and strict priv
 - Cloud syncing or telemetry
 - Ads
 
+## Tech Stack & Versions
+
+- **Language:** Java 21 & Native C++ (Inference Engine)
+- **Android SDK:** API 37 (Target & Compile), API 23 (Min)
+- **Build System:** Gradle 9.3.1
+- **Key Dependencies:**
+  - `androidx.core:core:1.13.1`
+  - `androidx.appcompat:appcompat:1.7.0`
+  - `com.google.android.material:material:1.12.0` (Material You integration)
+  - `androidx.preference:preference:1.2.1`
+  - `androidx.autofill:autofill:1.3.0`
+
 ## Downloads
 
 Download the latest APK release from [GitHub Releases](https://github.com/soyelmismo/simple-keyboard/releases/latest).

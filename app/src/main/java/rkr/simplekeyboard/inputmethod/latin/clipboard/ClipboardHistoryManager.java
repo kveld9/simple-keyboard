@@ -70,6 +70,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     private ContentObserver mScreenshotObserver = null;
     private volatile ScreenshotInfo mCachedScreenshotInfo = null;
     private volatile boolean mLatestScreenshotUsed = false;
+    private volatile Uri mDismissedScreenshotUri = null;
     private Runnable mOnScreenshotChangeListener = null;
     private Runnable mOnPrimaryClipChangeListener = null;
 
@@ -402,6 +403,9 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     }
 
     private boolean isNewScreenshot(final Uri contentUri) {
+        if (mDismissedScreenshotUri != null && mDismissedScreenshotUri.equals(contentUri)) {
+            return false;
+        }
         return mCachedScreenshotInfo == null || !mCachedScreenshotInfo.uri.equals(contentUri);
     }
 
@@ -425,6 +429,7 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
         recycleCachedScreenshotInfo();
         mCachedScreenshotInfo = new ScreenshotInfo(contentUri, fileName, targetPath, dateAdded);
         mLatestScreenshotUsed = false;
+        mDismissedScreenshotUri = null;
 
         final long retentionMinutes = getRetentionMinutes();
         mDatabase.deleteExpiredClips(retentionMinutes);
@@ -616,6 +621,9 @@ public class ClipboardHistoryManager implements ClipboardManager.OnPrimaryClipCh
     public synchronized void clearScreenshotIfMatches(final String uriString) {
         if (uriString == null || (mCachedScreenshotInfo != null &&
                 (uriString.equals(mCachedScreenshotInfo.fullPath) || uriString.equals(mCachedScreenshotInfo.uri.toString())))) {
+            if (mCachedScreenshotInfo != null) {
+                mDismissedScreenshotUri = mCachedScreenshotInfo.uri;
+            }
             recycleCachedScreenshotInfo();
             mLatestScreenshotUsed = true;
             mMainHandler.post(() -> {

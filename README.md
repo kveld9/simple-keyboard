@@ -4,7 +4,7 @@
       
 ## About
 
-Simple Keyboard is a highly optimized, lightweight, privacy-focused keyboard based on the AOSP LatinIME. Designed for performance and battery efficiency, it features a small footprint (~2MB) and a native zero-allocation inference engine without sacrificing usability or advanced typing features.
+Simple Keyboard is a highly optimized, lightweight, privacy-focused keyboard based on [rkkr/simple-keyboard](https://github.com/rkkr/simple-keyboard) (originally derived from AOSP LatinIME). Designed for performance and battery efficiency, it features a small footprint (~2MB) and a native zero-allocation inference engine without sacrificing usability or advanced typing features.
 
 ### Key Features
 
@@ -77,7 +77,7 @@ To build the project from source, simply run the Gradle wrapper:
 - **[soyelmismo](https://github.com/soyelmismo)**
 
 ## Credits
-
+ 
 Licensed under the **Apache License Version 2.0**.
-
-This keyboard is originally based on the AOSP LatinIME keyboard. You can get the original source code here: [AOSP LatinIME](https://android.googlesource.com/platform/packages/inputmethods/LatinIME/).
+ 
+This project is based on [rkkr/simple-keyboard](https://github.com/rkkr/simple-keyboard), which was originally derived from the [AOSP LatinIME](https://android.googlesource.com/platform/packages/inputmethods/LatinIME/) keyboard.

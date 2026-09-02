@@ -1,7 +1,25 @@
+<div align="center">
+
 # Simple Keyboard
 
-<img src="images/screenshot-0.png" alt="closeup" width="500"/>
-      
+[![Latest Release](https://img.shields.io/github/v/release/soyelmismo/simple-keyboard?style=flat-square&color=blue)](https://github.com/soyelmismo/simple-keyboard/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/soyelmismo/simple-keyboard/total?style=flat-square&color=emerald)](https://github.com/soyelmismo/simple-keyboard/releases)
+[![Stars](https://img.shields.io/github/stars/soyelmismo/simple-keyboard?style=flat-square&color=amber)](https://github.com/soyelmismo/simple-keyboard/stargazers)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
+[![Android](https://img.shields.io/badge/Android-6.0%2B-green.svg?style=flat-square)](https://android.com)
+[![Footprint](https://img.shields.io/badge/Footprint-~2MB-orange.svg?style=flat-square)](#about)
+
+**A private, ultra-fast, and zero-allocation open-source Android keyboard.**  
+*Forked from [rkkr/simple-keyboard](https://github.com/rkkr/simple-keyboard) / [AOSP LatinIME](https://android.googlesource.com/platform/packages/inputmethods/LatinIME/)*
+
+[Key Features](#key-features) • [Privacy & Permissions](#privacy--permissions) • [Tech Stack](#tech-stack--versions) • [Downloads](#downloads) • [Build Instructions](#build-instructions) • [Maintainers](#maintainers--authors) • [Credits](#credits)
+
+<br/>
+
+<img src="images/screenshot-0.png" alt="Simple Keyboard Interface" width="480"/>
+
+</div>
+
 ## About
 
 Simple Keyboard is a highly optimized, lightweight, privacy-focused keyboard based on [rkkr/simple-keyboard](https://github.com/rkkr/simple-keyboard) (originally derived from AOSP LatinIME). Designed for performance and battery efficiency, it features a small footprint (~2MB) and a native zero-allocation inference engine without sacrificing usability or advanced typing features.
@@ -77,7 +95,7 @@ To build the project from source, simply run the Gradle wrapper:
 - **[soyelmismo](https://github.com/soyelmismo)**
 
 ## Credits
- 
+
 Licensed under the **Apache License Version 2.0**.
- 
+
 This project is based on [rkkr/simple-keyboard](https://github.com/rkkr/simple-keyboard), which was originally derived from the [AOSP LatinIME](https://android.googlesource.com/platform/packages/inputmethods/LatinIME/) keyboard.

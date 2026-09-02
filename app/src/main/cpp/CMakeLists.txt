@@ -16,6 +16,7 @@ add_library(
     microtransformer
     SHARED
     micro_transformer.cpp
+    micro_frontier_engine.cpp
     micro_transformer_jni.cpp
 )
 

@@ -163,6 +163,7 @@ tasks.register("compileHostNativeLib", Exec) {
     commandLine "clang++", "-shared", "-fPIC", "-O3", "-msse4.2", "-std=c++17",
             "-I${jniInclude}", "-I${jniIncludeLinux}",
             "src/main/cpp/micro_transformer.cpp",
+            "src/main/cpp/micro_frontier_engine.cpp",
             "src/main/cpp/micro_transformer_jni.cpp",
             "-o", outputFile.absolutePath
 }

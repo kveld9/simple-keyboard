@@ -113,14 +113,34 @@ public final class CustomDictionaryManager {
         }
         final String lang = languageCode.toLowerCase();
         final File dictDir = getDictionaryDir(context);
-        // Buscar transformer primero, luego neural
-        File modelFile = new File(dictDir, "transformer_" + lang + ".bin");
-        if (modelFile.exists() && modelFile.length() > 64) {
-            return modelFile;
+        File internalModel = new File(dictDir, "transformer_" + lang + ".bin");
+
+        // 1. Check Download directory for latest model
+        final File dlModel = new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "transformer_" + lang + ".bin");
+        if (dlModel.exists() && dlModel.length() > 64) {
+            if (!internalModel.exists() || dlModel.lastModified() > internalModel.lastModified() || dlModel.length() != internalModel.length()) {
+                try {
+                    File stage = File.createTempFile("stage_trf_", ".bin", dictDir);
+                    copyFileWithSync(dlModel, stage);
+                    publishStagedFile(stage, internalModel);
+                    Log.i(TAG, "Updated internal transformer model from Download: " + dlModel.getAbsolutePath());
+                } catch (Exception e) {
+                    Log.w(TAG, "Could not copy transformer model from Download", e);
+                }
+            }
         }
-        modelFile = new File(dictDir, "neural_" + lang + ".bin");
-        if (modelFile.exists() && modelFile.length() > 64) {
-            return modelFile;
+
+        if (internalModel.exists() && internalModel.length() > 64) {
+            return internalModel;
+        }
+
+        File neuralModel = new File(dictDir, "neural_" + lang + ".bin");
+        if (neuralModel.exists() && neuralModel.length() > 64) {
+            return neuralModel;
+        }
+
+        if (dlModel.exists() && dlModel.length() > 64) {
+            return dlModel;
         }
         return null;
     }
@@ -161,7 +181,8 @@ public final class CustomDictionaryManager {
                     final int magic = buffer.getInt(0);
                     if (magic == 0x54524631 || magic == 0x31465254
                             || magic == 0x54524632 || magic == 0x32465254
-                            || (buffer.get(0) == 'T' && buffer.get(1) == 'R' && buffer.get(2) == 'F' && (buffer.get(3) == '1' || buffer.get(3) == '2'))) {
+                            || magic == 0x54524633 || magic == 0x33465254
+                            || (buffer.get(0) == 'T' && buffer.get(1) == 'R' && buffer.get(2) == 'F' && (buffer.get(3) == '1' || buffer.get(3) == '2' || buffer.get(3) == '3'))) {
                         wordCount = buffer.getInt(8);
                     }
                 } else if (buffer.getInt(0) == 0x42444B53) {
@@ -417,8 +438,8 @@ public final class CustomDictionaryManager {
                         "Successfully imported and compiled AOSP .dict (" + decoded.words.size() + " words)");
             }
 
-            // Case 3: TRF2 (Ternary BitNet) Micro-Transformer model
-            if (magic == 0x54524632 || magic == 0x32465254) {
+            // Case 3: TRF2 / TRF3 (Ternary BitNet) Micro-Transformer model
+            if (magic == 0x54524632 || magic == 0x32465254 || magic == 0x54524633 || magic == 0x33465254) {
                 return importRawBinaryModel(tempFile, dictDir, detectedLang, fallbackLang, "transformer_", "Micro-Transformer model");
             }
 

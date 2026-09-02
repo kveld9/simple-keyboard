@@ -16,6 +16,8 @@ public final class MicroTransformerModel {
 
     public static final int MAGIC_TRF2 = 0x54524632;      // "TRF2" (Ternary 1.58-bit BitNet format)
     public static final int MAGIC_TRF2_ALT = 0x32465254;  // ASCII "TRF2" LE
+    public static final int MAGIC_TRF3 = 0x54524633;      // "TRF3" (Frontier K-Cheb BitNet format)
+    public static final int MAGIC_TRF3_ALT = 0x33465254;  // ASCII "TRF3" LE
     public static final int MAX_SEQ_LEN = 32;
     public static final int UNK_TOKEN_ID = 1;
     public static final char WORD_START_CHAR = '\u2581';  // Lower One Eighth Block

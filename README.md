@@ -62,6 +62,24 @@ The core inference engine and input pipeline are engineered under strict zero-al
 | **Memory Footprint** | **~2.06 MB APK** | Native C++ triage structures and quantized neural weights without runtime bloat. |
 | **Idle Battery Impact** | **0.0% background draw** | No wake-locks, no background daemons, and zero network polling. |
 
+### Benchmark Setup & Methodology
+
+To ensure scientific rigor and prevent methodological bias:
+- **Warm-up Phase:** 1,000 preliminary iterations were executed prior to measurement to trigger JIT compilation and stabilize cache hierarchies.
+- **Measurement Sample:** 10,000 consecutive forward passes measured with nanosecond monotonic timers (`System.nanoTime()`).
+- **Target Model Architecture:** TRF2 BitNet 1.58-bit ternary quantized transformer (`d_model=64`, 2 transformer layers, multi-head attention) with token context sequence.
+- **Reference Environments:**
+  - **Host Environment:** Linux x86_64, Java 21 LTS (Eclipse Adoptium OpenJDK), Gradle 9.3.1.
+  - **Embedded Target Device:** Xiaomi Redmi Note 5 (Qualcomm Snapdragon 636 / SDM660 Octa-Core, Android 11).
+
+### Reproducibility
+
+You can verify and reproduce the benchmark measurements locally by executing the test suite:
+
+```bash
+./gradlew testDebugUnitTest --tests "rkr.simplekeyboard.inputmethod.latin.dict.neural.*"
+```
+
 ### Privacy & Permissions
 
 Simple Keyboard does not have internet access and respects your privacy. We don't store or transmit your data. Period.

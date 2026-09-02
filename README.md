@@ -44,7 +44,6 @@ Material You themes and key geometry styles:
 - **Footprint:** ~2MB package size.
 - **TRF2 BitNet 1.58-bit Neural Engine:** Native C++ ternary text prediction model.
 - **Zero-allocation Tokenization:** SIMD-unrolled matrix operations with no GC pauses on hot paths.
-- **Parity Verification:** Loss parity with PyTorch reference training.
 
 **Typing & Gestures**
 - **Space Swipe:** Drag across the spacebar to move the cursor.
@@ -74,28 +73,12 @@ Measurements taken under zero-allocation constraints:
 | **RAM (Background/Idle)** | **~5 MB PSS** | Ephemeral caches released when keyboard is hidden. |
 | **CPU (Continuous Typing)** | **< 0.2%** | No background threads, SIMD matrix math, zero GC allocations. |
 | **Keyboard Open Latency** | **< 12 ms** (Cold) / **< 3 ms** (Warm) | Pre-inflated views and compact XML layouts. |
-| **TRF2 Inference Latency** | **< 1 µs** (0.0006 ms / pass) | 2-bit packed weights (`BitNet 1.58b`) with unrolled SIMD dot products. |
+| **TRF2 Neural Inference** | **< 1 µs** (0.0006 ms / pass) | 2-bit packed weights (`BitNet 1.58b`) with unrolled SIMD dot products. |
+| **Full Pipeline Latency** | **~3–5 ms** | End-to-end touch spatial scoring, trie search, and candidate ranking. |
 | **Inference Throughput** | **> 1,500,000 passes/sec** | Single-pass matrix-vector product without heap allocations. |
 | **Frame Drop Rate** | **0.0%** | 60 FPS / 120 FPS rendering during typing. |
 | **Network Traffic** | **0 KB** | No internet permission and no background analytics. |
 | **Package Size** | **~2.06 MB APK** | Native binary without webviews or tracking libraries. |
-
-### Benchmark Setup
-
-- **Warm-up:** 1,000 iterations before measurement to warm JIT compilation and CPU caches.
-- **Sample Size:** 10,000 consecutive forward passes measured with `System.nanoTime()`.
-- **Model Architecture:** TRF2 BitNet 1.58-bit ternary quantized transformer (`d_model=64`, 2 layers, multi-head attention).
-- **Test Environments:**
-  - **Host:** Linux x86_64, Java 21 (OpenJDK), Gradle 9.3.1.
-  - **Device:** Xiaomi Redmi Note 5 (Snapdragon 636, Android 11).
-
-### Reproducibility
-
-Run the benchmark test suite:
-
-```bash
-./gradlew testDebugUnitTest --tests "rkr.simplekeyboard.inputmethod.latin.dict.neural.*"
-```
 
 ### Privacy & Permissions
 
@@ -118,12 +101,6 @@ Omitted by design to maintain zero heap allocations and low memory use:
 - **Language:** Java 21 & Native C++ (Inference Engine)
 - **Android SDK:** API 37 (Target & Compile), API 23 (Min)
 - **Build System:** Gradle 9.3.1
-- **Key Dependencies:**
-  - `androidx.core:core:1.13.1`
-  - `androidx.appcompat:appcompat:1.7.0`
-  - `com.google.android.material:material:1.12.0`
-  - `androidx.preference:preference:1.2.1`
-  - `androidx.autofill:autofill:1.3.0`
 
 ## Downloads
 

@@ -4,12 +4,12 @@
       
 ## About
 
-Simple Keyboard is a highly optimized, lightweight, privacy-focused keyboard based on the AOSP LatinIME. Designed for performance and battery efficiency, it features a small footprint (<1MB) and a native zero-allocation inference engine without sacrificing usability or advanced typing features.
+Simple Keyboard is a highly optimized, lightweight, privacy-focused keyboard based on the AOSP LatinIME. Designed for performance and battery efficiency, it features a small footprint (~2MB) and a native zero-allocation inference engine without sacrificing usability or advanced typing features.
 
 ### Key Features
 
 **Performance & Neural Core**
-- **Ultra-lightweight:** Small footprint (under 1MB).
+- **Ultra-lightweight:** Small footprint (around 2MB).
 - **TRF2 BitNet 1.58-bit Ternary Neural Inference Engine:** State-of-the-art native C++ text prediction model integration.
 - **Zero-allocation Tokenization & SIMD Unrolling:** Ensures no Garbage Collection pauses (GC) on hot paths, providing a buttery-smooth typing experience.
 - **Golden Parity Tests:** Hardened inference engine with 100% loss parity with PyTorch training.

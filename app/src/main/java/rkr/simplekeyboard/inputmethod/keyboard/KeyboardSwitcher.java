@@ -268,7 +268,11 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private void setMainKeyboardFrame(
             final SettingsValues settingsValues,
             final KeyboardSwitchState toggleState) {
-        if (mLatinIME != null && (mLatinIME.isEmojiViewShowing() || mLatinIME.isClipboardHistoryShowing())) {
+        if (mLatinIME != null && mLatinIME.isEmojiViewShowing()) {
+            mKeyboardView.setVisibility(View.GONE);
+            return;
+        }
+        if (mLatinIME != null && mLatinIME.isClipboardHistoryShowing() && !mLatinIME.isClipboardSearchActive()) {
             mKeyboardView.setVisibility(View.GONE);
             return;
         }

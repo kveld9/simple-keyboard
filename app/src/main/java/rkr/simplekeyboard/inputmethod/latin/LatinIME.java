@@ -1539,6 +1539,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private int computeVisibleViewHeight(final View visibleKeyboardView) {
         if (isViewVisible(mClipboardHistoryView)) {
+            if (isClipboardSearchActive()) {
+                return mClipboardHistoryView.getHeight() + computeKeyboardWithTopBarHeight(visibleKeyboardView);
+            }
             return mClipboardHistoryView.getHeight();
         }
         if (isViewVisible(mEmojiPalettesView)) {
@@ -1853,6 +1856,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 return;
             }
             if (event.mCodePoint > 0) {
+                if (event.mCodePoint == Constants.CODE_ENTER) {
+                    return;
+                }
                 mClipboardHistoryView.appendSearchText(StringUtils.newSingleCodePointString(event.mCodePoint));
                 mKeyboardSwitcher.onEvent(event);
             }
@@ -2240,7 +2246,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         startActivity(intent);
     }
 
-    private boolean isClipboardSearchActive() {
+    public boolean isClipboardSearchActive() {
         return mClipboardHistoryView != null && mClipboardHistoryView.getVisibility() == View.VISIBLE && mClipboardHistoryView.isSearchActive();
     }
 

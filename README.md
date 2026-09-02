@@ -12,17 +12,31 @@
 **A private, ultra-fast, and zero-allocation open-source Android keyboard.**  
 *Forked from [rkkr/simple-keyboard](https://github.com/rkkr/simple-keyboard) / [AOSP LatinIME](https://android.googlesource.com/platform/packages/inputmethods/LatinIME/)*
 
-[Key Features](#key-features) • [Benchmarks & Performance](#benchmarks--performance-guarantees) • [Privacy & Permissions](#privacy--permissions) • [Tech Stack](#tech-stack--versions) • [Downloads](#downloads) • [Build Instructions](#build-instructions) • [Maintainers](#maintainers--authors) • [Credits](#credits)
-
-<br/>
-
-<img src="images/screenshot-0.png" alt="Simple Keyboard Interface" width="480"/>
+[Themes & Key Shapes](#themes--key-shapes) • [Key Features](#key-features) • [Benchmarks & Performance](#benchmarks--performance-guarantees) • [Privacy & Permissions](#privacy--permissions) • [Tech Stack](#tech-stack--versions) • [Downloads](#downloads) • [Build Instructions](#build-instructions) • [Maintainers](#maintainers--authors) • [Credits](#credits)
 
 </div>
 
 ## About
 
 Simple Keyboard is a highly optimized, lightweight, privacy-focused keyboard based on [rkkr/simple-keyboard](https://github.com/rkkr/simple-keyboard) (originally derived from AOSP LatinIME). Designed for performance and battery efficiency, it features a small footprint (~2MB) and a native zero-allocation inference engine without sacrificing usability or advanced typing features.
+
+## Themes & Key Shapes
+
+Simple Keyboard provides clean Material You theme adaptations and key geometry styles tailored for visual ergonomics and battery optimization:
+
+### Dynamic Color Palettes
+
+| **Monet Light** | **Monet Dark** | **AMOLED Black** |
+| :---: | :---: | :---: |
+| ![Monet Light Theme](images/theme-monet-light.png) | ![Monet Dark Theme](images/theme-monet-dark.png) | ![AMOLED Black Theme](images/theme-amoled-black.png) |
+| *Adaptive pastel lavender with high-contrast glyphs* | *Deep slate palette for low-light comfort* | *True `#000000` dark mode optimized for OLED efficiency* |
+
+### Key Geometry & Styles
+
+| **Pill / Capsule** | **Rounded Rectangle (Squircle)** | **Keyless / Borderless** |
+| :---: | :---: | :---: |
+| ![Pill Key Shape](images/keyshape-pill.png) | ![Rounded Key Shape](images/keyshape-rounded.png) | ![Borderless Key Shape](images/keyshape-borderless.png) |
+| *Contemporary Material You pill geometry* | *Classic structured squircle with clear boundaries* | *Minimalist flat design with unobstructed canvas* |
 
 ### Key Features
 

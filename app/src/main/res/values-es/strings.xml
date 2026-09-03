@@ -206,6 +206,10 @@
     <string name="remove_custom_dict_message">¿Deseas eliminar el diccionario importado para %s?</string>
     <string name="remove_custom_dict_confirm">Eliminar</string>
     <string name="custom_dict_removed_toast">Diccionario de %s eliminado</string>
+    <string name="custom_transformer_item_title">%1$s (%2$s) • Modelo neuronal</string>
+    <string name="custom_transformer_item_summary">Vocabulario de %1$d tokens · %2$s</string>
+    <string name="import_transformer_success">Modelo neuronal de transformador para %1$s importado correctamente (%2$d tokens)</string>
+    <string name="remove_custom_transformer_message">¿Deseas eliminar el modelo neuronal importado para %s?</string>
 
     <!-- Copia de seguridad y restauración -->
     <string name="settings_screen_backup">Copia de seguridad</string>

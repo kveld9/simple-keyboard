@@ -635,6 +635,9 @@ public final class BackupHelper {
     @NonNull
     public static List<String> selectBackupsToDelete(@Nullable final List<String> oldestFirst,
             final int maxKeep) {
+        if (maxKeep < 0) {
+            throw new IllegalArgumentException("maxKeep must be >= 0");
+        }
         final List<String> backups = new ArrayList<>();
         if (oldestFirst != null) {
             for (final String name : oldestFirst) {
@@ -643,7 +646,7 @@ public final class BackupHelper {
                 }
             }
         }
-        if (maxKeep < 0 || backups.size() <= maxKeep) {
+        if (backups.size() <= maxKeep) {
             return Collections.emptyList();
         }
         return new ArrayList<>(backups.subList(0, backups.size() - maxKeep));

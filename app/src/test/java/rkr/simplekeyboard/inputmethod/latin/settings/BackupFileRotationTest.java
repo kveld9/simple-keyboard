@@ -28,6 +28,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 @RunWith(JUnit4.class)
 public class BackupFileRotationTest {
@@ -94,5 +95,15 @@ public class BackupFileRotationTest {
                 "simplekeyboard_backup_20260101_120000.json",
                 "simplekeyboard_backup_20260102_120000.json");
         assertEquals(2, BackupHelper.selectBackupsToDelete(names, 0).size());
+    }
+
+    @Test
+    public void testNegativeKeepThrows() {
+        try {
+            BackupHelper.selectBackupsToDelete(
+                    Collections.singletonList("simplekeyboard_backup_20260101_120000.json"), -1);
+            fail("expected IllegalArgumentException");
+        } catch (final IllegalArgumentException expected) {
+        }
     }
 }

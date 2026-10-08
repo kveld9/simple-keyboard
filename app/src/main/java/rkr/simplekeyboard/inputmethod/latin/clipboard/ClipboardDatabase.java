@@ -336,7 +336,10 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         if (text == null) {
             return false;
         }
-        if (text.toLowerCase(Locale.getDefault()).contains(query.toLowerCase(Locale.getDefault()))) {
+        // Same folding for both branches: judge locale-lowered copies everywhere so
+        // the exact path and the fuzzy fallback never disagree on casing rules.
+        final Locale locale = Locale.getDefault();
+        if (text.toLowerCase(locale).contains(query.toLowerCase(locale))) {
             return true;
         }
         final String trimmedQuery = query.trim();
@@ -348,7 +351,8 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
             return false;
         }
         // Typo-tolerant fallback for queries typed in the search box.
-        return FuzzyMatcher.partialRatio(query, text) >= FUZZY_MATCH_THRESHOLD;
+        return FuzzyMatcher.partialRatio(
+                query.toLowerCase(locale), text.toLowerCase(locale)) >= FUZZY_MATCH_THRESHOLD;
     }
 
     public synchronized List<ClipboardHistoryEntry> getClips() {

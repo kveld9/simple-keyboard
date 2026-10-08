@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resources resolved at runtime via Resources.getIdentifier, invisible to the
+  static resource shrinker:
+  - keyboard layout sets (KeyboardLayoutSet.getXmlId, "xml")
+  - locale display names (LocaleResourceUtils, "string/locale_name_*")
+  - key labels referenced as !string/ names from keyboard XML (KeyboardTextsSet)
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@xml/keyboard_layout_set_*,@string/locale_name_*,@string/label_pause_key,@string/label_wait_key" />

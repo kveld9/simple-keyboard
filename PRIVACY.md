@@ -26,5 +26,6 @@ permission is ever added.
   from cloud backup and device transfer via `backup_rules.xml`, and clipboard
   retention is user-configurable with automatic expiry.
 - Backups are manual JSON exports to a user-chosen location. Auto-generated
-  names follow `simplekeyboard_backup_yyyyMMdd_HHmmss.json`, and rotation keeps
-  the 10 most recent files.
+  names follow `simplekeyboard_backup_yyyyMMdd_HHmmss.json`; the
+  `BackupHelper.selectBackupsToDelete` helper offers FIFO pruning that keeps
+  the 10 most recent files when cleaning a backup folder.

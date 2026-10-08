@@ -60,7 +60,8 @@ public final class DurationFormatter {
     /**
      * Parses free-form input into seconds: every digit counts, the last two
      * digits are seconds and the rest are minutes ({@code "1:05"} reads 65).
-     * Null, digit-free, or overflowing input reads 0.
+     * Null, digit-free, or overflowing input reads 0. Range validation belongs
+     * to callers: this method converts digits, it does not judge durations.
      */
     public static int parseInputToSeconds(final String input) {
         if (input == null) {

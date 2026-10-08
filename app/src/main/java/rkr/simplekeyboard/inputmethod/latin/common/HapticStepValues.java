@@ -32,6 +32,9 @@ public final class HapticStepValues {
     private static final double[] DEFAULT_FRACTIONS = { 0.0, 0.25, 0.5, 0.75 };
     private static final double[] HALF_FRACTIONS = { 0.0, 0.5 };
 
+    /** Tolerance below which a fraction displays as .00. */
+    private static final double NEAR_ZERO = 0.001;
+
     /** Returns a copy of the canonical quarter-step fractions. */
     public static double[] getDefaultFractions() {
         return DEFAULT_FRACTIONS.clone();
@@ -99,7 +102,7 @@ public final class HapticStepValues {
      * as {@code .00}.
      */
     public static String formatFractionDisplay(final double fraction) {
-        if (!(fraction > 0.001)) {
+        if (!(fraction > NEAR_ZERO)) {
             return ".00";
         }
         if (Math.abs(fraction - 0.25) < 0.01) {

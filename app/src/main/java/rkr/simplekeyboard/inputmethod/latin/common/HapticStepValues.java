@@ -29,10 +29,18 @@ public final class HapticStepValues {
         // This utility class is not publicly instantiable.
     }
 
-    /** Canonical quarter-step fractions. Do not mutate. */
-    public static final double[] DEFAULT_FRACTIONS = { 0.0, 0.25, 0.5, 0.75 };
-    /** Coarse half-step fractions. Do not mutate. */
-    public static final double[] HALF_FRACTIONS = { 0.0, 0.5 };
+    private static final double[] DEFAULT_FRACTIONS = { 0.0, 0.25, 0.5, 0.75 };
+    private static final double[] HALF_FRACTIONS = { 0.0, 0.5 };
+
+    /** Returns a copy of the canonical quarter-step fractions. */
+    public static double[] getDefaultFractions() {
+        return DEFAULT_FRACTIONS.clone();
+    }
+
+    /** Returns a copy of the coarse half-step fractions. */
+    public static double[] getHalfFractions() {
+        return HALF_FRACTIONS.clone();
+    }
 
     public static final int MAX_WEIGHT_WHOLE = 400;
     public static final int MAX_REPS = 100;
@@ -73,19 +81,22 @@ public final class HapticStepValues {
 
     /**
      * Combines a whole part and a fraction into a value rounded to two decimals.
-     * Negative input counts as 0.
+     * Negative or non-finite fractions count as 0; a fraction at or above 1
+     * wraps with modulo (e.g. 2.5 behaves as 0.5).
      */
     public static double combineWeight(final int whole, final double fraction) {
         final int safeWhole = Math.max(0, whole);
-        final double safeFraction =
-                (Double.isNaN(fraction) || Double.isInfinite(fraction) || fraction < 0.0)
-                        ? 0.0 : fraction;
-        return Math.round((safeWhole + safeFraction) * 100.0) / 100.0;
+        if (Double.isNaN(fraction) || Double.isInfinite(fraction) || fraction < 0.0) {
+            return (double) safeWhole;
+        }
+        final double normalized = fraction % 1.0;
+        return Math.round((safeWhole + normalized) * 100.0) / 100.0;
     }
 
     /**
      * Formats a fraction for settings display ({@code .00}, {@code .25},
-     * {@code .50}, {@code .75}). Cold path only.
+     * {@code .50}, {@code .75}). Cold path only. Values outside [0,1) render
+     * as {@code .00}.
      */
     public static String formatFractionDisplay(final double fraction) {
         if (!(fraction > 0.001)) {
@@ -101,10 +112,8 @@ public final class HapticStepValues {
             return ".75";
         }
         int hundredths = (int) Math.round(fraction * 100.0);
-        if (hundredths < 0) {
-            hundredths = 0;
-        } else if (hundredths > 99) {
-            hundredths = 99;
+        if (hundredths < 0 || hundredths >= 100) {
+            return ".00";
         }
         final String digits = Integer.toString(hundredths);
         return digits.length() < 2 ? ".0" + digits : "." + digits;

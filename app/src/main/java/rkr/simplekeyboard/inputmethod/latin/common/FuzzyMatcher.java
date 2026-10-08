@@ -47,7 +47,16 @@ public final class FuzzyMatcher {
     private static final ThreadLocal<int[]> S_ROW_PREV = new ThreadLocal<>();
     private static final ThreadLocal<int[]> S_ROW_CURR = new ThreadLocal<>();
 
+    /**
+     * Spans above this length allocate per call instead of pinning a large
+     * reused buffer on the thread forever.
+     */
+    private static final int MAX_CACHED_ROW = 1024;
+
     private static int[] getRow(final ThreadLocal<int[]> slot, final int size) {
+        if (size > MAX_CACHED_ROW) {
+            return new int[size];
+        }
         int[] row = slot.get();
         if (row == null || row.length < size) {
             row = new int[size];

@@ -88,4 +88,17 @@ public class FuzzyMatcherTest {
         final int partial = FuzzyMatcher.partialRatio("abcd", "wxyz abce vw");
         assertTrue(partial >= 0 && partial <= 100);
     }
+
+    @Test
+    public void testLargeSpansStayCorrect() {
+        final StringBuilder first = new StringBuilder();
+        final StringBuilder second = new StringBuilder();
+        for (int i = 0; i < 1500; i++) {
+            first.append('x');
+            second.append('x');
+        }
+        second.setCharAt(750, 'y');
+        assertEquals(0, FuzzyMatcher.levenshteinDistance(first, first));
+        assertEquals(1, FuzzyMatcher.levenshteinDistance(first, second));
+    }
 }

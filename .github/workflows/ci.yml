@@ -162,6 +162,7 @@ jobs:
 
           cd "${STAGE}"
           sha256sum simple-keyboard-*.apk > SHA256SUMS.txt
+          { echo "# SHA-256"; sha256sum simple-keyboard-*.apk; echo "# SHA-512"; sha512sum simple-keyboard-*.apk; echo "# MD5"; md5sum simple-keyboard-*.apk; } > "checksums-v${VERSION}.txt"
           cd ..
 
       # Master Workflow: 5. Create Tag & Publish GitHub Release Directly

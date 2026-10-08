@@ -30,12 +30,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -71,6 +74,10 @@ public final class BackupHelper {
     public static final int MAX_BACKUP_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
     public static final int MAX_STRING_LENGTH = 4096;
     public static final int MAX_USER_WORDS_LIMIT = 20000;
+
+    public static final String BACKUP_FILE_PREFIX = "simplekeyboard_backup_";
+    public static final String BACKUP_FILE_EXTENSION = ".json";
+    public static final int MAX_AUTO_BACKUPS = 10;
 
     public static final String PREF_RECENT_EMOJIS = "pref_recent_emojis";
     public static final String PREF_BACKUP_INCLUDE_USER_DICTIONARY = "pref_backup_include_user_dictionary";
@@ -605,5 +612,40 @@ public final class BackupHelper {
             }
         }
         return count;
+    }
+
+    @NonNull
+    public static String generateBackupFileName(final long timestamp) {
+        final SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US);
+        return BACKUP_FILE_PREFIX + formatter.format(new Date(timestamp)) + BACKUP_FILE_EXTENSION;
+    }
+
+    public static boolean isBackupFile(@Nullable final String name) {
+        return name != null
+                && name.startsWith(BACKUP_FILE_PREFIX)
+                && name.endsWith(BACKUP_FILE_EXTENSION);
+    }
+
+    /**
+     * Pure rotation helper ported from trackGym's AutoBackupEngine pruning:
+     * {@code oldestFirst} lists candidate names oldest first. Returns the backup
+     * names to delete so at most {@code maxKeep} remain. Non-backup names are
+     * ignored and never returned. Never returns null.
+     */
+    @NonNull
+    public static List<String> selectBackupsToDelete(@Nullable final List<String> oldestFirst,
+            final int maxKeep) {
+        final List<String> backups = new ArrayList<>();
+        if (oldestFirst != null) {
+            for (final String name : oldestFirst) {
+                if (isBackupFile(name)) {
+                    backups.add(name);
+                }
+            }
+        }
+        if (maxKeep < 0 || backups.size() <= maxKeep) {
+            return Collections.emptyList();
+        }
+        return new ArrayList<>(backups.subList(0, backups.size() - maxKeep));
     }
 }

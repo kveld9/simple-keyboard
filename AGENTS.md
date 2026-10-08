@@ -39,3 +39,9 @@ Reglas de rendimiento y estabilidad para este repositorio:
 
 Para el repositorio de entrenamiento (`simple-keyboard-neural`):
 - `transformer_neural.ipynb` *(Notebook con la destilación Gemma 26B, Focal Loss y Ruido QWERTY)*
+
+## 6. Flujo fork -> upstream
+- El desarrollo diario se realiza en ramas cortas dentro del fork `kveld9`.
+- La integración en `soyelmismo/simple-keyboard` se hace exclusivamente mediante PRs atómicos contra su rama `master`.
+- Prohibido hacer push directo hacia el repositorio upstream (`soyelmismo`).
+- Los commits locales dentro de las ramas del fork están permitidos y deben mantenerse atómicos.

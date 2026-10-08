@@ -6,9 +6,16 @@ updates:
     target-branch: master
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: gradle
     labels: []
     directory: /
     target-branch: master
     schedule:
       interval: monthly
+    groups:
+      minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

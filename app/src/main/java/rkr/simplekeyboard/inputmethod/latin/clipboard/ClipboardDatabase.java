@@ -29,6 +29,8 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     public static final int MAX_PINNED_CLIPS = 50;
     /** Minimum partial-ratio score (0-100) for typo-tolerant search matches. */
     public static final int FUZZY_MATCH_THRESHOLD = 70;
+    /** Clips longer than this skip the fuzzy fallback (exact substring still applies). */
+    public static final int FUZZY_MAX_TEXT_LENGTH = 1000;
     private static final int MAX_TEXT_LENGTH = 50000;
 
     private final Context mContext;
@@ -336,6 +338,14 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         }
         if (text.toLowerCase(Locale.getDefault()).contains(query.toLowerCase(Locale.getDefault()))) {
             return true;
+        }
+        final String trimmedQuery = query.trim();
+        final String trimmedText = text.trim();
+        // Directional guard: the clip must be able to contain the query, otherwise
+        // any short clip matches whenever it appears inside a longer query.
+        if (trimmedQuery.length() > trimmedText.length()
+                || trimmedText.length() > FUZZY_MAX_TEXT_LENGTH) {
+            return false;
         }
         // Typo-tolerant fallback for queries typed in the search box.
         return FuzzyMatcher.partialRatio(query, text) >= FUZZY_MATCH_THRESHOLD;

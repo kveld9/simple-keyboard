@@ -126,4 +126,23 @@ public class ClipboardSearchTest {
                 "https://github.com/soyelmismo/simple-keyboard", "gitlab"));
         assertFalse(ClipboardDatabase.matchesQuery("abc", "xyz"));
     }
+
+    @Test
+    public void testShortClipDoesNotMatchLongerQuery() {
+        assertFalse(ClipboardDatabase.matchesQuery("a", "abc"));
+        assertFalse(ClipboardDatabase.matchesQuery("hello", "say hello world"));
+    }
+
+    @Test
+    public void testLongClipSkipsFuzzyFallback() {
+        final StringBuilder longText = new StringBuilder();
+        for (int i = 0; i < 200; i++) {
+            longText.append("clipboard ");
+        }
+        final String text = longText.toString();
+        // Exact substring still matches past the fuzzy length cap.
+        assertTrue(ClipboardDatabase.matchesQuery(text, "clipboard"));
+        // Typo no longer fuzzy-matches past the cap.
+        assertFalse(ClipboardDatabase.matchesQuery(text, "clipboad"));
+    }
 }

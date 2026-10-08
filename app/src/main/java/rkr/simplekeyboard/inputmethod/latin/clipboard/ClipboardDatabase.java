@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
+import rkr.simplekeyboard.inputmethod.latin.common.FuzzyMatcher;
+
 public class ClipboardDatabase extends SQLiteOpenHelper {
     private static final String TAG = "ClipboardDatabase";
     private static final String DATABASE_NAME = "clipboard_history.db";
@@ -25,6 +27,8 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     private static final String COL_URI = "uri";
     public static final int MAX_CLIPS = 50;
     public static final int MAX_PINNED_CLIPS = 50;
+    /** Minimum partial-ratio score (0-100) for typo-tolerant search matches. */
+    public static final int FUZZY_MATCH_THRESHOLD = 70;
     private static final int MAX_TEXT_LENGTH = 50000;
 
     private final Context mContext;
@@ -330,7 +334,11 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         if (text == null) {
             return false;
         }
-        return text.toLowerCase(Locale.getDefault()).contains(query.toLowerCase(Locale.getDefault()));
+        if (text.toLowerCase(Locale.getDefault()).contains(query.toLowerCase(Locale.getDefault()))) {
+            return true;
+        }
+        // Typo-tolerant fallback for queries typed in the search box.
+        return FuzzyMatcher.partialRatio(query, text) >= FUZZY_MATCH_THRESHOLD;
     }
 
     public synchronized List<ClipboardHistoryEntry> getClips() {

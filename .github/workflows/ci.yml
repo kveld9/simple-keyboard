@@ -169,7 +169,7 @@ jobs:
       # Master Workflow: 5. Create Tag & Publish GitHub Release Directly
       - name: Publish GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.semver.outputs.version }}
           name: v${{ steps.semver.outputs.version }}

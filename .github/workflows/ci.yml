@@ -124,7 +124,7 @@ jobs:
             -PversionCode="${{ steps.semver.outputs.version_code }}"
 
       # Master Workflow: 4. Package Artifacts & Compute Checksums
-      - name: Package Release & Debug APKs
+      - name: Package Release APKs
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           set -euo pipefail
@@ -146,24 +146,9 @@ jobs:
             fi
           done
 
-          # Copy architecture-specific & universal debug APKs
-          for apk in app/build/outputs/apk/debug/app-*-debug.apk app/build/outputs/apk/debug/app-debug.apk; do
-            if [ -f "$apk" ]; then
-              base=$(basename "$apk")
-              if [ "$base" = "app-debug.apk" ]; then
-                target="simple-keyboard-${VERSION}-universal-debug.apk"
-              else
-                arch="${base#app-}"
-                target="simple-keyboard-${VERSION}-${arch}"
-              fi
-              cp "$apk" "${STAGE}/${target}"
-            fi
-          done
-
           cd "${STAGE}"
-          S256=$(sha256sum simple-keyboard-*.apk)
-          printf '%s\n' "${S256}" > SHA256SUMS.txt
-          { echo "# SHA-256"; printf '%s\n' "${S256}"; echo "# SHA-512"; sha512sum simple-keyboard-*.apk; echo "# MD5 (legacy, corruption detection only - not for security verification)"; md5sum simple-keyboard-*.apk; } > "checksums-v${VERSION}.txt"
+          S256=$(sha256sum simple-keyboard-*-release.apk)
+          { echo "# SHA-256"; printf '%s\n' "${S256}"; echo "# SHA-512"; sha512sum simple-keyboard-*-release.apk; echo "# MD5 (legacy, corruption detection only - not for security verification)"; md5sum simple-keyboard-*-release.apk; } > "checksums-v${VERSION}.txt"
           cd ..
 
       # Master Workflow: 5. Create Tag & Publish GitHub Release Directly
@@ -187,7 +172,6 @@ jobs:
             | `simple-keyboard-${{ steps.semver.outputs.version }}-x86_64-release.apk` | 64-bit x86 (Emulators / ChromeOS, ~3 MB) |
             | `simple-keyboard-${{ steps.semver.outputs.version }}-x86-release.apk` | 32-bit x86 (Emulators, ~2.9 MB) |
             | `simple-keyboard-${{ steps.semver.outputs.version }}-universal-release.apk` | Universal Production Build (All ABIs) |
-            | `SHA256SUMS.txt` | SHA-256 Checksum Verification |
             | `checksums-v${{ steps.semver.outputs.version }}.txt` | Multi-hash checksums (SHA-256, SHA-512, MD5 legacy only; for sha256sum -c first filter the 64-hex-char lines with grep) |
           files: artifacts/*
           fail_on_unmatched_files: true

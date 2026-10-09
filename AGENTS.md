@@ -39,3 +39,13 @@ Reglas de rendimiento y estabilidad para este repositorio:
 
 Para el repositorio de entrenamiento (`simple-keyboard-neural`):
 - `transformer_neural.ipynb` *(Notebook con la destilación Gemma 26B, Focal Loss y Ruido QWERTY)*
+
+
+## 6. Idioma y localización modular (i18n)
+
+- **Idioma del repositorio**: inglés estricto. Todo el código, identificadores, comentarios, commits (Conventional Commits), títulos y descripciones de PRs, issues y documentación (`README.md`, `CONTRIBUTING.md`) se escribe exclusivamente en inglés.
+- **Texto de UI en recursos, cero hardcodeo**: ningún texto visible vive en layouts, diálogos o pantallas de ajustes. Todo texto de usuario reside en recursos `string`/`string-array`.
+- **Base y fuente única de verdad**: `app/src/main/res/values/strings.xml` (inglés). El locale base se declara en `app/src/main/res/resources.properties` (`unqualifiedResLocale=en`).
+- **Módulos de recursos**: `values/strings.xml` es el único módulo traducible. `values/strings-action-keys.xml` y `values/strings-appname.xml` son íntegramente `translatable="false"` (etiquetas internas, nombres y URLs) y nunca se copian a un `values-<locale>/`.
+- **Contribuir un idioma**: crear `app/src/main/res/values-<locale>/strings.xml` espejando las claves del inglés base, manteniendo intactos los placeholders `<xliff:g>` y los argumentos de formato (`%1$s`, `%d`). Las entradas `translatable="false"` se omiten: resuelven por fallback al inglés automáticamente.
+- **Build sin fricción**: `app/build.gradle` deriva el conjunto empaquetado (`resourceConfigurations`) del base más cada directorio `values-<locale>/` que contenga `strings.xml`. Las traducciones de librerías para otros locales se descartan. Agregar un directorio de traducción es el único paso necesario; ningún cambio de build hace falta.

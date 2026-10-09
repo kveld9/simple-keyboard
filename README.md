@@ -12,7 +12,7 @@
 **Private, zero-allocation open-source Android keyboard.**  
 *Forked from [rkkr/simple-keyboard](https://github.com/rkkr/simple-keyboard) / [AOSP LatinIME](https://android.googlesource.com/platform/packages/inputmethods/LatinIME/)*
 
-[Themes & Key Shapes](#themes--key-shapes) • [Key Features](#key-features) • [Benchmarks & Performance](#benchmarks--performance) • [Privacy & Permissions](#privacy--permissions) • [Tech Stack](#tech-stack--versions) • [Downloads](#downloads) • [Build Instructions](#build-instructions) • [Maintainers](#maintainers) • [Credits](#credits)
+[Themes & Key Shapes](#themes--key-shapes) • [Key Features](#key-features) • [Benchmarks & Performance](#benchmarks--performance) • [Privacy & Permissions](#privacy--permissions) • [Localization](#localization--contributing-translations) • [Tech Stack](#tech-stack--versions) • [Downloads](#downloads) • [Build Instructions](#build-instructions) • [Maintainers](#maintainers) • [Credits](#credits)
 
 </div>
 
@@ -95,6 +95,43 @@ Omitted by design to maintain zero heap allocations and low memory use:
 - Gesture / swipe typing
 - Cloud sync and analytics
 - Ads
+
+## Localization & Contributing Translations
+
+Simple Keyboard is built to be easily localizable by the community. All UI text is strictly modularized into Android string resources without hardcoded strings in settings screens and dialogs.
+
+### String resource modules
+
+| File | Content | Translating it |
+| :--- | :--- | :--- |
+| `app/src/main/res/values/strings.xml` | All translatable UI text (English base) | **Yes: copy and translate** |
+| `app/src/main/res/values/strings-action-keys.xml` | Internal key labels, all `translatable="false"` | No: never copy |
+| `app/src/main/res/values/strings-appname.xml` | App names and URLs, all `translatable="false"` | No: never copy |
+| `app/src/main/res/resources.properties` | Base locale declaration (`unqualifiedResLocale=en`) | No: single source of truth |
+
+Entries marked `translatable="false"` (units, internal values, URLs) always fall back to the base file; omitting them from a translation is correct.
+
+The packaged locale set is derived in `app/build.gradle` from every `values-<locale>/` directory that ships a `strings.xml`, on top of the base locale. Library translations for any other locale are stripped, so adding a translation directory is the only step needed: no build change is required.
+
+### How to contribute a new language
+
+1. Locate the default string resource file:
+   ```
+   app/src/main/res/values/strings.xml
+   ```
+2. Create a new locale resource directory under `app/src/main/res/` named `values-<locale_code>/` (e.g., `values-fr/` for French, `values-pt/` for Portuguese, `values-de/` for German).
+3. Copy only `strings.xml` into the new folder:
+   ```
+   app/src/main/res/values-<locale_code>/strings.xml
+   ```
+4. Translate each string value keeping the XML `name` keys, `<xliff:g>` placeholders, and format arguments (`%1$s`, `%d`) unchanged:
+   ```xml
+   <!-- Example: values-fr/strings.xml -->
+   <string name="select_language">Langues</string>
+   <string name="clipboard_empty">Presse-papiers vide</string>
+   ```
+5. Do not copy entries marked `translatable="false"` or the non-translatable modules (`strings-action-keys.xml`, `strings-appname.xml`); they fall back to English automatically.
+6. Submit a Pull Request with your translation.
 
 ## Tech Stack & Versions
 

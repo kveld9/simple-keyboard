@@ -110,4 +110,39 @@ public class ClipboardSearchTest {
         boolean token2Valid = (token2 == currentToken);
         assertTrue(token2Valid);
     }
+
+    @Test
+    public void testTypoTolerantSearch() {
+        // Single typo still finds the clip ("clipboad" scores 89 against "clipboar").
+        assertTrue(ClipboardDatabase.matchesQuery("clipboard history", "clipboad"));
+        // Missing letter still finds the clip ("meting" scores 86 against "meeting").
+        assertTrue(ClipboardDatabase.matchesQuery("meeting notes", "meting"));
+    }
+
+    @Test
+    public void testTypoThresholdRejectsLookalikes() {
+        // "gitlab" scores 67 against "github": below threshold, still rejected.
+        assertFalse(ClipboardDatabase.matchesQuery(
+                "https://github.com/soyelmismo/simple-keyboard", "gitlab"));
+        assertFalse(ClipboardDatabase.matchesQuery("abc", "xyz"));
+    }
+
+    @Test
+    public void testShortClipDoesNotMatchLongerQuery() {
+        assertFalse(ClipboardDatabase.matchesQuery("a", "abc"));
+        assertFalse(ClipboardDatabase.matchesQuery("hello", "say hello world"));
+    }
+
+    @Test
+    public void testLongClipSkipsFuzzyFallback() {
+        final StringBuilder longText = new StringBuilder();
+        for (int i = 0; i < 200; i++) {
+            longText.append("clipboard ");
+        }
+        final String text = longText.toString();
+        // Exact substring still matches past the fuzzy length cap.
+        assertTrue(ClipboardDatabase.matchesQuery(text, "clipboard"));
+        // Typo no longer fuzzy-matches past the cap.
+        assertFalse(ClipboardDatabase.matchesQuery(text, "clipboad"));
+    }
 }

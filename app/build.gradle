@@ -74,7 +74,12 @@ if (resourcesPropsFile.isFile()) {
 }
 def localeDirPattern = ~/values-([a-z]{2,3}(?:-r[A-Z]{2})?)/
 def translatedLocales = []
-resDir.listFiles()?.each { dir ->
+    resDir.listFiles()?.each { file ->
+        if (file.isDirectory() && new File(file, "strings.xml").isFile()) {
+            def matcher = localeDirPattern.matcher(file.name)
+            if (matcher.matches()) translatedLocales << matcher.group(1)
+        }
+    }
     if (new File(dir, "strings.xml").isFile()) {
         def matcher = localeDirPattern.matcher(dir.name)
         if (matcher.matches()) translatedLocales << matcher.group(1)

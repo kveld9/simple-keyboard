@@ -61,6 +61,26 @@ def computeVersionCode(String versionName) {
 def appVersionName = project.findProperty("versionName") ?: getGitVersionName()
 def appVersionCode = project.findProperty("versionCode") ? project.property("versionCode").toInteger() : computeVersionCode(appVersionName)
 
+// Locales packaged into the APK: the base locale declared in res/resources.properties plus
+// every values-<locale> directory that ships a strings.xml. Translations bundled by libraries
+// for any other locale are stripped, so adding a translation directory is the only step needed.
+def resDir = file("src/main/res")
+def baseLocale = "en"
+def resourcesPropsFile = new File(resDir, "resources.properties")
+if (resourcesPropsFile.isFile()) {
+    def resourcesProps = new Properties()
+    resourcesPropsFile.withInputStream { resourcesProps.load(it) }
+    baseLocale = resourcesProps.getProperty("unqualifiedResLocale", baseLocale)
+}
+def localeDirPattern = ~/values-([a-z]{2,3}(?:-r[A-Z]{2})?)/
+def translatedLocales = []
+resDir.listFiles()?.each { dir ->
+    if (new File(dir, "strings.xml").isFile()) {
+        def matcher = localeDirPattern.matcher(dir.name)
+        if (matcher.matches()) translatedLocales << matcher.group(1)
+    }
+}
+
 android {
     ndkVersion "29.0.14206865"
     defaultConfig {
@@ -70,7 +90,7 @@ android {
         targetSdkVersion 37
         versionCode appVersionCode
         versionName appVersionName
-        resourceConfigurations += ["en", "es", "ru"]
+        resourceConfigurations += ([baseLocale] + translatedLocales)
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {

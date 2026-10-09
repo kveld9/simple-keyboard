@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
+import rkr.simplekeyboard.inputmethod.latin.common.FuzzyMatcher;
+
 public class ClipboardDatabase extends SQLiteOpenHelper {
     private static final String TAG = "ClipboardDatabase";
     private static final String DATABASE_NAME = "clipboard_history.db";
@@ -25,6 +27,10 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
     private static final String COL_URI = "uri";
     public static final int MAX_CLIPS = 50;
     public static final int MAX_PINNED_CLIPS = 50;
+    /** Minimum partial-ratio score (0-100) for typo-tolerant search matches. */
+    public static final int FUZZY_MATCH_THRESHOLD = 70;
+    /** Clips longer than this skip the fuzzy fallback (exact substring still applies). */
+    public static final int FUZZY_MAX_TEXT_LENGTH = 1000;
     private static final int MAX_TEXT_LENGTH = 50000;
 
     private final Context mContext;
@@ -330,7 +336,23 @@ public class ClipboardDatabase extends SQLiteOpenHelper {
         if (text == null) {
             return false;
         }
-        return text.toLowerCase(Locale.getDefault()).contains(query.toLowerCase(Locale.getDefault()));
+        // Same folding for both branches: judge locale-lowered copies everywhere so
+        // the exact path and the fuzzy fallback never disagree on casing rules.
+        final Locale locale = Locale.getDefault();
+        if (text.toLowerCase(locale).contains(query.toLowerCase(locale))) {
+            return true;
+        }
+        final String trimmedQuery = query.trim();
+        final String trimmedText = text.trim();
+        // Directional guard: the clip must be able to contain the query, otherwise
+        // any short clip matches whenever it appears inside a longer query.
+        if (trimmedQuery.length() > trimmedText.length()
+                || trimmedText.length() > FUZZY_MAX_TEXT_LENGTH) {
+            return false;
+        }
+        // Typo-tolerant fallback for queries typed in the search box.
+        return FuzzyMatcher.partialRatio(
+                query.toLowerCase(locale), text.toLowerCase(locale)) >= FUZZY_MATCH_THRESHOLD;
     }
 
     public synchronized List<ClipboardHistoryEntry> getClips() {

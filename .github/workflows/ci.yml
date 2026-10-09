@@ -93,6 +93,11 @@ jobs:
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+          if [ -n "$PREV_TAG" ] && [ -z "$(git log "${PREV_TAG}..HEAD" --oneline)" ]; then
+            echo "skip_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_release=false" >> "$GITHUB_OUTPUT"
+          fi
           {
             echo "changelog<<CHANGELOG_EOF"
             echo "$BODY"
@@ -153,7 +158,7 @@ jobs:
 
       # Master Workflow: 5. Create Tag & Publish GitHub Release Directly
       - name: Publish GitHub Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && steps.semver.outputs.skip_release != 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.semver.outputs.version }}

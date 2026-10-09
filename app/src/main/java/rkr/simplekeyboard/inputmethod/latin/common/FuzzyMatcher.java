@@ -49,7 +49,8 @@ public final class FuzzyMatcher {
 
     /**
      * Spans above this length allocate per call instead of pinning a large
-     * reused buffer on the thread forever.
+     * reused buffer on the thread forever. 1024 covers typical clipboard
+     * entries while limiting per-thread memory footprint.
      */
     private static final int MAX_CACHED_ROW = 1024;
 
@@ -231,7 +232,7 @@ public final class FuzzyMatcher {
     /**
      * Best match of the shorter string against any substring or token block of
      * the longer string. Exact containment returns 100. The window scan
-     * allocates nothing; token iteration reuses one {@code Matcher}.
+     * allocates nothing; token iteration creates a Matcher per call (cold path).
      */
     public static int partialRatio(final String s1, final String s2) {
         if (s1 == null || s2 == null) {

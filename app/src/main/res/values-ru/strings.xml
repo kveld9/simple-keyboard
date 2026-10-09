@@ -209,6 +209,10 @@
     <string name="remove_custom_dict_message">Удалить импортированный словарь для %s?</string>
     <string name="remove_custom_dict_confirm">Удалить</string>
     <string name="custom_dict_removed_toast">Словарь для %s удалён</string>
+    <string name="custom_transformer_item_title">%1$s (%2$s) • Нейросетевая модель</string>
+    <string name="custom_transformer_item_summary">Словарь: %1$d токенов · %2$s</string>
+    <string name="import_transformer_success">Нейросетевая модель Transformer для %1$s успешно импортирована (токенов: %2$d)</string>
+    <string name="remove_custom_transformer_message">Удалить импортированную нейросетевую модель Transformer для %s?</string>
 
     <!-- Резервное копирование и восстановление -->
     <string name="settings_screen_backup">Резервное копирование</string>

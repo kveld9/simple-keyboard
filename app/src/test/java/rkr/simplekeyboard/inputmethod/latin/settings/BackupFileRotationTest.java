@@ -85,7 +85,7 @@ public class BackupFileRotationTest {
             names.add("random_file_" + i + ".json");
         }
         names.add("simplekeyboard_backup_20260101_120000.json");
-        assertTrue(BackupHelper.selectBackupsToDelete(names, 0).size() <= 1);
+        assertEquals(1, BackupHelper.selectBackupsToDelete(names, 0).size());
         assertTrue(BackupHelper.selectBackupsToDelete(names, BackupHelper.MAX_AUTO_BACKUPS).isEmpty());
     }
 

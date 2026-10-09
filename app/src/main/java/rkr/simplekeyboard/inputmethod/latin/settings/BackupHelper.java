@@ -631,6 +631,8 @@ public final class BackupHelper {
      * {@code oldestFirst} lists candidate names oldest first. Returns the backup
      * names to delete so at most {@code maxKeep} remain. Non-backup names are
      * ignored and never returned. Never returns null.
+     *
+     * @throws IllegalArgumentException if maxKeep is negative.
      */
     @NonNull
     public static List<String> selectBackupsToDelete(@Nullable final List<String> oldestFirst,

@@ -161,7 +161,9 @@ jobs:
           done
 
           cd "${STAGE}"
-          sha256sum simple-keyboard-*.apk > SHA256SUMS.txt
+          S256=$(sha256sum simple-keyboard-*.apk)
+          printf '%s\n' "${S256}" > SHA256SUMS.txt
+          { echo "# SHA-256"; printf '%s\n' "${S256}"; echo "# SHA-512"; sha512sum simple-keyboard-*.apk; echo "# MD5 (legacy, corruption detection only - not for security verification)"; md5sum simple-keyboard-*.apk; } > "checksums-v${VERSION}.txt"
           cd ..
 
       # Master Workflow: 5. Create Tag & Publish GitHub Release Directly
@@ -186,6 +188,7 @@ jobs:
             | `simple-keyboard-${{ steps.semver.outputs.version }}-x86-release.apk` | 32-bit x86 (Emulators, ~2.9 MB) |
             | `simple-keyboard-${{ steps.semver.outputs.version }}-universal-release.apk` | Universal Production Build (All ABIs) |
             | `SHA256SUMS.txt` | SHA-256 Checksum Verification |
+            | `checksums-v${{ steps.semver.outputs.version }}.txt` | Multi-hash checksums (SHA-256, SHA-512, MD5 legacy only; for sha256sum -c first filter the 64-hex-char lines with grep) |
           files: artifacts/*
           fail_on_unmatched_files: true
           generate_release_notes: false

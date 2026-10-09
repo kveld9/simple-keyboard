@@ -100,7 +100,7 @@ Omitted by design to maintain zero heap allocations and low memory use:
 
 - **Language:** Java 21 & Native C++ (Inference Engine)
 - **Android SDK:** API 37 (Target & Compile), API 23 (Min)
-- **Build System:** Gradle 9.3.1
+- **Build System:** Gradle 9.8.0
 
 ## Downloads
 

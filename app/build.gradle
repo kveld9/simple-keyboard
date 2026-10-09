@@ -70,7 +70,7 @@ android {
         targetSdkVersion 37
         versionCode appVersionCode
         versionName appVersionName
-        resourceConfigurations += ["en", "es"]
+        resourceConfigurations += ["en", "es", "ru"]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
@@ -122,9 +122,24 @@ android {
     buildTypes {
         release {
             minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
+    }
+    packaging {
+        resources {
+            excludes += [
+                "DebugProbesKt.bin",
+                "kotlin-tooling-metadata.json",
+                "META-INF/*.version",
+                "META-INF/androidx/**"
+            ]
+        }
+    }
+    dependenciesInfo {
+        includeInApk false
+        includeInBundle false
     }
     testOptions {
         unitTests.returnDefaultValues = true

@@ -1,0 +1,6 @@
+gradle/wrapper/gradle-wrapper.jar linguist-vendored=true
+metadata/** linguist-documentation=true
+images/** linguist-documentation=true
+icons/** linguist-documentation=true
+*.md linguist-documentation=true
+.github/** linguist-vendored=true

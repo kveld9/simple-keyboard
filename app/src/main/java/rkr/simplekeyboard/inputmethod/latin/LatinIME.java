@@ -205,7 +205,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             case MSG_UPDATE_SUGGESTIONS:
                 final SuggestionsPayload payload = (SuggestionsPayload) msg.obj;
                 if (payload != null && latinIme.mTopBarView != null) {
-                    if (!latinIme.mSettings.getCurrent().mShowSuggestionBar) {
+                    final SettingsValues currentSettings = latinIme.mSettings.getCurrent();
+                    if (currentSettings == null || !currentSettings.mShowSuggestionBar) {
                         break;
                     }
                     if (payload.seq == latinIme.mSuggestionSeq.get()) {
@@ -758,11 +759,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (secondaryView != null && secondaryView.getVisibility() == View.VISIBLE) {
             secondaryView.setVisibility(View.GONE);
             if (mTopBarView != null) {
-                if (mSettings.getCurrent().mShowSuggestionBar) {
+                final SettingsValues currentSettings = mSettings.getCurrent();
+                if (currentSettings != null && currentSettings.mShowSuggestionBar) {
                     mTopBarView.setVisibility(View.VISIBLE);
                     mTopBarView.setMode(TopBarView.MODE_NORMAL);
                 } else {
                     mTopBarView.setVisibility(View.GONE);
+                    mTopBarView.closeToolTray();
+                    if (mTopBarView.isExternalViewActive()) {
+                        mTopBarView.setExternalView(null);
+                    }
                 }
             }
             final View keyboardView = mKeyboardSwitcher.getMainKeyboardView();
